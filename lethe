@@ -37,6 +37,14 @@ DATA_DIR=$(absolute "${XDG_DATA_HOME:-$HOME/.local/share}")/lethe
 CACHE_DIR=$(absolute "${XDG_CACHE_HOME:-$HOME/.cache}")/lethe
 TRASH_DIR=$DATA_DIR/trash
 export CODEX_HOME=$CODEX_DIR
+
+# Physical path of a directory: open-file links in /proc and lsof name the real
+# file, so a home reached through a symlink must be compared by its target.
+physical() {
+    if [[ -d $1 ]]; then (cd -P -- "$1" && pwd -P); else printf '%s' "$1"; fi
+}
+CODEX_REAL=$(physical "$CODEX_DIR")
+CLAUDE_REAL=$(physical "$CLAUDE_DIR")
 printf -v NOW '%(%s)T' -1
 
 # ── Output helpers ───────────────────────────────────────────────────────────
@@ -155,7 +163,7 @@ file_stats() {
 # ── Storage ──────────────────────────────────────────────────────────────────
 
 CODEX_DB="" CODEX_SELECT="" CLAUDE_CACHE="" HAS_EDGES=0 PRELUDE="" REINDEX=1
-declare -A CODEX_COLS=() SIZES=()
+declare -A CODEX_COLS=() SIZES=() MTIMES=() ROLLOUTS=()
 
 codex_sql() {
     sqlite3 -batch -noheader -readonly -cmd '.timeout 5000' -separator "$US" "$CODEX_DB" "$1"
@@ -203,7 +211,7 @@ init_codex() {
     [[ -z ${CODEX_COLS[created_at]+x} ]] || recency+=("created_at")
     source=$(codex_col source "''")
     title="COALESCE(NULLIF($(codex_col name "''"), ''), NULLIF($(codex_col title "''"), ''),
-                    NULLIF($(codex_col preview "''"), ''),
+                    NULLIF($(codex_col preview "''"), ''), NULLIF($(codex_col first_user_message "''"), ''),
                     'subagent ' || NULLIF($(codex_col agent_nickname "''"), ''), '')"
     CODEX_SELECT="
         SELECT 'codex' AS agent, id, archived,
@@ -211,7 +219,8 @@ init_codex() {
                $(codex_col created_at 0) AS created,
                CASE WHEN $source LIKE '{%' THEN 'subagent' WHEN $source = '' THEN 'unknown' ELSE $source END AS mode,
                $(codex_col model_provider "''") AS provider,
-               ($title = '' AND $source NOT LIKE '{%') AS empty,
+               ($title = '' AND $source NOT LIKE '{%' AND COALESCE($(codex_col has_user_event 0), 0) = 0
+                AND COALESCE($(codex_col tokens_used 0), 0) = 0) AS empty,
                $(codex_col cwd "''") AS cwd,
                $title AS title,
                rollout_path AS path,
@@ -236,7 +245,7 @@ claude_mode() {
 
 # Print an INSERT statement with the metadata of one Claude transcript.
 claude_extract() {
-    local path=$1 mtime=$2 fsize=$3 id cwd="" entry="" created="" title prompt model size kb value
+    local path=$1 mtime=$2 fsize=$3 id cwd="" entry="" created="" title prompt model size kb value substantive
     id=${path##*/}
     id=${id%.jsonl}
     [[ $id =~ ^$UUID_RE$ ]] || return 0
@@ -256,6 +265,19 @@ claude_extract() {
               | .message.content
               | if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end
               | select(length > 0 and (startswith("<") | not))) // empty' 2>/dev/null) || true
+    # Empty: no reply from Claude and no user content (images count), only
+    # commands and injected context.
+    substantive=$({ grep -E '"type":"(user|assistant)"' -- "$path" || true; } | jq -rRn '
+        any(inputs | fromjson? | select(.isMeta != true and .isSidechain != true);
+            if .type == "assistant" then
+                (.message.model // "") != "<synthetic>" and ((.message.content // []) | length > 0)
+            else
+                .message.content
+                | if type == "string" then length > 0 and (startswith("<") | not)
+                  else any(.[]?; .type == "image"
+                                 or (.type == "text" and (.text | length > 0 and (startswith("<") | not))))
+                  end
+            end)' 2>/dev/null) || true
     model=$({ grep -o '"model":"claude[^"]*"' -- "$path" || true; } | tail -n 1) || true
     model=${model#'"model":"'}
     model=${model%'"'}
@@ -272,7 +294,7 @@ claude_extract() {
         "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" \
         "$([[ -n $created ]] && printf "CAST(strftime('%%s', '%s') AS INTEGER)" "${created//\'/}" || echo "$mtime")" \
         "${cwd//\'/\'\'}" "${title//\'/\'\'}" "$(claude_mode "$entry")" "${model//\'/\'\'}" \
-        "$([[ -z $prompt ]] && echo 1 || echo 0)"
+        "$([[ $substantive == true ]] && echo 0 || echo 1)"
 }
 
 # Bring the cache up to date: only new or modified transcripts are parsed.
@@ -280,7 +302,8 @@ init_claude() {
     [[ -d $CLAUDE_DIR/projects ]] || return 0
     need jq
     mkdir -p "$CACHE_DIR"
-    CLAUDE_CACHE=$CACHE_DIR/claude-v1.sqlite
+    CLAUDE_CACHE=$CACHE_DIR/claude-v2.sqlite
+    rm -f -- "$CACHE_DIR/claude-v1.sqlite"
     # The picker preview only reads the index that the list has just refreshed.
     [[ $REINDEX == 1 || ! -f $CLAUDE_CACHE ]] || return 0
     sqlite3 -cmd '.timeout 5000' "$CLAUDE_CACHE" "CREATE TABLE IF NOT EXISTS claude (
@@ -350,7 +373,8 @@ init() {
     PRELUDE+="PRAGMA query_only = 1;"
 }
 
-# Codex transcript sizes, gathered in one pass instead of one stat per session.
+# Codex transcript sizes and dates, gathered in one pass instead of one stat
+# per session; ROLLOUTS finds a transcript by session id wherever it is.
 load_sizes() {
     local dir mtime size path
     [[ -n $CODEX_DB ]] || return 0
@@ -358,6 +382,8 @@ load_sizes() {
         [[ -d $dir ]] || continue
         while IFS=$'\t' read -r mtime size path; do
             SIZES[$path]=$size
+            MTIMES[$path]=${mtime%.*}
+            [[ ! $path =~ ($UUID_RE)\.jsonl$ ]] || ROLLOUTS[${BASH_REMATCH[1]}]=$path
         done < <(file_stats "$dir" -type f -name 'rollout-*.jsonl')
     done
 }
@@ -365,6 +391,7 @@ load_sizes() {
 # ── Running sessions ─────────────────────────────────────────────────────────
 
 declare -A OPEN=()
+OPEN_WARNING="" # set when running agents could not be fully inspected
 
 # Is PID alive, and (Linux) still the process that started at START?
 pid_alive() {
@@ -379,8 +406,8 @@ pid_alive() {
 
 mark_open_path() {
     local path=$1 rest
-    if [[ $path == "$CLAUDE_DIR"/projects/* ]]; then
-        rest=${path#"$CLAUDE_DIR"/projects/*/}
+    if [[ $path == "$CLAUDE_REAL"/projects/* ]]; then
+        rest=${path#"$CLAUDE_REAL"/projects/*/}
         rest=${rest%%/*}
         rest=${rest%.jsonl}
         [[ ! $rest =~ ^$UUID_RE$ ]] || OPEN[$rest]=1
@@ -394,9 +421,17 @@ mark_open_path() {
 # are inspected; "full" inspects every process and is used before any change.
 detect_open() {
     OPEN=()
-    local target pid sid start fds=() name
+    OPEN_WARNING=""
+    local target pid sid start fds=() name blind=()
     # Transcripts held open by a process (Codex keeps its rollout file open).
     if [[ -d /proc/self/fd ]]; then
+        # An agent process of ours whose open files cannot be listed (hidepid,
+        # sandbox) could hold a session we would not see.
+        while IFS= read -r name; do
+            name=${name%/comm}
+            [[ ! -O $name || -r $name/fd ]] || blind+=("${name#/proc/}")
+        done < <(grep -s -l -E '^(codex|claude)' /proc/[0-9]*/comm || true)
+        ((${#blind[@]} == 0)) || OPEN_WARNING="cannot list the open files of agent process(es) ${blind[*]}"
         if [[ ${1:-} == full ]]; then
             fds=(/proc/[0-9]*/fd)
         else
@@ -408,13 +443,15 @@ detect_open() {
             while IFS= read -r target; do
                 mark_open_path "$target"
             done < <(find "${fds[@]}" -maxdepth 1 -type l \
-                \( -lname "$CODEX_DIR/*rollout-*.jsonl" -o -lname "$CLAUDE_DIR/projects/*" \) \
+                \( -lname "$CODEX_REAL/*rollout-*.jsonl" -o -lname "$CLAUDE_REAL/projects/*" \) \
                 -printf '%l\n' 2>/dev/null || true)
         fi
     elif command -v lsof >/dev/null 2>&1; then
         while IFS= read -r target; do
             mark_open_path "${target#n}"
         done < <(lsof -n -w -Fn 2>/dev/null | grep -E '^n.*\.jsonl$' || true)
+    else
+        OPEN_WARNING="neither /proc nor lsof is available to see which sessions are open"
     fi
     # Claude Code registers each running session in sessions/<pid>.json, and
     # each background job in jobs/<id>/state.json.
@@ -640,19 +677,31 @@ messages() {
               }
             | select(.text != "")'
     else
-        { grep -F '"type":"message"' -- "$2" 2>/dev/null || true; } | jq -cR '
-            fromjson?
-            | select(.type == "response_item" and .payload.type == "message"
-                     and (.payload.role == "user" or .payload.role == "assistant"))
-            | {
-                role: .payload.role,
-                text: ([.payload.content[]?
-                        | select(.type == "input_text" or .type == "output_text")
-                        | .text // empty
-                        | select((startswith("<") or startswith("# AGENTS.md instructions")) | not)]
-                       | join("\n"))
-              }
-            | select(.text != "")'
+        # Messages are response items, or voice transcript segments. Transcripts
+        # with neither fall back to the user/agent message events.
+        { grep -E '"type":"(message|transcript_segment|user_message|agent_message)"' -- "$2" 2>/dev/null ||
+            true; } | jq -cRn '
+            def clean: select((startswith("<") or startswith("# AGENTS.md instructions")) | not);
+            [inputs | fromjson? | select(type == "object" and (.payload | type) == "object")] as $all
+            | [$all[]
+               | if .type == "response_item" and .payload.type == "message"
+                    and (.payload.role == "user" or .payload.role == "assistant") then
+                     {role: .payload.role,
+                      text: ([.payload.content[]? | select(.type == "input_text" or .type == "output_text")
+                              | .text // empty | clean] | join("\n"))}
+                 elif .type == "realtime_item" and .payload.type == "transcript_segment"
+                    and (.payload.role == "user" or .payload.role == "assistant") then
+                     {role: .payload.role, text: (.payload.text // "")}
+                 else empty end
+               | select(.text != "")] as $primary
+            | if ($primary | length) > 0 then $primary[]
+              else $all[]
+                   | select(.type == "event_msg"
+                            and (.payload.type == "user_message" or .payload.type == "agent_message"))
+                   | {role: (if .payload.type == "user_message" then "user" else "assistant" end),
+                      text: (.payload.message // "" | tostring | clean)}
+                   | select(.text != "")
+              end'
     fi
 }
 
@@ -671,6 +720,16 @@ fetch_rows() {
     where=$(build_where)
     load_sizes
     while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size; do
+        if [[ $agent == codex ]]; then
+            [[ $path == /* ]] || path=$CODEX_DIR/$path
+            # The index can lag behind: a moved transcript is still this session's,
+            # and a file written after the index counts as activity.
+            [[ -n ${SIZES[$path]+x} || -z ${ROLLOUTS[$id]+x} ]] || path=${ROLLOUTS[$id]}
+            if ((${MTIMES[$path]:-0} > recency)); then
+                recency=${MTIMES[$path]}
+                printf -v date '%(%Y-%m-%d %H:%M)T' "$recency"
+            fi
+        fi
         if [[ -n $size ]]; then
             :
         elif [[ -n ${SIZES[$path]+x} ]]; then
@@ -937,6 +996,7 @@ cmd_show() {
 
     local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status
     IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size _ < <(session_info "$id")
+    path=$(codex_path "$agent" "$id" "$path")
     if [[ -n ${OPEN[$id]+x} ]]; then
         status="${C_MAGENTA}open in a running agent"
     elif ((archived)); then
@@ -1002,23 +1062,66 @@ render_conversation() {
     printf '%s\n' "${conversation:-${C_DIM}(no messages)${C_RESET}}"
 }
 
-cmd_resume() {
+# cmd_export ID — the conversation as Markdown, on stdout.
+cmd_export() {
     parse_args "ids" "$@"
-    ((${#F_IDS[@]} == 1)) || usage_error "resume takes exactly one session id"
+    ((${#F_IDS[@]} == 1)) || usage_error "export takes exactly one session id"
+    need jq
     prepare
-    local id=${F_IDS[0]} agent cwd
-    IFS=$US read -r agent _ _ _ cwd _ < <(session_info "$id")
+    local id=${F_IDS[0]} agent mode cwd title created recency path model name
+    IFS=$US read -r agent _ mode _ cwd title created recency path model _ < <(session_info "$id")
+    path=$(codex_path "$agent" "$id" "$path")
+    [[ -f $path ]] || die "the transcript of $id is missing: $path"
+    if [[ $agent == claude ]]; then name="Claude"; else name="Codex"; fi
+    printf '# %s\n\n' "${title:-Untitled session}"
+    printf -- '- Agent: %s (%s%s)\n- Project: `%s`\n- Session: `%s`\n- %s → %s\n\n' \
+        "$name" "$mode" "${model:+, $model}" "$cwd" "$id" "$created" "$recency"
+    messages "$agent" "$path" | jq -r --arg name "$name" \
+        '"---\n\n## " + (if .role == "user" then "You" else $name end) + "\n\n" + .text + "\n"'
+}
+
+# codex_path AGENT ID PATH — PATH, or where a Codex transcript is now if the
+# index still points to its old place (relative paths are under CODEX_HOME).
+codex_path() {
+    local path=$3
+    if [[ $1 == codex ]]; then
+        [[ $path == /* ]] || path=$CODEX_DIR/$path
+        if [[ ! -f $path ]]; then
+            load_sizes
+            path=${ROLLOUTS[$2]:-$path}
+        fi
+    fi
+    printf '%s' "$path"
+}
+
+# cmd_resume [--fork] ID — reopen a session, or a copy of it with --fork, in
+# its agent and directory.
+cmd_resume() {
+    local fork=0 verb=resume
+    if [[ ${1:-} == --fork ]]; then
+        fork=1 verb=fork
+        shift
+    fi
+    parse_args "ids" "$@"
+    ((${#F_IDS[@]} == 1)) || usage_error "$verb takes exactly one session id"
+    prepare
+    local id=${F_IDS[0]} agent mode cwd
+    IFS=$US read -r agent _ mode _ cwd _ < <(session_info "$id")
+    [[ $mode != subagent ]] || die "$id is a subagent session; resume the session that started it"
+    # Two agents writing the same transcript would interleave it.
+    ((fork)) || [[ -z ${OPEN[$id]+x} ]] ||
+        die "$id is already open in a running agent; switch to it, or use '$PROG fork $id' for a copy"
     if [[ -d $cwd ]]; then
         cd -- "$cwd"
     else
-        printf '%s: %s no longer exists, resuming from %s\n' "$PROG" "$cwd" "$PWD" >&2
+        printf '%s: %s no longer exists, starting from %s\n' "$PROG" "$cwd" "$PWD" >&2
     fi
     if [[ $agent == claude ]]; then
         need claude
-        exec claude --resume "$id"
+        if ((fork)); then exec claude --resume "$id" --fork-session; else exec claude --resume "$id"; fi
     else
         need codex
-        exec codex resume "$id"
+        exec codex "$verb" "$id"
     fi
 }
 
@@ -1043,9 +1146,11 @@ claude_items() {
     done
 }
 
-# Move a Claude Code session to the trash, with a manifest to restore it.
+# Move a Claude Code session to the trash, with a manifest to restore it. The
+# transcript moves last and a failure puts back what was moved, so a session
+# is either fully in the trash or untouched.
 claude_trash() {
-    local id=$1 path=$2 entry item dest items=()
+    local id=$1 path=$2 entry item dest items=() moved=() i
     mapfile -t items < <(claude_items "$id" "$path")
     entry=$(mktemp -d "$TRASH_DIR/claude-$id.XXXXXX" 2>/dev/null) || {
         mkdir -p "$TRASH_DIR" && entry=$(mktemp -d "$TRASH_DIR/claude-$id.XXXXXX")
@@ -1054,11 +1159,22 @@ claude_trash() {
                               'last_activity', recency, 'trashed_at', $NOW)
              FROM sessions WHERE id = '$id';" |
         jq --arg root "$CLAUDE_DIR" '. + {root: $root, items: $ARGS.positional}' --args "${items[@]}" \
-            >"$entry/manifest.json"
-    for item in "${items[@]}"; do
+            >"$entry/manifest.json" && [[ -s $entry/manifest.json ]] || {
+        rm -rf -- "$entry"
+        printf 'could not write the trash manifest\n' >&2
+        return 1
+    }
+    for ((i = ${#items[@]} - 1; i >= 0; i--)); do
+        item=${items[i]}
         dest=$entry/files/${item#"$CLAUDE_DIR"/}
-        mkdir -p -- "${dest%/*}"
-        mv -- "$item" "$dest"
+        if ! { mkdir -p -- "${dest%/*}" && mv -- "$item" "$dest"; }; then
+            for item in "${moved[@]}"; do
+                mv -- "$entry/files/${item#"$CLAUDE_DIR"/}" "$item"
+            done
+            rm -rf -- "$entry"
+            return 1
+        fi
+        moved+=("$item")
     done
 }
 
@@ -1087,8 +1203,12 @@ trash_find() {
 trash_restore() {
     local entry=$1 root item dest
     root=$(jq -r .root "$entry/manifest.json")
+    [[ $root == /* && $root != */../* && $root != */.. ]] || die "invalid trash manifest: $entry"
     while IFS= read -r item; do
-        [[ ! -e $item ]] || die "cannot restore: $item already exists"
+        # Only paths inside the Claude Code directory the session came from.
+        [[ $item == "$root"/* && $item != */../* && $item != */.. ]] ||
+            die "invalid trash manifest: $item is outside $root"
+        [[ ! -e $item && ! -L $item ]] || die "cannot restore: $item already exists"
     done < <(jq -r '.items[]' "$entry/manifest.json")
     while IFS= read -r item; do
         dest=$entry/files/${item#"$root"/}
@@ -1171,7 +1291,17 @@ cmd_trash() {
 
 # ── Actions ──────────────────────────────────────────────────────────────────
 
-declare -A PLAN_OP=() PLAN_DEPTH=() PLAN_ROOT=() PLAN_SIZE=() PLAN_PATH=() PLAN_AGENT=() SKIP=()
+declare -A PLAN_OP=() PLAN_DEPTH=() PLAN_ROOT=() PLAN_SIZE=() PLAN_PATH=() PLAN_AGENT=() PLAN_STAMP=() SKIP=()
+
+# session_stamp AGENT PATH — "newest-mtime total-size" of a session's files (for
+# Claude Code, the transcript and its directory of subagents and tool results).
+session_stamp() {
+    local paths=("$2")
+    [[ $1 != claude || ! -d ${2%.jsonl} ]] || paths+=("${2%.jsonl}")
+    { file_stats "${paths[@]}" -type f || true; } | awk -F '\t' '
+        { size += $2; if ($1 + 0 > newest) newest = $1 + 0 }
+        END { printf "%d %d", newest, size }'
+}
 
 # plan_codex OP CONDITION IDS... — schedule OP for Codex IDS and, through spawn
 # edges, for the subagent sessions they started (children are processed first).
@@ -1293,6 +1423,10 @@ run_action() {
     fi
 
     detect_open full
+    if [[ -n $OPEN_WARNING ]]; then
+        printf '%s: %s; nothing changed, as an open session could be missed.\n' "$PROG" "$OPEN_WARNING" >&2
+        return 1
+    fi
 
     # Protection: open or recent sessions, children of open sessions, and the
     # whole subagent tree of any protected session.
@@ -1305,6 +1439,7 @@ run_action() {
         PLAN_AGENT[$id]=$agent
         PLAN_PATH[$id]=$path
         PLAN_SIZE[$id]=$((size < 0 ? 0 : size))
+        PLAN_STAMP[$id]=$(session_stamp "$agent" "$path")
     done < <(fetch_rows)
     local open_ids=()
     for id in "${!OPEN[@]}"; do open_ids+=("$id"); done
@@ -1378,17 +1513,31 @@ run_action() {
 
     # Execute, deepest subagents first. Running agents are checked again right
     # before acting, in case a session was opened during the confirmation.
-    local total i=0 failed=0 freed=0 out run_cmd
+    local total i=0 failed=0 freed=0 out run_cmd checked skipped_now=0 stamp
     declare -A done_count=()
     detect_open full
+    checked=$SECONDS
     mapfile -t order < <(for id in "${!PLAN_OP[@]}"; do printf '%s\t%s\n' "${PLAN_DEPTH[$id]}" "$id"; done |
         sort -t $'\t' -k1,1nr -k2,2 | cut -f 2)
     total=${#order[@]}
     for id in "${order[@]}"; do
         i=$((i + 1))
         op=${PLAN_OP[$id]}
-        if [[ -n ${OPEN[$id]+x} ]]; then
+        # Checked again right before each change: opened, written to or moved
+        # since the plan was shown means the session is left alone.
+        if ((SECONDS - checked >= 5)); then
+            detect_open full
+            checked=$SECONDS
+        fi
+        if [[ -n ${OPEN[$id]+x} || -n $OPEN_WARNING ]]; then
             printf '%s◉ %s was opened meanwhile, skipped%s\n' "$C_MAGENTA" "$id" "$C_RESET" >&2
+            skipped_now=$((skipped_now + 1))
+            continue
+        fi
+        stamp=$(session_stamp "${PLAN_AGENT[$id]}" "${PLAN_PATH[$id]}")
+        if [[ $stamp != "${PLAN_STAMP[$id]}" ]] && ! op_done "$op" "$id" "$(session_state "$id")"; then
+            printf '%s◔ %s changed since the plan was shown, skipped%s\n' "$C_CYAN" "$id" "$C_RESET" >&2
+            skipped_now=$((skipped_now + 1))
             continue
         fi
         if ! op_done "$op" "$id" "$(session_state "$id")"; then
@@ -1428,6 +1577,8 @@ run_action() {
     [[ -z ${done_count[archive]+x} ]] || summary+=("archived ${done_count[archive]}")
     [[ -z ${done_count[unarchive]+x} ]] || summary+=("unarchived ${done_count[unarchive]}")
     ((${#summary[@]} == 0)) || printf '%s✓ %s%s\n' "$C_GREEN" "$(join_by ', ' "${summary[@]}")" "$C_RESET"
+    ((skipped_now == 0)) || printf '%s%d session(s) left alone because they changed after the plan was shown.%s\n' \
+        "$C_DIM" "$skipped_now" "$C_RESET"
     if ((failed)); then
         printf '%s✗ %d operation(s) failed%s\n' "$C_RED" "$failed" "$C_RESET" >&2
         return 1
@@ -1504,6 +1655,8 @@ cmd_pick() {
         --bind="ctrl-d:execute($me __action delete {+1})+deselect-all+reload($me __rows)" \
         --bind="ctrl-x:execute($me __action toggle {+1})+deselect-all+reload($me __rows)" \
         --bind="ctrl-r:execute($me __resume {1})+reload($me __rows)" \
+        --bind="ctrl-k:execute($me __resume {1} fork)+reload($me __rows)" \
+        --bind="ctrl-e:execute($me __export {1})" \
         --bind="ctrl-t:execute-silent($me __state agent)$refresh" \
         --bind="ctrl-s:execute-silent($me __state status)$refresh" \
         --bind="ctrl-f:execute-silent($me __state filter)$refresh" \
@@ -1656,9 +1809,10 @@ internal_state() {
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
                     "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit")
             else
-                keys=("Tab:mark Ctrl-A:all Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume"
-                    "Enter:read Ctrl-T:agent Ctrl-S:status Ctrl-F:filter Ctrl-W:project"
-                    "Ctrl-G:find_text Ctrl-O:sort Ctrl-P:preview Ctrl-B:stats Esc:quit")
+                keys=("Tab:mark Ctrl-A:all Ctrl-D:delete Ctrl-X:archive Enter:read"
+                    "Ctrl-R:resume Ctrl-K:fork Ctrl-E:export Ctrl-B:stats"
+                    "Ctrl-T:agent Ctrl-S:status Ctrl-F:filter Ctrl-W:project"
+                    "Ctrl-G:find_text Ctrl-O:sort Ctrl-P:preview Esc:quit")
             fi
             for line in "${keys[@]}"; do
                 out=()
@@ -1674,9 +1828,10 @@ internal_state() {
                 printf '%s\n' "Tab mark · Ctrl-A all · Ctrl-R restore · Ctrl-D delete forever · Enter read" \
                     "Ctrl-F leave the trash · Ctrl-P preview · Esc quit"
             else
-                printf '%s\n' "Tab mark · Ctrl-A all · Ctrl-D delete · Ctrl-X archive · Ctrl-R resume · Enter read" \
-                    "Ctrl-T agent · Ctrl-S status · Ctrl-F filter · Ctrl-W project · Ctrl-G find text" \
-                    "Ctrl-O sort · Ctrl-P preview · Ctrl-B stats · Esc quit"
+                printf '%s\n' "Tab mark · Ctrl-A all · Ctrl-D delete · Ctrl-X archive · Enter read" \
+                    "Ctrl-R resume · Ctrl-K fork · Ctrl-E export · Ctrl-B stats" \
+                    "Ctrl-T agent · Ctrl-S status · Ctrl-F filter · Ctrl-W project" \
+                    "Ctrl-G find text · Ctrl-O sort · Ctrl-P preview · Esc quit"
             fi
             ;;
     esac
@@ -1737,6 +1892,14 @@ trash_action() {
 }
 
 internal_resume() {
+    if [[ ${2:-} == fork ]]; then
+        [[ $1 != trash:* ]] || return 0
+        "$SELF" fork "$1" || {
+            printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
+            read -r </dev/tty || true
+        }
+        return 0
+    fi
     if [[ $1 == trash:* ]]; then
         printf '\e[H\e[2J'
         trash_action restore "$1"
@@ -1748,6 +1911,23 @@ internal_resume() {
         printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
         read -r </dev/tty || true
     }
+}
+
+# Save a conversation as Markdown in the directory the picker was started from.
+internal_export() {
+    local file="lethe-${1:0:8}.md"
+    printf '\e[H\e[2J'
+    if [[ $1 == trash:* ]]; then
+        printf 'Restore the session first (Ctrl-R) to export it.\n'
+    elif [[ -e $file ]]; then
+        printf '%s already exists; nothing written.\n' "$PWD/$file"
+    elif "$SELF" export "$1" >"$file"; then
+        printf '%s✓ saved %s%s\n' "$C_GREEN" "$PWD/$file" "$C_RESET"
+    else
+        rm -f -- "$file"
+    fi
+    printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
+    read -r </dev/tty || true
 }
 
 internal_page() {
@@ -1785,7 +1965,7 @@ cmd_completion() {
     cat <<'EOF'
 _lethe() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]} cmd=${COMP_WORDS[1]}
-    local commands="pick list stats show resume delete archive unarchive trash completion help"
+    local commands="pick list stats show resume fork export delete archive unarchive trash completion help"
     local filters="--claude --codex --agent --active --archived --older-than --newer-than --dir --mode
                    --provider --grep --empty --missing --orphans --keep --sort"
     case $prev in
@@ -1805,7 +1985,7 @@ _lethe() {
         COMPREPLY=($(compgen -W "$filters --dry-run --yes --force --all --json --ids" -- "$cur"))
     elif [[ -n $cur ]]; then
         case $cmd in
-            show | resume | delete | archive | unarchive)
+            show | resume | fork | export | delete | archive | unarchive)
                 COMPREPLY=($(compgen -W "$(lethe list --ids 2>/dev/null)" -- "$cur")) ;;
         esac
     fi
@@ -1826,6 +2006,8 @@ Usage:
   $PROG stats  [FILTERS]                 disk usage and cleanup hints
   $PROG show   ID                        print a conversation
   $PROG resume ID                        reopen a session in its agent and directory
+  $PROG fork   ID                        open a copy of a session, leaving the original as is
+  $PROG export ID                        the conversation as Markdown, on stdout
   $PROG delete    (FILTERS | ID...) [-n] [-y] [--force]
   $PROG archive   (FILTERS | ID...) [-n] [-y]      Codex only
   $PROG unarchive (FILTERS | ID...) [-n] [-y]      Codex only
@@ -1841,7 +2023,7 @@ Filters (combined with AND):
   --mode MODE             cli, exec, vscode, subagent, ...
   --provider NAME         model provider (anthropic, openai, ...)
   --grep TEXT             conversation contains TEXT (case-insensitive)
-  --empty                 sessions without any message
+  --empty                 sessions without any message (nor any reply)
   --missing               Codex index entries whose transcript file is gone
   --orphans               sessions whose project directory no longer exists
   --keep N                spare the N most recent sessions of each project
@@ -1859,12 +2041,15 @@ Options:
 Safety:
   Sessions open in a running Claude Code or Codex (◉) are never modified, nor
   are sessions active in the last 10 minutes (◔) unless --force is given.
+  Each session is checked again right before it is changed, and left alone
+  if it was opened or written to since the plan was shown.
   Claude Code sessions are moved to a trash ($TRASH_DIR) and can be
   restored. Codex sessions are deleted with \`codex delete\`, which is permanent;
   archiving them is the reversible alternative.
 
 Picker keys:
-  Tab mark  Ctrl-A mark all  Ctrl-D delete  Ctrl-X archive/unarchive  Ctrl-R resume  Enter read
+  Tab mark  Ctrl-A mark all  Ctrl-D delete  Ctrl-X archive/unarchive  Enter read
+  Ctrl-R resume  Ctrl-K fork  Ctrl-E export to ./lethe-ID.md
   Ctrl-T agent  Ctrl-S status  Ctrl-W this project  Ctrl-G find the typed text in conversations
   Ctrl-F filter: empty, orphans, missing, idle 30d+, idle 90d+, trash (Ctrl-R restores there)
   Ctrl-O sort by size  Ctrl-P preview  Ctrl-B stats  Esc quit
@@ -1894,6 +2079,8 @@ main() {
         stats) shift && cmd_stats "$@" ;;
         show) shift && cmd_show "$@" ;;
         resume) shift && cmd_resume "$@" ;;
+        fork) shift && cmd_resume --fork "$@" ;;
+        export) shift && cmd_export "$@" ;;
         trash) shift && cmd_trash "$@" ;;
         completion) shift && cmd_completion "$@" ;;
         delete | rm | archive | unarchive)
@@ -1908,7 +2095,8 @@ main() {
         __preview) REINDEX=0 && internal_preview "$2" ;;
         __stats) REINDEX=0 && internal_stats ;;
         __page) REINDEX=0 && internal_page "$2" ;;
-        __resume) internal_resume "$2" ;;
+        __resume) internal_resume "$2" "${3:-}" ;;
+        __export) REINDEX=0 && setup_colors always && internal_export "$2" ;;
         __action) shift && internal_action "$@" ;;
         *) usage_error "unknown command: $cmd" ;;
     esac

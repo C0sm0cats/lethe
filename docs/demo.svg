@@ -45,7 +45,7 @@
 <text x="198.6" y="138.2" fill="#d7dae0" font-weight="bold" textLength="344.0" lengthAdjust="spacingAndGlyphs">2.0M  Fix the token refresh race in auth</text>
 <rect x="628.6" y="124.0" width="103.2" height="19" fill="#303030"/>
 <text x="628.6" y="138.2" fill="#7f848e" font-weight="bold" textLength="103.2" lengthAdjust="spacingAndGlyphs">~/code/api··</text>
-<text x="740.4" y="138.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ 2026-10-10 06:50 → 2026-10-10 07:20 · 019a0000-5c2e-7d41-9b6a-3f8e21c4d7a0</text>
+<text x="740.4" y="138.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ 2026-10-10 15:53 → 2026-10-10 16:23 · 019a0000-5c2e-7d41-9b6a-3f8e21c4d7a0</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="157.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
@@ -182,36 +182,41 @@
 <text x="740.4" y="499.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="783.4" y="499.2" fill="#d7dae0" textLength="679.4" lengthAdjust="spacingAndGlyphs">it resolves, and `auth.concurrency.test.ts` covers the race. All 214 tests pass</text>
 <text x="1471.4" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="740.4" y="518.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="18.0" y="518.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="783.4" y="518.2" fill="#d7dae0" textLength="8.6" lengthAdjust="spacingAndGlyphs">.</text>
 <text x="1471.4" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="537.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="537.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="556.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="52.4" y="556.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
+<text x="198.6" y="556.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="241.6" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
+<text x="430.8" y="556.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
+<text x="508.2" y="556.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="559.8" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="749.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="575.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="575.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="301.8" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
-<text x="370.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
-<text x="430.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
-<text x="508.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="568.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
+<text x="241.6" y="575.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
+<text x="293.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
+<text x="353.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
+<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
+<text x="482.4" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
 <text x="749.0" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="104.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="155.6" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="215.8" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="276.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="336.2" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
-<text x="405.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="465.2" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="534.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="594.2" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
+<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
+<text x="112.6" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
+<text x="172.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
+<text x="233.0" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
+<text x="301.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
+<text x="362.0" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
+<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
+<text x="491.0" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
 <text x="749.0" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
@@ -220,10 +225,8 @@
 <text x="267.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
 <text x="319.0" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
 <text x="379.2" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="456.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="516.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="577.0" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="611.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="456.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="491.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
 <text x="749.0" y="613.2" fill="#7f848e" textLength="731.0" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f1">
@@ -265,7 +268,7 @@
 <text x="198.6" y="138.2" fill="#d7dae0" font-weight="bold" textLength="344.0" lengthAdjust="spacingAndGlyphs">2.0M  Fix the token refresh race in auth</text>
 <rect x="628.6" y="124.0" width="103.2" height="19" fill="#303030"/>
 <text x="628.6" y="138.2" fill="#7f848e" font-weight="bold" textLength="103.2" lengthAdjust="spacingAndGlyphs">~/code/api··</text>
-<text x="740.4" y="138.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ 2026-10-10 06:50 → 2026-10-10 07:20 · 019a0000-5c2e-7d41-9b6a-3f8e21c4d7a0</text>
+<text x="740.4" y="138.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ 2026-10-10 15:53 → 2026-10-10 16:23 · 019a0000-5c2e-7d41-9b6a-3f8e21c4d7a0</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="157.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
@@ -364,36 +367,41 @@
 <text x="740.4" y="499.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="783.4" y="499.2" fill="#d7dae0" textLength="679.4" lengthAdjust="spacingAndGlyphs">it resolves, and `auth.concurrency.test.ts` covers the race. All 214 tests pass</text>
 <text x="1471.4" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="740.4" y="518.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="18.0" y="518.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="783.4" y="518.2" fill="#d7dae0" textLength="8.6" lengthAdjust="spacingAndGlyphs">.</text>
 <text x="1471.4" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="537.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="537.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="556.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="52.4" y="556.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
+<text x="198.6" y="556.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="241.6" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
+<text x="430.8" y="556.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
+<text x="508.2" y="556.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="559.8" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="749.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="575.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="575.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="301.8" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
-<text x="370.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
-<text x="430.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
-<text x="508.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="568.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
+<text x="241.6" y="575.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
+<text x="293.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
+<text x="353.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
+<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
+<text x="482.4" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
 <text x="749.0" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="104.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="155.6" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="215.8" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="276.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="336.2" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
-<text x="405.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="465.2" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="534.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="594.2" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
+<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
+<text x="112.6" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
+<text x="172.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
+<text x="233.0" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
+<text x="301.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
+<text x="362.0" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
+<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
+<text x="491.0" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
 <text x="749.0" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
@@ -402,10 +410,8 @@
 <text x="267.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
 <text x="319.0" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
 <text x="379.2" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="456.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="516.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="577.0" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="611.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="456.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="491.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
 <text x="749.0" y="613.2" fill="#7f848e" textLength="731.0" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f2">
@@ -450,7 +456,7 @@
 <text x="250.2" y="138.2" fill="#d7dae0" font-weight="bold" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
 <rect x="628.6" y="124.0" width="103.2" height="19" fill="#303030"/>
 <text x="628.6" y="138.2" fill="#7f848e" font-weight="bold" textLength="103.2" lengthAdjust="spacingAndGlyphs">~/code/gam··</text>
-<text x="740.4" y="138.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ 2026-10-04 06:54 → 2026-10-04 07:24 · 019a0005-5c2e-7d41-9b6a-3f8e21c52cf5</text>
+<text x="740.4" y="138.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ 2026-10-04 15:57 → 2026-10-04 16:27 · 019a0005-5c2e-7d41-9b6a-3f8e21c52cf5</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="157.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
@@ -537,35 +543,40 @@
 <text x="18.0" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="740.4" y="499.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="740.4" y="518.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="18.0" y="518.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="1471.4" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="537.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="537.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="556.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="52.4" y="556.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
+<text x="198.6" y="556.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="241.6" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
+<text x="430.8" y="556.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
+<text x="508.2" y="556.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="559.8" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="749.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="575.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="575.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="301.8" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
-<text x="370.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
-<text x="430.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
-<text x="508.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="568.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
+<text x="241.6" y="575.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
+<text x="293.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
+<text x="353.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
+<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
+<text x="482.4" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
 <text x="749.0" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="104.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="155.6" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="215.8" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="276.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="336.2" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
-<text x="405.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="465.2" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="534.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="594.2" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
+<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
+<text x="112.6" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
+<text x="172.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
+<text x="233.0" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
+<text x="301.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
+<text x="362.0" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
+<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
+<text x="491.0" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
 <text x="749.0" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
@@ -574,10 +585,8 @@
 <text x="267.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
 <text x="319.0" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
 <text x="379.2" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="456.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="516.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="577.0" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="611.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="456.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="491.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
 <text x="749.0" y="613.2" fill="#7f848e" textLength="731.0" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f3">
@@ -587,7 +596,7 @@
 <text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="81.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-02 07:24</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-02 16:27</text>
 <text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="387.8" y="81.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="749.0" y="81.2" fill="#7f848e" textLength="292.4" lengthAdjust="spacingAndGlyphs">~/code/old-prototype        vscode</text>
@@ -595,7 +604,7 @@
 <text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
 <text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="119.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-10 07:20</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-10 16:23</text>
 <text x="336.2" y="119.2" fill="#d7dae0" textLength="344.0" lengthAdjust="spacingAndGlyphs">2.0M  Fix the token refresh race in auth</text>
 <text x="749.0" y="119.2" fill="#7f848e" textLength="266.6" lengthAdjust="spacingAndGlyphs">~/code/api-server           cli</text>
 <text x="69.6" y="138.2" fill="#7f848e" textLength="215.0" lengthAdjust="spacingAndGlyphs">↳ open in a running agent</text>
@@ -609,7 +618,7 @@
 <text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="81.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-02 07:24</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-02 16:27</text>
 <text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="387.8" y="81.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="749.0" y="81.2" fill="#7f848e" textLength="292.4" lengthAdjust="spacingAndGlyphs">~/code/old-prototype        vscode</text>
@@ -617,7 +626,7 @@
 <text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
 <text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="119.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-10 07:20</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-10 16:23</text>
 <text x="336.2" y="119.2" fill="#d7dae0" textLength="344.0" lengthAdjust="spacingAndGlyphs">2.0M  Fix the token refresh race in auth</text>
 <text x="749.0" y="119.2" fill="#7f848e" textLength="266.6" lengthAdjust="spacingAndGlyphs">~/code/api-server           cli</text>
 <text x="69.6" y="138.2" fill="#7f848e" textLength="215.0" lengthAdjust="spacingAndGlyphs">↳ open in a running agent</text>
@@ -670,7 +679,7 @@
 <text x="336.2" y="138.2" fill="#d7dae0" font-weight="bold" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <rect x="628.6" y="124.0" width="103.2" height="19" fill="#303030"/>
 <text x="628.6" y="138.2" fill="#7f848e" font-weight="bold" textLength="103.2" lengthAdjust="spacingAndGlyphs">~/code/old··</text>
-<text x="740.4" y="138.2" fill="#7f848e" textLength="464.4" lengthAdjust="spacingAndGlyphs">││ trashed 2026-10-10 07:25 · 11M · Ctrl-R restores it</text>
+<text x="740.4" y="138.2" fill="#7f848e" textLength="464.4" lengthAdjust="spacingAndGlyphs">││ trashed 2026-10-10 16:27 · 11M · Ctrl-R restores it</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="740.4" y="157.2" fill="#7f848e" textLength="739.6" lengthAdjust="spacingAndGlyphs">││ ───────────────────────────────────────────────────────────────────────────────── │</text>

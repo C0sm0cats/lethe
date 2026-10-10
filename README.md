@@ -23,7 +23,7 @@ One Bash file. No runtime, no daemon, no install step.
 ## Features
 
 - **Every session, one list.** Claude Code and Codex side by side, with age, size, project and title, and a live preview of the conversation.
-- **Resume anything.** `Ctrl-R` reopens a session in its agent, in the directory it was started from.
+- **Resume anything.** `Ctrl-R` reopens a session in its agent, in the directory it was started from. `Ctrl-K` forks it into a new session, and `Ctrl-E` exports it as Markdown.
 - **Clean up in seconds.** Mark with `Tab`, delete with `Ctrl-D`. Or `lethe delete --older-than 1m --keep 3`.
 - **Running sessions are untouchable.** Sessions open in a running agent, or active in the last 10 minutes, are detected and skipped. Always, even with `--yes`.
 - **Undo.** Deleted Claude Code sessions go to a trash and can be restored. Codex sessions can be archived instead of deleted.
@@ -48,6 +48,8 @@ lethe                          # the picker
 lethe stats                    # what takes space, with cleanup suggestions
 lethe list --claude --sort size
 lethe resume 01a11ee1          # unique id prefixes work everywhere
+lethe fork 01a11ee1            # a copy to continue in another direction
+lethe export 01a11ee1 > notes.md
 ```
 
 ### Picker keys
@@ -61,6 +63,8 @@ Everything the command line can do, the picker can do too.
 | `Ctrl-D` | delete the marked sessions (or the current one) |
 | `Ctrl-X` | archive / unarchive (Codex) |
 | `Ctrl-R` | resume the session in its agent |
+| `Ctrl-K` | fork: continue in a copy of the session |
+| `Ctrl-E` | export the conversation to `./lethe-ID.md` |
 | `Enter` | read the whole conversation in your pager |
 | `Ctrl-T` | show all agents, Claude Code only, or Codex only |
 | `Ctrl-S` | show all, active or archived sessions |
@@ -120,7 +124,7 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
 | `--provider NAME` | `anthropic`, `openai`, … |
 | `--grep TEXT` | your messages or the agent's replies contain `TEXT` (case-insensitive) |
-| `--empty` | sessions without any message |
+| `--empty` | sessions with no message and no reply (commands only) |
 | `--orphans` | sessions whose project directory no longer exists |
 | `--missing` | Codex index entries whose transcript is gone |
 | `--keep N` | spares the `N` most recent sessions of each project |
@@ -138,10 +142,11 @@ lethe list --json | jq -r '.[] | select(.size > 50000000) | "\(.agent) \(.id) \(
   - it is an unfinished Claude Code background job;
   - it was active in the last 10 minutes.
 
-  Protection is checked when the plan is shown, and again right before each change. `--force` lifts only the 10-minute rule.
+  Protection is checked when the plan is shown, and again right before each change: a session that was opened, written to or moved in the meantime is left alone. `--force` lifts only the 10-minute rule. If a running agent's open files cannot be listed, lethe changes nothing. Homes reached through symlinks (`~/.codex` in a dotfiles repo, say) are resolved.
 - **Subagents.** Deleting a Codex session also deletes the subagent sessions it spawned, children first. A subagent whose parent is running is protected, and so is the whole tree of any protected session. Claude Code subagent transcripts live inside their session and go with it.
 - **Codex** is changed only through its own CLI (`codex delete`, `codex archive`, `codex unarchive`). Every change is checked in its database afterwards.
-- **Claude Code** has no delete command. lethe moves the transcript and everything Claude Code keeps for that session (subagent transcripts, tool results, file history, session environment) to the trash, with a manifest to restore it.
+- **Claude Code** has no delete command. lethe moves the transcript and everything Claude Code keeps for that session (subagent transcripts, tool results, file history, session environment) to the trash, with a manifest to restore it. A session is moved entirely or not at all, and a restore only writes inside the Claude Code directory.
+- **Resume** refuses a session that is already open in a running agent (two agents writing one transcript would interleave it); fork it instead.
 - **Read-only by default.** Listing, searching and previewing never write to the agents' data. The Claude Code index is a cache in `~/.cache/lethe`.
 
 ## Configuration

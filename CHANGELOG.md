@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+Safety:
+- Open sessions are detected when `CODEX_HOME` or `CLAUDE_CONFIG_DIR` goes through a symlink.
+- `--empty` no longer matches sessions started by a slash command that got a reply, image-only
+  sessions, or Codex sessions with a user event or tokens.
+- Each session is checked again right before it is changed, and left alone if it was opened,
+  written to or moved since the plan was shown.
+- Codex activity also counts the transcript's own modification time, when the index lags behind.
+- Nothing is changed when the open files of a running agent cannot be listed.
+- A Codex transcript the index lost track of (moved, relative path) is not reported as missing.
+- Moving a Claude Code session to the trash is all or nothing; restore only writes inside the
+  Claude Code directory.
+- `resume` refuses sessions already open in a running agent, and subagent sessions.
+
+Features:
+- `lethe fork ID` and `Ctrl-K`: continue in a copy of a session.
+- `lethe export ID` and `Ctrl-E`: the conversation as Markdown.
+- Codex transcripts without response items (message events, voice transcripts) can be read and searched.
+- Codex titles fall back to the first user message.
+
 ## 0.1.0 — 2026-10-10
 
 First release.

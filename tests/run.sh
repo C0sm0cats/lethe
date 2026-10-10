@@ -31,6 +31,9 @@ sqlite3 "$DB" "
         cwd TEXT NOT NULL, title TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0,
         preview TEXT NOT NULL DEFAULT '', recency_at INTEGER NOT NULL DEFAULT 0,
         agent_nickname TEXT);
+    ALTER TABLE threads ADD COLUMN has_user_event INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE threads ADD COLUMN tokens_used INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE threads ADD COLUMN first_user_message TEXT NOT NULL DEFAULT '';
     CREATE TABLE thread_spawn_edges (
         parent_thread_id TEXT NOT NULL, child_thread_id TEXT NOT NULL PRIMARY KEY, status TEXT NOT NULL);"
 
@@ -54,8 +57,9 @@ codex_session() {
             [[ -z $text ]] ||
                 printf '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"%s"}]}}\n' "$text"
         } >"$file"
+        set_mtime "$ts" "$file"
     fi
-    sqlite3 "$DB" "INSERT INTO threads VALUES ('$id', '$file', $ts, $ts, '$source', '$provider',
+    sqlite3 "$DB" "INSERT INTO threads (id, rollout_path, created_at, updated_at, source, model_provider, cwd, title, archived, preview, recency_at, agent_nickname) VALUES ('$id', '$file', $ts, $ts, '$source', '$provider',
         '$cwd', '$title', $archived, '$text', $ts, NULL);"
 }
 
@@ -76,6 +80,8 @@ sqlite3 "$DB" "INSERT INTO thread_spawn_edges VALUES ('$A', '$C', 'closed');
 # Padding (not a message) so that --sort size has a known order.
 printf '%05000d\n' 0 >>"$(codex_file "$A" 0)"
 printf '%03000d\n' 0 >>"$(codex_file "$B" 0)"
+set_mtime "$(($(date +%s) - 100 * 86400))" "$(codex_file "$A" 0)"
+set_mtime "$(($(date +%s) - 2 * 86400))" "$(codex_file "$B" 0)"
 
 # Fake codex: applies delete/archive/unarchive to the fixture.
 cat >"$WORK/bin/codex" <<EOF
@@ -87,6 +93,8 @@ path=\$(sqlite3 "$DB" "SELECT rollout_path FROM threads WHERE id = '\$id';")
 [[ -n \$path ]] || { echo "no session \$id" >&2; exit 1; }
 case \$1 in
     delete)
+        # Test hook: write to another transcript while a deletion runs.
+        if [[ -f "$WORK/on-delete" ]]; then echo '{}' >>"\$(cat "$WORK/on-delete")"; rm -f "$WORK/on-delete"; fi
         rm -f -- "\$path"
         sqlite3 "$DB" "DELETE FROM threads WHERE id = '\$id'; DELETE FROM thread_spawn_edges WHERE child_thread_id = '\$id';" ;;
     archive) sqlite3 "$DB" "UPDATE threads SET archived = 1 WHERE id = '\$id';" ;;
@@ -94,6 +102,10 @@ case \$1 in
 esac
 EOF
 chmod +x "$WORK/bin/codex"
+cp "$WORK/bin/codex" "$WORK/codex.fake"
+# Fake claude: records how it was started.
+printf '#!/bin/sh\necho "$*" >>"%s/claude.log"\n' "$WORK" >"$WORK/bin/claude"
+chmod +x "$WORK/bin/claude"
 
 # ── Claude Code fixture ──────────────────────────────────────────────────────
 
@@ -138,6 +150,9 @@ reset_fixture() {
     cp -a "$WORK/codex.pristine" "$CODEX_HOME"
     cp -a "$WORK/claude.pristine" "$CLAUDE_CONFIG_DIR"
     : >"$WORK/codex.log"
+    : >"$WORK/claude.log"
+    rm -f "$WORK/on-delete"
+    cp "$WORK/codex.fake" "$WORK/bin/codex"
 }
 
 # ── Assertions ───────────────────────────────────────────────────────────────
@@ -313,6 +328,80 @@ printf '#!/bin/sh\nexit 0\n' >"$WORK/bin/codex"
 status=0
 "$LETHE" delete -y "$B" >"$WORK/out" 2>&1 || status=$?
 check "a no-op codex is reported as a failure" '((status == 1)) && grep -q "not updated" "$WORK/out"' "$(cat "$WORK/out")"
+
+echo "hardening"
+reset_fixture
+ln -s "$CODEX_HOME" "$WORK/codex-link"
+exec 9<"$(codex_file "$A" 0)" # A is open, as a running Codex holds its rollout
+out=$(CODEX_HOME=$WORK/codex-link "$LETHE" delete -y "$A" 2>&1) || true
+exec 9<&-
+check "open sessions are seen through a symlinked CODEX_HOME" \
+    '[[ $out == *"open in a running agent"* ]] && codex_exists "$A"' "$out"
+
+sqlite3 "$DB" "UPDATE threads SET has_user_event = 1 WHERE id = '$E';"
+expect_ids "a Codex session with a user event is not empty" "$H" --empty
+sqlite3 "$DB" "UPDATE threads SET first_user_message = 'continue the migration' WHERE id = '$E';"
+out=$("$LETHE" list --codex)
+check "Codex titles fall back to the first user message" '[[ $out == *"continue the migration"* ]]' "$out"
+printf '%s\n' \
+    '{"type":"user","cwd":"/w","timestamp":"2026-01-01T10:00:00.000Z","message":{"role":"user","content":"<command-name>/review</command-name>"}}' \
+    '{"type":"assistant","cwd":"/w","timestamp":"2026-01-01T10:00:01.000Z","message":{"model":"claude-test-1","role":"assistant","content":[{"type":"text","text":"Reviewed."}]}}' \
+    >"$CPROJ/$H.jsonl"
+expect_ids "a Claude session started by a command, with a reply, is not empty" "" --empty --claude
+printf '%s\n' '{"type":"user","cwd":"/w","timestamp":"2026-01-01T10:00:00.000Z","message":{"role":"user","content":[{"type":"image","source":{}}]}}' \
+    >"$CPROJ/$H.jsonl"
+expect_ids "an image-only Claude session is not empty" "" --empty --claude
+
+reset_fixture
+moved=$(codex_file "$D" 1)
+sqlite3 "$DB" "UPDATE threads SET rollout_path = '$CODEX_HOME/sessions/gone/rollout-x-$D.jsonl' WHERE id = '$D';"
+expect_ids "a transcript the index lost track of is not missing" "$F" --missing
+check "and it can still be read" '"$LETHE" show "$D" | grep -q "an old idea"'
+sqlite3 "$DB" "UPDATE threads SET rollout_path = '${moved#"$CODEX_HOME"/}' WHERE id = '$D';"
+expect_ids "relative index paths are under CODEX_HOME" "$F" --missing
+printf '%s\n' '{"type":"session_meta","payload":{"id":"x"}}' \
+    '{"type":"event_msg","payload":{"type":"user_message","message":"event only question"}}' \
+    '{"type":"event_msg","payload":{"type":"agent_message","message":"event only answer"}}' >"$moved"
+out=$("$LETHE" show "$D")
+check "Codex transcripts with only message events can be read" \
+    '[[ $out == *"event only question"* && $out == *"event only answer"* ]]' "$out"
+
+reset_fixture
+set_mtime "$(date +%s)" "$(codex_file "$B" 0)"
+out=$("$LETHE" delete -y "$B" 2>&1)
+check "a transcript written after the index counts as recent activity" \
+    '[[ $out == *"active in the last 10 minutes"* ]] && codex_exists "$B"' "$out"
+
+reset_fixture
+codex_file "$B" 0 >"$WORK/on-delete"
+out=$("$LETHE" delete -y "$A" "$B" 2>&1) || true
+check "a session written to after the plan is left alone" \
+    '[[ $out == *"changed since the plan"* ]] && codex_exists "$B" && ! codex_exists "$A"' "$out"
+
+reset_fixture
+chmod a-w "$CLAUDE_CONFIG_DIR/session-env"
+out=$("$LETHE" delete -y "$G" 2>&1) || true
+chmod u+w "$CLAUDE_CONFIG_DIR/session-env"
+check "a failed move to the trash puts everything back" \
+    '[[ -f $CPROJ/$G.jsonl && -d $CPROJ/$G && -d $CLAUDE_CONFIG_DIR/file-history/$G && -z $(ls -A "$TRASH" 2>/dev/null) ]]' "$out"
+"$LETHE" delete -y "$G" >/dev/null 2>&1
+manifest=$(echo "$TRASH"/*/manifest.json)
+jq --arg bad "$WORK/outside.jsonl" '.items[0] = $bad' "$manifest" >"$manifest.new" && mv "$manifest.new" "$manifest"
+expect_status "restore refuses manifest paths outside the Claude directory" 1 trash restore "$G"
+check "and moves nothing" '[[ ! -e $WORK/outside.jsonl && ! -e $CPROJ/$G.jsonl ]]'
+
+reset_fixture
+out=$("$LETHE" resume "$I" 2>&1) || true
+check "resume refuses a session that is already open" '[[ $out == *"already open"* && ! -s $WORK/claude.log ]]' "$out"
+expect_status "resume refuses subagent sessions" 1 resume "$C"
+"$LETHE" fork "$I" >/dev/null 2>&1
+check "fork opens a copy of a Claude session" '[[ $(cat "$WORK/claude.log") == "--resume $I --fork-session" ]]' \
+    "$(cat "$WORK/claude.log")"
+"$LETHE" fork "$A" >/dev/null 2>&1
+check "fork uses codex fork" 'grep -qx "fork $A" "$WORK/codex.log"' "$(cat "$WORK/codex.log")"
+out=$("$LETHE" export "$A")
+check "export writes the conversation as Markdown" \
+    '[[ $out == "# Refactor parser"* && $out == *"## You"* && $out == *"please refactor the Parser"* && $out != *secretword* ]]' "$out"
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

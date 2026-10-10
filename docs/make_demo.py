@@ -96,6 +96,7 @@ def build_demo(root):
             write_padded(path, [{"type": "response_item", "payload": {"type": "message", "role": role, "content": [
                 {"type": "input_text" if role == "user" else "output_text", "text": text}]}}
                 for role, text in conversation], size)
+            os.utime(path, (stamp, stamp))
             source = '{"subagent":{}}' if mode == "subagent" else mode
             db.execute("INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?, 'openai', ?, ?, ?, ?, 'gpt-5.5', ?)",
                        (session_id, path, stamp - 1800, stamp, stamp, source, cwd, title, title, archived,
