@@ -5,7 +5,8 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 LETHE=$ROOT/lethe
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/lethe-test.XXXXXX")
+# Canonical path: macOS has a trailing slash in $TMPDIR and /tmp is a symlink.
+WORK=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/lethe-test.XXXXXX")" && pwd -P)
 trap 'rm -rf -- "$WORK"' EXIT
 
 export CODEX_HOME=$WORK/codex CLAUDE_CONFIG_DIR=$WORK/claude
@@ -291,7 +292,8 @@ check "picker: Ctrl-W keeps the current project" '[[ $(picker_ids) == "$B " ]]' 
 "$LETHE" __state dir "$B"
 "$LETHE" __state grep parser
 check "picker: Ctrl-G searches the conversations" '[[ $(picker_ids) == "$A " ]]' "$(picker_ids)"
-check "picker: an empty open-session list does not break the preview" '"$LETHE" __preview "$A" | grep -q Parser'
+out=$("$LETHE" __preview "$A")
+check "picker: an empty open-session list does not break the preview" '[[ $out == *Parser* ]]' "$out"
 unset LETHE_STATE LETHE_FILTERS
 
 reset_fixture
