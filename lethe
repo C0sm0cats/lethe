@@ -990,8 +990,8 @@ render_conversation() {
         return
     fi
     conversation=$(messages "$agent" "$path" | jq -rs \
-        --arg you "$C_CYAN$C_BOLD● You$C_RESET" \
-        --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE$C_BOLD● Claude" || echo "$C_CODEX$C_BOLD● Codex")$C_RESET" \
+        --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
+        --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
         --arg dim "$C_DIM" --arg reset "$C_RESET" --argjson preview "$preview" '
         def render: (if .role == "user" then $you else $agent end) + "\n"
             + (.text | if $preview == 1 and length > 1200 then .[:1200] + " …" else . end) + "\n";
@@ -1331,7 +1331,7 @@ run_action() {
         format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" 40
         line=$REPLY
         if protected "$id" "$recency"; then
-            skipped+=("  $line" "      $C_DIM↳ $REPLY$C_RESET")
+            skipped+=("  $line" "      ${C_DIM}↳ $REPLY$C_RESET")
             unset 'PLAN_OP[$id]'
             continue
         fi
