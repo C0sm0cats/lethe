@@ -805,23 +805,36 @@ format_row() {
     fi
     if [[ $agent == claude ]]; then agent_color=$C_CLAUDE; else agent_color=$C_CODEX; fi
     human_age age "$recency"
+    # Age shaded by how recent it is: today stands out, old sessions fade.
+    local age_color=$C_DIM
+    if ((NOW - recency < 3600)); then
+        age_color=$C_CYAN$C_BOLD
+    elif ((NOW - recency < 86400)); then
+        age_color=$C_CYAN
+    elif ((NOW - recency < 30 * 86400)); then
+        age_color=""
+    fi
     short_path dir "$cwd"
     [[ -n $title ]] || title="(empty)" title_color=$C_DIM
     if [[ -z $date ]]; then
-        local tag=""
-        [[ $mode == cli || $mode == subagent || $mode == unknown ]] || tag="$mode · "
-        fit title "$tag$title" 42
-        [[ -z $tag ]] || title="$C_DIM$tag$C_RESET$title_color${title:${#tag}}"
-        fit_tail dir "$dir" 22
-        printf -v REPLY '%s %s%-6s%s %s%4s%s  %s%6s%s  %s%s%s  %s%s%s' \
-            "$icon" "$agent_color" "$agent" "$C_RESET" "$C_CYAN" "$age" "$C_RESET" \
-            "$size_color" "$hsize" "$C_RESET" "$title_color" "$title" "$C_RESET" "$C_DIM" "$dir" "$C_RESET"
+        # Picker: the project name stays visible, the title takes what is left.
+        local tag="" project
+        [[ $mode == cli || $mode == subagent || $mode == unknown ]] || tag="$C_DIM$mode · $C_RESET"
+        case $cwd in
+            "") project="-" ;;
+            "$HOME") project="~" ;;
+            *) project=${cwd##*/} ;;
+        esac
+        fit project "$project" 16
+        printf -v REPLY '%s %s%-6s%s %s%4s%s  %s%6s%s  %s%s%s  %s%s%s%s' \
+            "$icon" "$agent_color" "$agent" "$C_RESET" "$age_color" "$age" "$C_RESET" \
+            "$size_color" "$hsize" "$C_RESET" "$C_BLUE" "$project" "$C_RESET" "$tag" "$title_color" "$title" "$C_RESET"
         return
     fi
     fit title "$title" "$title_width"
     fit_tail dir "$dir" 26
     printf -v REPLY '%s %s%-6s%s %s%4s%s  %s%s%s  %s%6s%s  %s%s%s  %s%s  %-8s%s' \
-        "$icon" "$agent_color" "$agent" "$C_RESET" "$C_CYAN" "$age" "$C_RESET" "$C_DIM" "$date" "$C_RESET" \
+        "$icon" "$agent_color" "$agent" "$C_RESET" "$age_color" "$age" "$C_RESET" "$C_DIM" "$date" "$C_RESET" \
         "$size_color" "$hsize" "$C_RESET" "$title_color" "$title" "$C_RESET" "$C_DIM" "$dir" "$mode" "$C_RESET"
 }
 
@@ -1013,7 +1026,7 @@ cmd_show() {
         "$C_RESET" "$status" "$C_RESET" "$C_DIM" "$mode${model:+ · $model}" "$C_RESET"
     printf '%s%s%s%s\n' "$C_BLUE" "$cwd" "$C_RESET" "$C_DIM${size:+ · $size}$( ((${tokens:-0} == 0)) ||
         printf ' · %s tokens' "$tokens")$(subagent_summary "$agent" "$path")$C_RESET"
-    printf '%s%s → %s · %s%s\n' "$C_DIM" "$created" "$recency" "$id" "$C_RESET"
+    printf '%s%s → %s · %s%s\n' "$C_DIM" "$created" "$recency" "$( ((preview)) && echo "${id:0:8}" || echo "$id")" "$C_RESET"
     rule
 
     render_conversation "$agent" "$path" "$preview"
@@ -1049,12 +1062,35 @@ render_conversation() {
         printf '%s(transcript file is missing: %s)%s\n' "$C_RED" "$path" "$C_RESET"
         return
     fi
+    local width=${FZF_PREVIEW_COLUMNS:-0}
+    if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
     conversation=$(messages "$agent" "$path" | jq -rs \
         --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
         --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
-        --arg dim "$C_DIM" --arg reset "$C_RESET" --argjson preview "$preview" '
+        --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
+        --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" '
+        def vlen: gsub("\u001b\\[[0-9;]*m"; "") | length;
+        # Wrap on spaces to the preview width (fzf would cut words in two).
+        def wrap: if $width == 0 or vlen <= $width then . else
+            reduce (split(" ") | .[]) as $word ({lines: [], cur: null};
+                if .cur == null then .cur = $word
+                elif ((.cur + " " + $word) | vlen) <= $width then .cur += " " + $word
+                else .lines += [.cur] | .cur = $word end)
+            | .lines + [.cur] | join("\n") end;
+        # Light Markdown: headings and **bold** in bold, `code` and code blocks in color.
+        def inline: gsub("\\*\\*(?<x>[^*]+)\\*\\*"; $bold + .x + $reset) | gsub("`(?<x>[^`]+)`"; $code + .x + $reset);
+        # Without colors the Markdown stays as written, only wrapped.
+        def styled:
+            reduce split("\n")[] as $line ({out: [], fence: false};
+                if ($line | startswith("```")) then .out += [$dim + $line + $reset] | .fence = (.fence | not)
+                elif .fence then .out += [$code + $line + $reset]
+                elif $reset != "" and ($line | test("^#{1,6} ")) then
+                    .out += [$bold + ($line | sub("^#{1,6} "; "")) + $reset]
+                elif $reset != "" then .out += [$line | inline | wrap]
+                else .out += [$line | wrap] end)
+            | .out | join("\n");
         def render: (if .role == "user" then $you else $agent end) + "\n"
-            + (.text | if $preview == 1 and length > 1200 then .[:1200] + " …" else . end) + "\n";
+            + (.text | if $preview == 1 and length > 1200 then .[:1200] + " …" else . end | styled) + "\n";
         if $preview == 1 and length > 24 then
             (.[:4] | map(render) | join("\n")) + "\n" + $dim + "  … \(length - 20 - 4) more messages …" + $reset
             + "\n\n" + (.[-20:] | map(render) | join("\n"))
@@ -1629,9 +1665,10 @@ cmd_pick() {
         layout=(
             --input-border=rounded --input-label=" lethe " --input-label-pos=2
             --list-border=rounded --list-label-pos=2
-            --preview-window='right,50%,wrap,border-rounded,<56(down,55%,wrap,border-rounded)'
-            --preview-wrap-sign='  ' --ghost='type to filter by title, project, agent or mode'
+            --preview-window='right,45%,wrap,border-rounded,<50(down,55%,wrap,border-rounded)'
+            --preview-wrap-sign='  ' --ghost='type to filter'
             --footer="$("$SELF" __state footer)" --highlight-line --gutter=' '
+            --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
             --color='border:8,label:7,input-label:6:bold,list-label:7,preview-label:7,footer:-1'
             --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,bg+:236,info:8,ghost:8'
             --color='scrollbar:8,separator:8,spinner:6'
@@ -1809,10 +1846,10 @@ internal_state() {
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
                     "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit")
             else
-                keys=("Tab:mark Ctrl-A:all Ctrl-D:delete Ctrl-X:archive Enter:read"
-                    "Ctrl-R:resume Ctrl-K:fork Ctrl-E:export Ctrl-B:stats"
-                    "Ctrl-T:agent Ctrl-S:status Ctrl-F:filter Ctrl-W:project"
-                    "Ctrl-G:find_text Ctrl-O:sort Ctrl-P:preview Esc:quit")
+                keys=("Tab:mark Ctrl-A:all Enter:read Ctrl-P:preview Esc:quit"
+                    "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork"
+                    "Ctrl-E:export Ctrl-B:stats Ctrl-T:agent Ctrl-S:status"
+                    "Ctrl-F:filter Ctrl-W:project Ctrl-G:find Ctrl-O:sort")
             fi
             for line in "${keys[@]}"; do
                 out=()

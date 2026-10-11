@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Picker rows show the project name before the title, so it stays visible on narrow terminals.
+- Ages are shaded by how recent they are; the match counter drops fzf's tracking marker.
+- The preview wraps on words and renders light Markdown (headings, bold, inline code, code blocks).
+- Narrower preview (45%), footer keys that fit the list, shorter preview header.
+
 ## 0.2.0 — 2026-10-10
 
 Safety:

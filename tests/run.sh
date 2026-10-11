@@ -391,6 +391,13 @@ expect_status "restore refuses manifest paths outside the Claude directory" 1 tr
 check "and moves nothing" '[[ ! -e $WORK/outside.jsonl && ! -e $CPROJ/$G.jsonl ]]'
 
 reset_fixture
+printf '%s\n' '{"type":"assistant","cwd":"/w","timestamp":"2026-01-01T10:00:01.000Z","message":{"model":"claude-test-1","role":"assistant","content":[{"type":"text","text":"**Done** with `make test`, and here is a fairly long sentence that has to wrap on word boundaries."}]}}' \
+    >>"$CPROJ/$G.jsonl"
+out=$(NO_COLOR="" FZF_PREVIEW_COLUMNS=30 "$LETHE" __preview "$G" | perl -pe 's/\e\[[0-9;]*m//g')
+check "the preview wraps on words and renders light Markdown" \
+    '[[ $out == *"Done with make test"* && $out != *"**"* ]] && ! awk "length > 30 { exit 1 }" <<<"$out"' "$out"
+
+reset_fixture
 out=$("$LETHE" resume "$I" 2>&1) || true
 check "resume refuses a session that is already open" '[[ $out == *"already open"* && ! -s $WORK/claude.log ]]' "$out"
 expect_status "resume refuses subagent sessions" 1 resume "$C"
