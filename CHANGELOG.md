@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 — 2026-10-11
 
 - Alt-B is visible: the prompt shows `⑂ all branches`, and a long preview keeps every abandoned
   message (with the one before it) instead of hiding them in "… more messages …".
