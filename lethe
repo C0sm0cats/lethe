@@ -1199,9 +1199,18 @@ render_conversation() {
             else
                 (if .role == "user" then $you else $agent end) + "\n" + (.text | cut | styled) + "\n"
             end;
+        # Long previews keep the start and the end, and every abandoned message
+        # with the one before it, so that Alt-B always shows something.
         if $preview == 1 and length > 24 then
-            (.[:4] | map(render) | join("\n")) + "\n" + $dim + "  … \(length - 20 - 4) more messages …" + $reset
-            + "\n\n" + (.[-20:] | map(render) | join("\n"))
+            . as $all
+            | [range(0; length) | select(. < 4 or . >= ($all | length) - 20
+                                         or $all[.].abandoned or ($all[. + 1].abandoned // false))] as $keep
+            | reduce range(0; $keep | length) as $k ([];
+                . + (if $k > 0 and $keep[$k] > $keep[$k - 1] + 1
+                     then [$dim + "  … \($keep[$k] - $keep[$k - 1] - 1) more messages …" + $reset + "\n"]
+                     else [] end)
+                  + [$all[$keep[$k]] | render])
+            | join("\n")
         else map(render) | join("\n") end')
     printf '%s\n' "${conversation:-${C_DIM}(no messages)${C_RESET}}"
 }
@@ -1813,7 +1822,7 @@ cmd_pick() {
         --bind="ctrl-w:execute-silent($me __state dir {1})$refresh" \
         --bind="ctrl-g:execute-silent($me __state grep {q})+clear-query$refresh" \
         --bind="ctrl-o:execute-silent($me __state sort)+reload($me __rows)" \
-        --bind="alt-b:execute-silent($me __state branches)+refresh-preview" \
+        --bind="alt-b:execute-silent($me __state branches)+transform-prompt($me __state prompt)+refresh-preview" \
         --bind="ctrl-b:execute($me __stats)" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
@@ -1953,6 +1962,7 @@ internal_state() {
             fi
             value=$(<"$dir/grep")
             [[ -z $value ]] || parts+=("text: $value")
+            [[ $(cat "$dir/branches" 2>/dev/null) != all ]] || parts+=("⑂ all branches")
             printf '%s ❯ ' "$(join_by ' · ' "${parts[@]}")"
             ;;
         footer)

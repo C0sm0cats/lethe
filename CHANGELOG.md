@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Alt-B is visible: the prompt shows `⑂ all branches`, and a long preview keeps every abandoned
+  message (with the one before it) instead of hiding them in "… more messages …".
+
 ## 0.3.0 — 2026-10-11
 
 - Claude Code sessions show the active branch only: prompts edited or rewound (Esc Esc, `/rewind`)

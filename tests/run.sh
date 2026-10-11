@@ -440,6 +440,19 @@ mkdir -p "$WORK/branches" && printf 'all\n' >"$WORK/branches/branches"
 out=$(LETHE_STATE=$WORK/branches "$LETHE" __preview "$G")
 check "picker: Alt-B state shows abandoned branches in the preview" \
     '[[ $out == *"You (abandoned)"* && $out == *"abandoned reply"* ]]' "$out"
+printf 'all\n' >"$WORK/branches/filter" && : >"$WORK/branches/grep" && : >"$WORK/branches/dir"
+printf 'all\n' >"$WORK/branches/agent" && printf 'all\n' >"$WORK/branches/status"
+check "picker: the prompt says when all branches are shown" \
+    '[[ $(LETHE_STATE=$WORK/branches "$LETHE" __state prompt) == *"⑂ all branches"* ]]'
+parent=a5
+for n in $(seq 1 30); do
+    printf '{"type":"user","uuid":"m%d","parentUuid":"%s","message":{"role":"user","content":"more %d"}}\n' "$n" "$parent" "$n"
+    parent=m$n
+done >>"$CPROJ/$G.jsonl"
+set_mtime "$(($(date +%s) - 3600))" "$CPROJ/$G.jsonl"
+out=$(LETHE_STATE=$WORK/branches "$LETHE" __preview "$G")
+check "picker: a long preview keeps the abandoned messages" \
+    '[[ $out == *"abandoned prompt"* && $out == *"more messages"* && $out == *"more 30"* ]]' "$out"
 check "list --json counts abandoned branches" \
     '"$LETHE" list --json --claude | jq -e "map(select(.id == \"$G\"))[0].abandoned_branches == 1" >/dev/null'
 
