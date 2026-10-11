@@ -9,6 +9,7 @@
   with abandoned branches; computed once a session has been quiet for 10 minutes.
 - `show --all-branches`, `export --all-branches` and `Alt-B` in the picker show them, labelled
   `(abandoned)`. `--grep` searches every branch.
+- The picker no longer scrolls long rows sideways to show a match, which hid the start of the row.
 
 ## 0.2.2 — 2026-10-11
 

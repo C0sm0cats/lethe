@@ -1798,7 +1798,7 @@ cmd_pick() {
     fi
 
     "$SELF" __rows | SHELL=$(command -v bash) fzf \
-        --ansi --multi --layout=reverse --height=100% --info=inline-right \
+        --ansi --multi --layout=reverse --height=100% --info=inline-right --no-hscroll \
         --delimiter=$'\t' --with-nth=2.. --tiebreak=index "${track[@]}" "${layout[@]}" \
         --prompt="$("$SELF" __state prompt)" --pointer='▌' --marker='✓' \
         --preview="$me __preview {1}" \
