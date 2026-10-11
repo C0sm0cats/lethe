@@ -1165,8 +1165,8 @@ render_conversation() {
     if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
     conversation=$(messages "$agent" "$path" "$O_BRANCHES" | jq -rs \
         --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
-        --arg abandoned_you "$C_DIM○ You (abandoned)$C_RESET" \
-        --arg abandoned_agent "$C_DIM○ $([[ $agent == claude ]] && echo Claude || echo Codex) (abandoned)$C_RESET" \
+        --arg abandoned_you "${C_DIM}○ You (abandoned)$C_RESET" \
+        --arg abandoned_agent "${C_DIM}○ $([[ $agent == claude ]] && echo Claude || echo Codex) (abandoned)$C_RESET" \
         --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
         --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
         --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" '

@@ -183,6 +183,11 @@ archived() { [[ $(sqlite3 "$DB" "SELECT archived FROM threads WHERE id = '$1';")
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 
+echo "portability"
+# macOS bash reads `$VAR●` as one name under some locales: brace them.
+out=$(perl -ne 'print "$.: $_" if /\$[A-Za-z_]\w*[^\x00-\x7f]/' "$LETHE")
+check "no unbraced variable before non-ASCII text" '[[ -z $out ]]' "$out"
+
 echo "filters"
 expect_ids "no filter lists both agents" "$A $B $C $D $E $F $G $H $I"
 expect_ids "--claude" "$G $H $I" --claude
