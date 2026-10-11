@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 — 2026-10-11
 
 - `list` and the deletion plan use the picker's columns: project name, then title (mode as a tag).
 - `stats` (and `Ctrl-B`) draw bars for agents, activity age and the biggest projects.
