@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-11
 
 - Claude Code sessions show the active branch only: prompts edited or rewound (Esc Esc, `/rewind`)
   and their replies are hidden from `show`, the preview, `Enter` and `export`. Parallel tool results
