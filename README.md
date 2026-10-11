@@ -27,6 +27,7 @@ One Bash file. No runtime, no daemon, no install step.
 - **Clean up in seconds.** Mark with `Tab`, delete with `Ctrl-D`. Or `lethe delete --older-than 1m --keep 3`.
 - **Running sessions are untouchable.** Sessions open in a running agent, or active in the last 10 minutes, are detected and skipped. Always, even with `--yes`.
 - **Undo.** Deleted Claude Code sessions go to a trash and can be restored. Codex sessions can be archived instead of deleted.
+- **The conversation as it is now.** When you edit or rewind an earlier prompt in Claude Code, the old branch stays in the transcript. lethe shows the active branch only, marks sessions that have abandoned branches with `⑂N`, and shows those branches on demand (`Alt-B`, `--all-branches`).
 - **Find what to clean.** Empty sessions, sessions whose project folder is gone, idle ones, the biggest ones, or full-text search in your conversations.
 - **Scriptable.** `list --json`, `stats`, `--dry-run`, `--yes` for cron, and tab completion.
 
@@ -50,6 +51,7 @@ lethe list --claude --sort size
 lethe resume 01a11ee1          # unique id prefixes work everywhere
 lethe fork 01a11ee1            # a copy to continue in another direction
 lethe export 01a11ee1 > notes.md
+lethe export 01a11ee1 --all-branches   # with abandoned branches, labelled (abandoned)
 ```
 
 ### Picker keys
@@ -74,6 +76,7 @@ Everything the command line can do, the picker can do too.
 | `Ctrl-O` | sort by date or by size |
 | `Ctrl-P` | show / hide the conversation preview |
 | `Ctrl-B` | disk usage and cleanup stats |
+| `Alt-B` | show or hide abandoned branches (`⑂`) in the preview, `Enter` and `Ctrl-E` |
 | `Esc` | quit |
 
 In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good. Typing filters the list by title, project, agent or mode. Command-line filters apply too: `lethe --dir ~/work --older-than 2w`.
@@ -86,6 +89,7 @@ In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good.
 | `◔` | active in the last 10 minutes: protected |
 | `✗` | indexed by Codex, but the transcript file is gone |
 | `↺` | in the trash, restorable |
+| `⑂N` | Claude Code session with N abandoned branches (edited or rewound prompts), hidden by default |
 
 Sizes over 10 MB are yellow, over 50 MB red.
 
@@ -123,7 +127,7 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | `--dir PATH` | sessions started in `PATH` or below it (repeatable) |
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
 | `--provider NAME` | `anthropic`, `openai`, … |
-| `--grep TEXT` | your messages or the agent's replies contain `TEXT` (case-insensitive) |
+| `--grep TEXT` | your messages or the agent's replies contain `TEXT` (case-insensitive, abandoned branches included) |
 | `--empty` | sessions with no message and no reply (commands only) |
 | `--orphans` | sessions whose project directory no longer exists |
 | `--missing` | Codex index entries whose transcript is gone |

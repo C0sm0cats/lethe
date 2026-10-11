@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Claude Code sessions show the active branch only: prompts edited or rewound (Esc Esc, `/rewind`)
+  and their replies are hidden from `show`, the preview, `Enter` and `export`. Parallel tool results
+  and compactions are followed.
+- `⑂N` badge in the picker and `list` (and `abandoned_branches` in `list --json`) for sessions
+  with abandoned branches; computed once a session has been quiet for 10 minutes.
+- `show --all-branches`, `export --all-branches` and `Alt-B` in the picker show them, labelled
+  `(abandoned)`. `--grep` searches every branch.
+
 ## 0.2.2 — 2026-10-11
 
 - `list` and the deletion plan use the picker's columns: project name, then title (mode as a tag).

@@ -397,6 +397,47 @@ out=$(NO_COLOR="" FZF_PREVIEW_COLUMNS=30 "$LETHE" __preview "$G" | perl -pe 's/\
 check "the preview wraps on words and renders light Markdown" \
     '[[ $out == *"Done with make test"* && $out != *"**"* ]] && ! awk "length > 30 { exit 1 }" <<<"$out"' "$out"
 
+echo "branches"
+reset_fixture
+# A rewind (the second prompt was edited), parallel tool results (one with a
+# queued note) and a compaction whose logical parent is written after it.
+{
+    entry() { printf '{"type":"%s","uuid":"%s","parentUuid":%s,"cwd":"%s","timestamp":"2026-01-01T10:00:00.000Z","message":{"role":"%s","model":"claude-test-1","content":%s}}\n' "$1" "$2" "$3" "$PROJ" "$1" "$4"; }
+    entry user u1 null '"first question"'
+    entry assistant a1 '"u1"' '[{"type":"text","text":"first answer"}]'
+    entry user u2 '"a1"' '"abandoned prompt"'
+    entry assistant a2 '"u2"' '[{"type":"text","text":"abandoned reply"}]'
+    entry user u2b '"a1"' '"kept prompt"'
+    entry assistant t1 '"u2b"' '[{"type":"tool_use","id":"x","name":"Read","input":{}}]'
+    entry user r1 '"t1"' '[{"type":"tool_result","tool_use_id":"x","content":"ok"}]'
+    entry user r2 '"t1"' '[{"type":"tool_result","tool_use_id":"y","content":"ok"},{"type":"text","text":"queued note"}]'
+    entry assistant a3 '"r1"' '[{"type":"text","text":"after tools"}]'
+    printf '{"type":"system","subtype":"compact_boundary","uuid":"cb","parentUuid":null,"logicalParentUuid":"late"}\n'
+    printf '{"type":"attachment","uuid":"late","parentUuid":"a3"}\n'
+    entry user u3 '"cb"' '"after compaction"'
+    entry assistant a5 '"u3"' '[{"type":"text","text":"final answer"}]'
+    printf '{"type":"ai-title","aiTitle":"Branchy","sessionId":"%s"}\n' "$G"
+} >"$CPROJ/$G.jsonl"
+set_mtime "$(($(date +%s) - 3600))" "$CPROJ/$G.jsonl"
+out=$("$LETHE" show "$G")
+check "show follows the active branch only" \
+    '[[ $out == *"kept prompt"* && $out == *"queued note"* && $out == *"after tools"* && $out == *"final answer"* && $out != *"abandoned prompt"* && $out != *"abandoned reply"* ]]' "$out"
+check "and says how many branches are hidden" '[[ $out == *"1 abandoned branch(es) hidden"* ]]' "$out"
+out=$("$LETHE" export "$G" --all-branches)
+check "export --all-branches labels abandoned messages" \
+    '[[ $out == *$'"'"'## You (abandoned)\n\nabandoned prompt'"'"'* && $out == *"## Claude (abandoned)"* && $out == *$'"'"'## You\n\nkept prompt'"'"'* ]]' "$out"
+out=$("$LETHE" export "$G")
+check "export keeps the active branch by default" '[[ $out != *"abandoned"* && $out == *"final answer"* ]]' "$out"
+expect_ids "--grep searches abandoned branches too" "$G" --grep "abandoned reply"
+out=$("$LETHE" list --claude)
+check "list shows the abandoned-branch badge" '[[ $out == *"⑂1 Branchy"* ]]' "$out"
+mkdir -p "$WORK/branches" && printf 'all\n' >"$WORK/branches/branches"
+out=$(LETHE_STATE=$WORK/branches "$LETHE" __preview "$G")
+check "picker: Alt-B state shows abandoned branches in the preview" \
+    '[[ $out == *"You (abandoned)"* && $out == *"abandoned reply"* ]]' "$out"
+check "list --json counts abandoned branches" \
+    '"$LETHE" list --json --claude | jq -e "map(select(.id == \"$G\"))[0].abandoned_branches == 1" >/dev/null'
+
 reset_fixture
 out=$("$LETHE" resume "$I" 2>&1) || true
 check "resume refuses a session that is already open" '[[ $out == *"already open"* && ! -s $WORK/claude.log ]]' "$out"

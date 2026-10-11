@@ -237,7 +237,8 @@ init_codex() {
                rollout_path AS path,
                $(codex_col model "''") AS model,
                $(codex_col tokens_used 0) AS tokens,
-               NULL AS size
+               NULL AS size,
+               0 AS rewinds
           FROM cx.threads"
 }
 
@@ -256,7 +257,7 @@ claude_mode() {
 
 # Print an INSERT statement with the metadata of one Claude transcript.
 claude_extract() {
-    local path=$1 mtime=$2 fsize=$3 id cwd="" entry="" created="" title prompt model size kb value substantive
+    local path=$1 mtime=$2 fsize=$3 id cwd="" entry="" created="" title prompt model size kb value substantive rewinds
     id=${path##*/}
     id=${id%.jsonl}
     [[ $id =~ ^$UUID_RE$ ]] || return 0
@@ -297,15 +298,23 @@ claude_extract() {
         kb=$(du -sk -- "${path%.jsonl}" 2>/dev/null | cut -f 1) || kb=0
         size=$((size + ${kb:-0} * 1024))
     fi
+    # Abandoned branches (edited or rewound prompts), for the ⑂ badge. Costly on
+    # long sessions, so left for later (NULL) while the transcript is being written.
+    rewinds=NULL
+    if ((NOW - mtime >= RECENT_SECONDS)); then
+        rewinds=$({ grep -E '"uuid"|"type":"(user|assistant)"' -- "$path" || true; } |
+            jq -cR "$CLAUDE_ENTRIES" | jq -s "$CLAUDE_BRANCHES | .rewinds" 2>/dev/null) || rewinds=0
+        [[ $rewinds =~ ^[0-9]+$ ]] || rewinds=0
+    fi
     [[ -n $title ]] || title=$prompt
     title=${title//[$'\t\n\r']/ }
     title=${title:0:200}
 
-    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d);\n" \
+    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s);\n" \
         "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" \
         "$([[ -n $created ]] && printf "CAST(strftime('%%s', '%s') AS INTEGER)" "${created//\'/}" || echo "$mtime")" \
         "${cwd//\'/\'\'}" "${title//\'/\'\'}" "$(claude_mode "$entry")" "${model//\'/\'\'}" \
-        "$([[ $substantive == true ]] && echo 0 || echo 1)"
+        "$([[ $substantive == true ]] && echo 0 || echo 1)" "$rewinds"
 }
 
 # Bring the cache up to date: only new or modified transcripts are parsed.
@@ -313,20 +322,23 @@ init_claude() {
     [[ -d $CLAUDE_DIR/projects ]] || return 0
     need jq
     mkdir -p "$CACHE_DIR"
-    CLAUDE_CACHE=$CACHE_DIR/claude-v2.sqlite
-    rm -f -- "$CACHE_DIR/claude-v1.sqlite"
+    CLAUDE_CACHE=$CACHE_DIR/claude-v3.sqlite
+    rm -f -- "$CACHE_DIR/claude-v1.sqlite" "$CACHE_DIR/claude-v2.sqlite"
     # The picker preview only reads the index that the list has just refreshed.
     [[ $REINDEX == 1 || ! -f $CLAUDE_CACHE ]] || return 0
     sqlite3 -cmd '.timeout 5000' "$CLAUDE_CACHE" "CREATE TABLE IF NOT EXISTS claude (
         path TEXT PRIMARY KEY, id TEXT, mtime INTEGER, fsize INTEGER, size INTEGER, created INTEGER,
-        cwd TEXT, title TEXT, mode TEXT, model TEXT, empty INTEGER);"
+        cwd TEXT, title TEXT, mode TEXT, model TEXT, empty INTEGER, rewinds INTEGER);"
 
-    local path mtime fsize script count=0 done=0 seen=0
+    local path mtime fsize pending script count=0 done=0 seen=0
     declare -A known=()
     local -a stale=()
-    while IFS=$US read -r path mtime fsize; do
+    while IFS=$US read -r path mtime fsize pending; do
         known[$path]="$mtime $fsize"
-    done < <(sqlite3 -cmd '.timeout 5000' -separator "$US" "$CLAUDE_CACHE" "SELECT path, mtime, fsize FROM claude;")
+        # The badge was left for later: compute it once the session is quiet.
+        if [[ -n $pending ]] && ((NOW - mtime >= RECENT_SECONDS)); then known[$path]=pending; fi
+    done < <(sqlite3 -cmd '.timeout 5000' -separator "$US" "$CLAUDE_CACHE" \
+        "SELECT path, mtime, fsize, CASE WHEN rewinds IS NULL THEN 1 ELSE '' END FROM claude;")
 
     script=$(mktemp "$CACHE_DIR/update.XXXXXX")
     {
@@ -373,7 +385,7 @@ init() {
     if [[ -n $CLAUDE_CACHE ]]; then
         PRELUDE+="ATTACH '${CLAUDE_CACHE//\'/\'\'}' AS cl;"
         parts+=("SELECT 'claude', id, 0, mtime, created, mode, 'anthropic', empty, cwd, title, path,
-                        model, 0, size FROM cl.claude")
+                        model, 0, size, COALESCE(rewinds, 0) FROM cl.claude")
     fi
     ((${#parts[@]})) || die "no sessions found: neither $CODEX_DIR nor $CLAUDE_DIR/projects exists"
     PRELUDE+="CREATE TEMP VIEW sessions AS $(join_by ' UNION ALL ' "${parts[@]}");"
@@ -487,7 +499,7 @@ F_AGENT="" F_STATUS="" F_OLDER="" F_NEWER="" F_MODE="" F_PROVIDER="" F_GREP=""
 F_EMPTY=0 F_MISSING=0 F_ORPHANS=0 F_KEEP="" F_ALL=0
 F_DIRS=() F_IDS=()
 FILTER_ARGS=() # filters as given (minus agent and status), replayed by the picker on reload
-O_YES=0 O_DRY=0 O_JSON=0 O_IDS=0 O_FORCE=0 O_SORT=recent
+O_YES=0 O_DRY=0 O_JSON=0 O_IDS=0 O_FORCE=0 O_SORT=recent O_BRANCHES=active
 
 reset_filters() {
     F_AGENT="" F_STATUS="" F_OLDER="" F_NEWER="" F_MODE="" F_PROVIDER="" F_GREP=""
@@ -580,6 +592,7 @@ parse_args() {
             -y | --yes) allow yes && O_YES=1 ;;
             -n | --dry-run) allow dry && O_DRY=1 ;;
             --json) allow json && O_JSON=1 ;;
+            --all-branches) allow branches && O_BRANCHES=all ;;
             --ids) allow json && O_IDS=1 ;;
             -h | --help)
                 usage
@@ -672,21 +685,70 @@ build_where() {
 
 # ── Transcripts ──────────────────────────────────────────────────────────────
 
-# messages AGENT FILE — one JSON object {role, text} per user/assistant message.
-# Context injected by the agents themselves (environment, instructions, tool
-# output, command wrappers) is skipped.
+# Claude Code branches. Editing an earlier prompt (Esc Esc, /rewind) leaves the
+# old branch in the transcript: entries form a tree through uuid/parentUuid,
+# and the conversation is the path from the last message back to the root.
+#
+# CLAUDE_ENTRIES (per line): [uuid, parent, logical parent, is a message,
+# is a prompt, type, displayed text, linked] for every entry of the main chain.
+# Messages without a uuid (older formats) are not linked: always shown.
+readonly CLAUDE_ENTRIES='
+    fromjson? | select(type == "object" and .isSidechain != true
+                       and (.uuid != null or .type == "user" or .type == "assistant"))
+    | ((.type == "user" or .type == "assistant") and .isMeta != true) as $msg
+    | (.message.content? // null) as $c
+    | [.uuid // "line:\(input_line_number)", .parentUuid, .logicalParentUuid, $msg,
+       ($msg and .type == "user"
+        and (($c | type) == "string" or (($c | type) == "array" and all($c[]; .type? != "tool_result")))),
+       .type,
+       (if $msg then
+            $c | if type == "string" then [.] else [.[]? | select(.type == "text") | .text] end
+               | map(select(startswith("<") | not)) | join("\n")
+        else "" end),
+       .uuid != null]'
+
+# CLAUDE_BRANCHES (all entries, slurped): {rewinds, messages: [{role, text, abandoned}]}.
+# A branch off the active path is abandoned only if it contains a prompt (a
+# rewind); otherwise it is kept, as parallel tool results branch off too.
+# No `//` inside reduce bodies: its backtracking makes jq copy the object on
+# every step, which is quadratic on long sessions.
+readonly CLAUDE_BRANCHES='
+    . as $all
+    | (reduce range(0; length) as $i ({}; .[$all[$i][0]] = $i)) as $index
+    # Parent: parentUuid; across a compaction the logical parent, if it was
+    # written before (it can come after), else the entry written just before.
+    | (reduce range(0; length) as $i ({};
+         $all[$i] as $e
+         | .[$e[0]] = (if $e[1] != null then $e[1]
+                       elif $e[2] == null then null
+                       elif $index[$e[2]] != null and $index[$e[2]] < $i then $e[2]
+                       elif $i > 0 then $all[$i - 1][0] else null end))) as $parent
+    | ([.[] | select(.[3] and .[7])] | last | .[0]) as $leaf
+    | ({at: $leaf, on: {}} | until(.at == null or .on[.at]; .on[.at] = true | .at = $parent[.at])).on as $on
+    | (reduce range(0; length) as $i ({root: {}, prompt: {}};
+         $all[$i] as $e
+         | if $on[$e[0]] or ($e[7] | not) then . else
+             $parent[$e[0]] as $up
+             | (if $up == null or $on[$up] or .root[$up] == null then $e[0] else .root[$up] end) as $root
+             | .root[$e[0]] = $root
+             | if $e[4] then .prompt[$root] = true else . end
+           end)) as $branch
+    | {rewinds: ($branch.prompt | length),
+       messages: [$all[] | select(.[6] != "")
+                  | {role: .[5], text: .[6],
+                     abandoned: (.[7] and ($on[.[0]] | not) and $branch.prompt[$branch.root[.[0]] // ""] == true)}]}'
+
+# messages AGENT FILE [all] — one JSON object {role, text, abandoned} per
+# user/assistant message. Claude Code sessions give the active branch only,
+# or with "all" every branch (abandoned ones flagged). Context injected by the
+# agents themselves (environment, instructions, tool output, command
+# wrappers) is skipped.
 messages() {
     if [[ $1 == claude ]]; then
-        { grep -E '"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } | jq -cR '
-            fromjson?
-            | select((.type == "user" or .type == "assistant") and .isMeta != true and .isSidechain != true)
-            | {
-                role: .type,
-                text: (.message.content
-                       | if type == "string" then [.] else [.[]? | select(.type == "text") | .text] end
-                       | map(select(startswith("<") | not)) | join("\n"))
-              }
-            | select(.text != "")'
+        { grep -E '"uuid"|"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } |
+            jq -cR "$CLAUDE_ENTRIES" | jq -sc "$CLAUDE_BRANCHES" |
+            jq -c --arg branches "${3:-active}" \
+                '.messages[] | select($branches == "all" or (.abandoned | not))'
     else
         # Messages are response items, or voice transcript segments. Transcripts
         # with neither fall back to the user/agent message events.
@@ -697,12 +759,12 @@ messages() {
             | [$all[]
                | if .type == "response_item" and .payload.type == "message"
                     and (.payload.role == "user" or .payload.role == "assistant") then
-                     {role: .payload.role,
+                     {role: .payload.role, abandoned: false,
                       text: ([.payload.content[]? | select(.type == "input_text" or .type == "output_text")
                               | .text // empty | clean] | join("\n"))}
                  elif .type == "realtime_item" and .payload.type == "transcript_segment"
                     and (.payload.role == "user" or .payload.role == "assistant") then
-                     {role: .payload.role, text: (.payload.text // "")}
+                     {role: .payload.role, abandoned: false, text: (.payload.text // "")}
                  else empty end
                | select(.text != "")] as $primary
             | if ($primary | length) > 0 then $primary[]
@@ -710,7 +772,7 @@ messages() {
                    | select(.type == "event_msg"
                             and (.payload.type == "user_message" or .payload.type == "agent_message"))
                    | {role: (if .payload.type == "user_message" then "user" else "assistant" end),
-                      text: (.payload.message // "" | tostring | clean)}
+                      abandoned: false, text: (.payload.message // "" | tostring | clean)}
                    | select(.text != "")
               end'
     fi
@@ -718,19 +780,20 @@ messages() {
 
 session_matches() {
     grep -qiF -- "$F_GREP" "$2" 2>/dev/null || return 1
-    messages "$1" "$2" | jq -r '.text' | grep -iF -- "$F_GREP" >/dev/null
+    # Every branch: a session is found by anything it still contains.
+    messages "$1" "$2" all | jq -r '.text' | grep -iF -- "$F_GREP" >/dev/null
 }
 
 # ── Rows ─────────────────────────────────────────────────────────────────────
 
 # One line per matching session, most recent first, fields separated by $US:
-#   agent id archived recency date mode provider empty size cwd title path state
+#   agent id archived recency date mode provider empty size cwd title path state rewinds
 # size is -1 when the transcript is missing; state is open, recent or "".
 fetch_rows() {
-    local where agent id archived recency date mode provider empty cwd title path size state
+    local where agent id archived recency date mode provider empty cwd title path size state rewinds
     where=$(build_where)
     load_sizes
-    while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size; do
+    while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds; do
         if [[ $agent == codex ]]; then
             [[ $path == /* ]] || path=$CODEX_DIR/$path
             # The index can lag behind: a moved transcript is still this session's,
@@ -763,11 +826,11 @@ fetch_rows() {
         else
             state=""
         fi
-        printf '%s\n' "$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state"
+        printf '%s\n' "$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}"
     done < <(query "
         SELECT agent, id, archived, recency,
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
-               mode, $(flat provider), empty, $(flat cwd), $(flat title), path, size
+               mode, $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds
           FROM ranked
          WHERE $where
          ORDER BY recency DESC, id DESC;")
@@ -782,12 +845,12 @@ fetch_sorted() {
     fi
 }
 
-# format_row AGENT ARCHIVED RECENCY DATE MODE SIZE CWD TITLE STATE [TITLE_WIDTH]
+# format_row AGENT ARCHIVED RECENCY DATE MODE SIZE CWD TITLE STATE [TITLE_WIDTH] [REWINDS]
 # Sets REPLY to a display line. An empty DATE gives the compact picker layout,
 # where the mode is shown as a tag before the title instead of a column.
 format_row() {
     local agent=$1 archived=$2 recency=$3 date=$4 mode=$5 size=$6 cwd=$7 title=$8 state=$9
-    local title_width=${10:-44} icon age hsize size_color="" agent_color title_color=""
+    local title_width=${10:-44} rewinds=${11:-0} icon age hsize size_color="" agent_color title_color=""
     if [[ $state == open ]]; then
         icon="${C_MAGENTA}◉${C_RESET}"
     elif [[ $state == trash ]]; then
@@ -827,8 +890,10 @@ format_row() {
     fi
     [[ -n $title ]] || title="(empty)" title_color=$C_DIM
     # The project name stays visible; uncommon modes are a dim tag before the title.
+    # ⑂N: N abandoned branches (edited or rewound prompts) are hidden.
     local tag="" project
     [[ $mode == cli || $mode == subagent || $mode == unknown ]] || tag="$mode · "
+    ((${rewinds:-0} == 0)) || tag="⑂$rewinds $tag"
     case $cwd in
         "") project="-" ;;
         "$HOME") project="~" ;;
@@ -877,7 +942,8 @@ cmd_list() {
                 title: .[10],
                 path: .[11],
                 open: (.[12] == "open"),
-                recent: (.[12] == "recent")
+                recent: (.[12] == "recent"),
+                abandoned_branches: (.[13] | tonumber? // 0)
             }]'
         return
     fi
@@ -894,8 +960,8 @@ cmd_list() {
         ((title_width <= 80)) || title_width=80
     fi
     row_header "$title_width"
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state; do
-        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$title_width"
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
+        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$title_width" "$rewinds"
         printf '%s\n' "$REPLY"
         count=$((count + 1))
         if ((size >= 0)); then bytes=$((bytes + size)); else missing=$((missing + 1)); fi
@@ -919,7 +985,7 @@ cmd_stats() {
     local limits=(86400 604800 2592000 7776000 31536000)
     declare -A n_agent=() b_agent=() n_mode=() n_dir=() b_dir=() n_age=() b_age=()
 
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state; do
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
         ((size >= 0)) || { missing=$((missing + 1)) && size=0; }
         ((!empty)) || empties=$((empties + 1))
         [[ $state != open ]] || open=$((open + 1))
@@ -1016,7 +1082,7 @@ session_info() {
         SELECT agent, archived, mode, $(flat provider), $(flat cwd), $(flat title),
                strftime('%Y-%m-%d %H:%M', created, 'unixepoch', 'localtime'),
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
-               path, $(flat model), tokens, size, recency
+               path, $(flat model), tokens, size, recency, rewinds
           FROM sessions WHERE id = '$1';"
 }
 
@@ -1026,13 +1092,14 @@ cmd_show() {
         preview=1
         shift
     fi
-    parse_args "ids" "$@"
+    parse_args "ids branches" "$@"
     ((${#F_IDS[@]} == 1)) || usage_error "show takes exactly one session id"
     need jq
     prepare
 
-    local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status
-    IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size _ < <(session_info "$id")
+    local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status rewinds
+    IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size _ rewinds \
+        < <(session_info "$id")
     path=$(codex_path "$agent" "$id" "$path")
     if [[ -n ${OPEN[$id]+x} ]]; then
         status="${C_MAGENTA}open in a running agent"
@@ -1051,6 +1118,14 @@ cmd_show() {
     printf '%s%s%s%s\n' "$C_BLUE" "$cwd" "$C_RESET" "$C_DIM${size:+ · $size}$( ((${tokens:-0} == 0)) ||
         printf ' · %s tokens' "$tokens")$(subagent_summary "$agent" "$path")$C_RESET"
     printf '%s%s → %s · %s%s\n' "$C_DIM" "$created" "$recency" "$( ((preview)) && echo "${id:0:8}" || echo "$id")" "$C_RESET"
+    if ((${rewinds:-0})); then
+        if [[ $O_BRANCHES == all ]]; then
+            printf '%s⑂ %d abandoned branch(es) shown, dimmed%s\n' "$C_MAGENTA" "$rewinds" "$C_RESET"
+        else
+            printf '%s⑂ %d abandoned branch(es) hidden: %s%s\n' "$C_MAGENTA" "$rewinds" \
+                "$( ((preview)) && echo "Alt-B shows them" || echo "--all-branches shows them")" "$C_RESET"
+        fi
+    fi
     rule
 
     render_conversation "$agent" "$path" "$preview"
@@ -1088,8 +1163,10 @@ render_conversation() {
     fi
     local width=${FZF_PREVIEW_COLUMNS:-0}
     if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
-    conversation=$(messages "$agent" "$path" | jq -rs \
+    conversation=$(messages "$agent" "$path" "$O_BRANCHES" | jq -rs \
         --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
+        --arg abandoned_you "$C_DIM○ You (abandoned)$C_RESET" \
+        --arg abandoned_agent "$C_DIM○ $([[ $agent == claude ]] && echo Claude || echo Codex) (abandoned)$C_RESET" \
         --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
         --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
         --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" '
@@ -1113,8 +1190,15 @@ render_conversation() {
                 elif $reset != "" then .out += [$line | inline | wrap]
                 else .out += [$line | wrap] end)
             | .out | join("\n");
-        def render: (if .role == "user" then $you else $agent end) + "\n"
-            + (.text | if $preview == 1 and length > 1200 then .[:1200] + " …" else . end | styled) + "\n";
+        def cut: if $preview == 1 and length > 1200 then .[:1200] + " …" else . end;
+        def render:
+            if .abandoned then
+                (if .role == "user" then $abandoned_you else $abandoned_agent end) + "\n"
+                + (.text | cut | split("\n") | map(wrap) | join("\n") | split("\n")
+                   | map($dim + . + $reset) | join("\n")) + "\n"
+            else
+                (if .role == "user" then $you else $agent end) + "\n" + (.text | cut | styled) + "\n"
+            end;
         if $preview == 1 and length > 24 then
             (.[:4] | map(render) | join("\n")) + "\n" + $dim + "  … \(length - 20 - 4) more messages …" + $reset
             + "\n\n" + (.[-20:] | map(render) | join("\n"))
@@ -1124,7 +1208,7 @@ render_conversation() {
 
 # cmd_export ID — the conversation as Markdown, on stdout.
 cmd_export() {
-    parse_args "ids" "$@"
+    parse_args "ids branches" "$@"
     ((${#F_IDS[@]} == 1)) || usage_error "export takes exactly one session id"
     need jq
     prepare
@@ -1136,8 +1220,9 @@ cmd_export() {
     printf '# %s\n\n' "${title:-Untitled session}"
     printf -- '- Agent: %s (%s%s)\n- Project: `%s`\n- Session: `%s`\n- %s → %s\n\n' \
         "$name" "$mode" "${model:+, $model}" "$cwd" "$id" "$created" "$recency"
-    messages "$agent" "$path" | jq -r --arg name "$name" \
-        '"---\n\n## " + (if .role == "user" then "You" else $name end) + "\n\n" + .text + "\n"'
+    messages "$agent" "$path" "$O_BRANCHES" | jq -r --arg name "$name" \
+        '"---\n\n## " + (if .role == "user" then "You" else $name end)
+         + (if .abandoned then " (abandoned)" else "" end) + "\n\n" + .text + "\n"'
 }
 
 # codex_path AGENT ID PATH — PATH, or where a Codex transcript is now if the
@@ -1493,8 +1578,8 @@ run_action() {
     reset_filters
     F_IDS=("${!PLAN_OP[@]}")
     declare -A rows=() recency_of=()
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state; do
-        rows[$id]="$agent$US$archived$US$recency$US$date$US$mode$US$size$US$cwd$US$title$US$state"
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
+        rows[$id]="$agent$US$archived$US$recency$US$date$US$mode$US$size$US$cwd$US$title$US$state$US$rewinds"
         recency_of[$id]=$recency
         PLAN_AGENT[$id]=$agent
         PLAN_PATH[$id]=$path
@@ -1525,8 +1610,8 @@ run_action() {
     mapfile -t order < <(for id in "${!rows[@]}"; do printf '%s\t%s\n' "${recency_of[$id]}" "$id"; done |
         sort -t $'\t' -k1,1nr | cut -f 2)
     for id in "${order[@]}"; do
-        IFS=$US read -r agent archived recency date mode size cwd title state <<<"${rows[$id]}"
-        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$plan_width"
+        IFS=$US read -r agent archived recency date mode size cwd title state rewinds <<<"${rows[$id]}"
+        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$plan_width" "$rewinds"
         line=$REPLY
         if protected "$id" "$recency"; then
             skipped+=("  $line" "      ${C_DIM}↳ $REPLY$C_RESET")
@@ -1675,6 +1760,7 @@ cmd_pick() {
     printf '%s\n' "${F_STATUS:-all}" >"$state/status"
     printf '%s\n' "$O_SORT" >"$state/sort"
     printf 'all\n' >"$state/filter"
+    printf 'active\n' >"$state/branches"
     : >"$state/grep"
     : >"$state/dir"
     export LETHE_STATE=$state
@@ -1727,6 +1813,7 @@ cmd_pick() {
         --bind="ctrl-w:execute-silent($me __state dir {1})$refresh" \
         --bind="ctrl-g:execute-silent($me __state grep {q})+clear-query$refresh" \
         --bind="ctrl-o:execute-silent($me __state sort)+reload($me __rows)" \
+        --bind="alt-b:execute-silent($me __state branches)+refresh-preview" \
         --bind="ctrl-b:execute($me __stats)" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
@@ -1768,8 +1855,8 @@ internal_rows() {
     picker_setup
     local agent id archived recency date mode provider empty size cwd title path state
     local count=0 bytes=0 open=0 hbytes
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state; do
-        format_row "$agent" "$archived" "$recency" "" "$mode" "$size" "$cwd" "$title" "$state"
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
+        format_row "$agent" "$archived" "$recency" "" "$mode" "$size" "$cwd" "$title" "$state" "" "$rewinds"
         printf '%s\t%s\n' "$id" "$REPLY"
         count=$((count + 1))
         ((size < 0)) || bytes=$((bytes + size))
@@ -1804,7 +1891,7 @@ trash_rows() {
 internal_state() {
     local dir=$LETHE_STATE value
     case $1 in
-        agent | status | sort)
+        agent | status | sort | branches)
             value=$(<"$dir/$1")
             case $1:$value in
                 agent:all) value=claude ;;
@@ -1813,6 +1900,8 @@ internal_state() {
                 status:active) value=archived ;;
                 sort:recent) value=size ;;
                 sort:size) value=recent ;;
+                branches:active) value=all ;;
+                branches:all) value=active ;;
                 *) value=all ;;
             esac
             printf '%s\n' "$value" >"$dir/$1"
@@ -1876,7 +1965,8 @@ internal_state() {
                 keys=("Tab:mark Ctrl-A:all Enter:read Ctrl-P:preview Esc:quit"
                     "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork"
                     "Ctrl-E:export Ctrl-B:stats Ctrl-T:agent Ctrl-S:status"
-                    "Ctrl-F:filter Ctrl-W:project Ctrl-G:find Ctrl-O:sort")
+                    "Ctrl-F:filter Ctrl-W:project Ctrl-G:find Ctrl-O:sort"
+                    "Alt-B:abandoned_branches")
             fi
             for line in "${keys[@]}"; do
                 out=()
@@ -1895,7 +1985,7 @@ internal_state() {
                 printf '%s\n' "Tab mark · Ctrl-A all · Ctrl-D delete · Ctrl-X archive · Enter read" \
                     "Ctrl-R resume · Ctrl-K fork · Ctrl-E export · Ctrl-B stats" \
                     "Ctrl-T agent · Ctrl-S status · Ctrl-F filter · Ctrl-W project" \
-                    "Ctrl-G find text · Ctrl-O sort · Ctrl-P preview · Esc quit"
+                    "Ctrl-G find text · Ctrl-O sort · Ctrl-P preview · Alt-B branches · Esc quit"
             fi
             ;;
     esac
@@ -1979,13 +2069,15 @@ internal_resume() {
 
 # Save a conversation as Markdown in the directory the picker was started from.
 internal_export() {
-    local file="lethe-${1:0:8}.md"
+    local file="lethe-${1:0:8}.md" branches=()
+    picker_branches
+    [[ $O_BRANCHES != all ]] || branches=(--all-branches)
     printf '\e[H\e[2J'
     if [[ $1 == trash:* ]]; then
         printf 'Restore the session first (Ctrl-R) to export it.\n'
     elif [[ -e $file ]]; then
         printf '%s already exists; nothing written.\n' "$PWD/$file"
-    elif "$SELF" export "$1" >"$file"; then
+    elif "$SELF" export "$1" "${branches[@]}" >"$file"; then
         printf '%s✓ saved %s%s\n' "$C_GREEN" "$PWD/$file" "$C_RESET"
     else
         rm -f -- "$file"
@@ -1995,6 +2087,7 @@ internal_export() {
 }
 
 internal_page() {
+    picker_branches
     export LESS=${LESS:--R}
     setup_colors always
     if [[ $1 == trash:* ]]; then
@@ -2004,7 +2097,13 @@ internal_page() {
     fi
 }
 
+# Branches shown in the picker's preview, pager and export (Alt-B).
+picker_branches() {
+    [[ -z ${LETHE_STATE:-} || ! -f $LETHE_STATE/branches ]] || O_BRANCHES=$(<"$LETHE_STATE/branches")
+}
+
 internal_preview() {
+    picker_branches
     setup_colors always
     if [[ $1 == trash:* ]]; then
         show_trash "$TRASH_DIR/${1#trash:}" 1
@@ -2068,10 +2167,10 @@ Usage:
   $PROG [pick] [FILTERS] [--sort size]   interactive browser (needs fzf)
   $PROG list   [FILTERS] [--sort size] [--json | --ids]
   $PROG stats  [FILTERS]                 disk usage and cleanup hints
-  $PROG show   ID                        print a conversation
+  $PROG show   ID [--all-branches]       print a conversation
   $PROG resume ID                        reopen a session in its agent and directory
   $PROG fork   ID                        open a copy of a session, leaving the original as is
-  $PROG export ID                        the conversation as Markdown, on stdout
+  $PROG export ID [--all-branches]       the conversation as Markdown, on stdout
   $PROG delete    (FILTERS | ID...) [-n] [-y] [--force]
   $PROG archive   (FILTERS | ID...) [-n] [-y]      Codex only
   $PROG unarchive (FILTERS | ID...) [-n] [-y]      Codex only
@@ -2100,6 +2199,8 @@ Options:
       --all               allow delete/archive without any filter
       --sort recent|size  order by last activity (default) or size
       --json, --ids       list output formats
+      --all-branches      show/export: include abandoned branches of Claude Code
+                          sessions (prompts edited or rewound), marked as such
   -h, --help, -V, --version
 
 Safety:
@@ -2117,6 +2218,7 @@ Picker keys:
   Ctrl-T agent  Ctrl-S status  Ctrl-W this project  Ctrl-G find the typed text in conversations
   Ctrl-F filter: empty, orphans, missing, idle 30d+, idle 90d+, trash (Ctrl-R restores there)
   Ctrl-O sort by size  Ctrl-P preview  Ctrl-B stats  Esc quit
+  Alt-B show or hide abandoned branches (⑂) in the preview, Enter and Ctrl-E
 
 Environment: CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, NO_COLOR, PAGER.
 EOF
