@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-10-11
 
 - Picker rows show the project name before the title, so it stays visible on narrow terminals.
 - Ages are shaded by how recent they are; the match counter drops fzf's tracking marker.
