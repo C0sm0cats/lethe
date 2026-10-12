@@ -1791,13 +1791,17 @@ cmd_pick() {
     # Keep the cursor on the same session across reloads (fzf >= 0.66).
     [[ $features != *--id-nth* ]] || track=(--track --id-nth=1)
     label=$(printf '%q' "$state/label")
+    # Narrow terminals put the preview under the list; when short too, it would
+    # leave room for two rows only, so it starts hidden (Ctrl-P shows it).
+    local narrow_preview="down,55%,wrap,border-rounded"
+    (($(tput lines 2>/dev/null || echo 50) >= 32)) || narrow_preview+=",hidden"
     if [[ $features == *--footer=* && $features == *--list-border* ]]; then
         # fzf >= 0.63: separate panels, keys in a footer.
         LETHE_COLUMNS=1
         layout=(
             --input-border=rounded --input-label=" lethe " --input-label-pos=2
             --list-border=rounded --list-label-pos=2
-            --preview-window='right,45%,wrap,border-rounded,<50(down,55%,wrap,border-rounded)'
+            --preview-window="right,45%,wrap,border-rounded,<50(${narrow_preview})"
             --preview-wrap-sign='  ' --ghost='type to filter'
             --footer="$("$SELF" __state footer)" --highlight-line --gutter=' '
             --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
