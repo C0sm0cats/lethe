@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — 2026-10-12
 
 - Ctrl-C (or a kill) while a Claude Code session moves to the trash can no longer leave it half
   moved: the few renames finish first.
