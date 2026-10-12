@@ -384,8 +384,10 @@ init() {
     fi
     if [[ -n $CLAUDE_CACHE ]]; then
         PRELUDE+="ATTACH '${CLAUDE_CACHE//\'/\'\'}' AS cl;"
-        parts+=("SELECT 'claude', id, 0, mtime, created, mode, 'anthropic', empty, cwd, title, path,
-                        model, 0, size, COALESCE(rewinds, 0) FROM cl.claude")
+        # Named columns: with no Codex part this SELECT names the view's columns.
+        parts+=("SELECT 'claude' AS agent, id, 0 AS archived, mtime AS recency, created, mode,
+                        'anthropic' AS provider, empty, cwd, title, path, model, 0 AS tokens, size,
+                        COALESCE(rewinds, 0) AS rewinds FROM cl.claude")
     fi
     ((${#parts[@]})) || die "no sessions found: neither $CODEX_DIR nor $CLAUDE_DIR/projects exists"
     PRELUDE+="CREATE TEMP VIEW sessions AS $(join_by ' UNION ALL ' "${parts[@]}");"
@@ -619,6 +621,10 @@ resolve_ids() {
     local i id matches
     for i in "${!F_IDS[@]}"; do
         id=${F_IDS[i],,}
+        case $id in
+            pick | list | ls | stats | show | resume | fork | export | delete | rm | archive | unarchive | trash)
+                usage_error "the command comes first, then the options: $PROG $id ..." ;;
+        esac
         [[ $id =~ ^[0-9a-f-]{4,36}$ ]] || usage_error "not a session id: ${F_IDS[i]}"
         mapfile -t matches < <(query "SELECT id FROM sessions WHERE id LIKE '$id%' LIMIT 2;")
         case ${#matches[@]} in
@@ -1278,7 +1284,8 @@ cmd_resume() {
     if [[ -d $cwd ]]; then
         cd -- "$cwd"
     else
-        printf '%s: %s no longer exists, starting from %s\n' "$PROG" "$cwd" "$PWD" >&2
+        printf '%s: %s, starting from %s\n' "$PROG" \
+            "$([[ -n $cwd ]] && echo "$cwd no longer exists" || echo "no project directory is recorded")" "$PWD" >&2
     fi
     if [[ $agent == claude ]]; then
         need claude
@@ -1328,6 +1335,8 @@ claude_trash() {
         printf 'could not write the trash manifest\n' >&2
         return 1
     }
+    # A few renames: Ctrl-C waits for them, so no session is left half moved.
+    trap '' INT TERM HUP
     for ((i = ${#items[@]} - 1; i >= 0; i--)); do
         item=${items[i]}
         dest=$entry/files/${item#"$CLAUDE_DIR"/}
@@ -1336,10 +1345,12 @@ claude_trash() {
                 mv -- "$entry/files/${item#"$CLAUDE_DIR"/}" "$item"
             done
             rm -rf -- "$entry"
+            trap - INT TERM HUP
             return 1
         fi
         moved+=("$item")
     done
+    trap - INT TERM HUP
 }
 
 trash_entries() {
@@ -1425,8 +1436,9 @@ cmd_trash() {
             (($#)) || usage_error "trash restore takes session ids"
             for id; do
                 entry=$(trash_find "$id")
+                title=$(jq -r '(.title // "") | if . == "" then "session" else . end' "$entry/manifest.json")
                 trash_restore "$entry"
-                printf '%s✓ restored %s%s\n' "$C_GREEN" "$id" "$C_RESET"
+                printf '%s✓ restored: %s%s\n' "$C_GREEN" "$title" "$C_RESET"
             done
             ;;
         empty)
@@ -1680,7 +1692,7 @@ run_action() {
 
     # Execute, deepest subagents first. Running agents are checked again right
     # before acting, in case a session was opened during the confirmation.
-    local total i=0 failed=0 freed=0 out run_cmd checked skipped_now=0 stamp
+    local total i=0 failed=0 freed=0 trashed=0 trashed_bytes=0 out run_cmd checked skipped_now=0 stamp
     declare -A done_count=()
     detect_open full
     checked=$SECONDS
@@ -1732,15 +1744,23 @@ run_action() {
             fi
         fi
         done_count[$op]=$((${done_count[$op]:-0} + 1))
-        [[ $op != delete || ${PLAN_AGENT[$id]} == claude ]] || freed=$((freed + PLAN_SIZE[$id]))
+        if [[ $op == delete && ${PLAN_AGENT[$id]} == claude ]]; then
+            trashed=$((trashed + 1)) trashed_bytes=$((trashed_bytes + PLAN_SIZE[$id]))
+        elif [[ $op == delete ]]; then
+            freed=$((freed + PLAN_SIZE[$id]))
+        fi
     done
     [[ ! -t 2 ]] || printf '\r\e[K' >&2
 
     local summary=()
-    [[ -z ${done_count[delete]+x} ]] || {
+    if ((${done_count[delete]:-0} > trashed)); then
         human_size hsize "$freed"
-        summary+=("deleted ${done_count[delete]} ($hsize freed)")
-    }
+        summary+=("deleted $((done_count[delete] - trashed)) ($hsize freed)")
+    fi
+    if ((trashed)); then
+        human_size hsize "$trashed_bytes"
+        summary+=("moved $trashed to the trash ($hsize, freed when the trash is emptied)")
+    fi
     [[ -z ${done_count[archive]+x} ]] || summary+=("archived ${done_count[archive]}")
     [[ -z ${done_count[unarchive]+x} ]] || summary+=("unarchived ${done_count[unarchive]}")
     ((${#summary[@]} == 0)) || printf '%s✓ %s%s\n' "$C_GREEN" "$(join_by ', ' "${summary[@]}")" "$C_RESET"
@@ -1949,6 +1969,8 @@ EOF
 # Ctrl-F / Ctrl-W: pick a cleanup filter or a project, seeing what each holds.
 internal_choose() {
     local kind=$1 current=${2:-} choice gutter=()
+    # The trash has no projects to choose from.
+    [[ $kind != dir || $(<"$LETHE_STATE/filter") != trash ]] || return 0
     [[ $current != trash:* ]] || current=""
     ! fzf --help 2>/dev/null | grep -q -- '--gutter' || gutter=(--gutter=' ')
     # The cursor starts on what is selected now: the current filter, or the

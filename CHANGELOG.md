@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Ctrl-C (or a kill) while a Claude Code session moves to the trash can no longer leave it half
+  moved: the few renames finish first.
+- With only Claude Code installed (no Codex), `list`, `stats` and the picker failed with
+  "no such column: recency".
+- Deleting Claude Code sessions reports "moved N to the trash (size, freed when the trash is
+  emptied)" instead of "deleted N (0B freed)".
+- `trash restore` names the restored session; `resume` explains a session with no recorded
+  directory; `Ctrl-W` does nothing in the trash; options before the command
+  (`lethe --dir x list`) get a clear message.
+
 ## 0.4.0 — 2026-10-12
 
 - `Ctrl-F` opens a menu of cleanup filters, each with its number of sessions and size, instead of

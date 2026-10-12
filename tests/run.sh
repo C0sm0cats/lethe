@@ -431,6 +431,25 @@ out=$(NO_COLOR="" FZF_PREVIEW_COLUMNS=30 "$LETHE" __preview "$G" | perl -pe 's/\
 check "the preview wraps on words and renders light Markdown" \
     '[[ $out == *"Done with make test"* && $out != *"**"* ]] && ! awk "length > 30 { exit 1 }" <<<"$out"' "$out"
 
+reset_fixture
+# Ctrl-C while a session moves to the trash (the signal reaches the whole
+# process group): the session ends up fully moved, never half.
+mkdir -p "$WORK/slow"
+printf '#!/bin/sh\nsleep 0.3\nexec /bin/mv "$@"\n' >"$WORK/slow/mv" && chmod +x "$WORK/slow/mv"
+PATH=$WORK/slow:$PATH perl -e 'setpgrp; exec @ARGV' "$LETHE" delete -y "$G" >/dev/null 2>&1 &
+group=$!
+for _ in $(seq 200); do
+    [[ -z $(ls "$TRASH"/*/files/file-history 2>/dev/null) ]] || break # one item moved
+    sleep 0.05
+done
+kill -TERM -- "-$group" 2>/dev/null || true
+wait "$group" 2>/dev/null || true
+sleep 1.5
+items=("$CPROJ/$G.jsonl" "$CPROJ/$G" "$CLAUDE_CONFIG_DIR/session-env/$G" "$CLAUDE_CONFIG_DIR/file-history/$G")
+present=0
+for item in "${items[@]}"; do [[ ! -e $item ]] || present=$((present + 1)); done
+check "Ctrl-C during a trash move leaves the session whole" '((present == 0 || present == 4))' "$present of 4 items left"
+
 echo "branches"
 reset_fixture
 # A rewind (the second prompt was edited), parallel tool results (one with a
