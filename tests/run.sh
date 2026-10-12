@@ -303,7 +303,8 @@ check "picker: column titles come first when the panel layout is on" \
     '[[ $(LETHE_COLUMNS=1 "$LETHE" __rows | head -n 1) == *"AGENT"*"PROJECT"*"TITLE"* ]]'
 "$LETHE" __rows >/dev/null
 out=$(FZF_SELECT_COUNT=2 "$LETHE" __marked "$A" "$B")
-check "picker: the list label sums the marked sessions" '[[ $out == " 2 marked · 8.6K ·"* ]]' "$out"
+sum=$("$LETHE" list --json "$A" "$B" | jq '[.[].size] | add / 1024 * 10 | floor / 10')
+check "picker: the list label sums the marked sessions" '[[ $out == " 2 marked · ${sum}K ·"* ]]' "$out (expected ${sum}K)"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
 check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'
