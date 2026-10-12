@@ -30,140 +30,140 @@
 <text x="998.4" y="119.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">· 2.0M</text>
 <text x="1471.4" y="119.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<rect x="35.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="35.2" y="138.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
-<rect x="43.8" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="52.4" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="52.4" y="138.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
-<rect x="61.0" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="69.6" y="124.0" width="51.6" height="19" fill="#303030"/>
-<text x="69.6" y="138.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<rect x="121.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="129.8" y="124.0" width="34.4" height="19" fill="#303030"/>
-<text x="147.0" y="138.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<rect x="164.2" y="124.0" width="86.0" height="19" fill="#303030"/>
-<text x="198.6" y="138.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
-<rect x="250.2" y="124.0" width="137.6" height="19" fill="#303030"/>
-<text x="250.2" y="138.2" fill="#61afef" font-weight="bold" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<rect x="387.8" y="124.0" width="421.4" height="19" fill="#303030"/>
-<text x="405.0" y="138.2" fill="#d7dae0" font-weight="bold" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
-<text x="817.8" y="138.2" fill="#7f848e" textLength="421.4" lengthAdjust="spacingAndGlyphs">││ 2026-10-11 18:52 → 2026-10-11 19:22 · 019a0000</text>
+<text x="69.6" y="138.2" fill="#7f848e" textLength="378.4" lengthAdjust="spacingAndGlyphs">AGENT   AGE    SIZE  PROJECT           TITLE</text>
+<text x="817.8" y="138.2" fill="#7f848e" textLength="421.4" lengthAdjust="spacingAndGlyphs">││ 2026-10-12 15:47 → 2026-10-12 16:17 · 019a0000</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="157.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="157.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
-<text x="147.0" y="157.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">3h</text>
-<text x="198.6" y="157.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">624K</text>
-<text x="250.2" y="157.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">web-dashboard</text>
-<text x="405.0" y="157.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Add dark mode to the settings page</text>
-<text x="817.8" y="157.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ ──────────────────────────────────────────────────────────────────────── │</text>
+<text x="18.0" y="157.2" fill="#7f848e" textLength="1462.0" lengthAdjust="spacingAndGlyphs">├────────────────────────────────────────────────────────────────────────────────────────────┤│ ──────────────────────────────────────────────────────────────────────── │</text>
 <text x="18.0" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="176.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="176.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="176.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">9h</text>
-<text x="198.6" y="176.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.0M</text>
-<text x="250.2" y="176.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<text x="405.0" y="176.2" fill="#d7dae0" textLength="301.0" lengthAdjust="spacingAndGlyphs">Write integration tests for /orders</text>
+<rect x="35.2" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="35.2" y="176.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
+<rect x="43.8" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="52.4" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="52.4" y="176.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
+<rect x="61.0" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="69.6" y="162.0" width="51.6" height="19" fill="#303030"/>
+<text x="69.6" y="176.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<rect x="121.2" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="129.8" y="162.0" width="34.4" height="19" fill="#303030"/>
+<text x="147.0" y="176.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
+<rect x="164.2" y="162.0" width="86.0" height="19" fill="#303030"/>
+<text x="198.6" y="176.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
+<rect x="250.2" y="162.0" width="137.6" height="19" fill="#303030"/>
+<text x="250.2" y="176.2" fill="#61afef" font-weight="bold" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<rect x="387.8" y="162.0" width="421.4" height="19" fill="#303030"/>
+<text x="405.0" y="176.2" fill="#d7dae0" font-weight="bold" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
 <text x="817.8" y="176.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="195.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="195.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
-<text x="147.0" y="195.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">1d</text>
-<text x="198.6" y="195.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">888K</text>
-<text x="250.2" y="195.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<text x="405.0" y="195.2" fill="#d7dae0" textLength="129.0" lengthAdjust="spacingAndGlyphs">subagent Kepler</text>
+<text x="147.0" y="195.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">3h</text>
+<text x="198.6" y="195.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">624K</text>
+<text x="250.2" y="195.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">web-dashboard</text>
+<text x="405.0" y="195.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Add dark mode to the settings page</text>
 <text x="817.8" y="195.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="195.2" fill="#56b6c2" font-weight="bold" textLength="43.0" lengthAdjust="spacingAndGlyphs">● You</text>
 <text x="1471.4" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="214.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="214.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
-<text x="147.0" y="214.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">3d</text>
-<text x="207.2" y="214.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">92K</text>
-<text x="250.2" y="214.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">scripts</text>
-<text x="405.0" y="214.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">exec ·</text>
-<text x="465.2" y="214.2" fill="#d7dae0" textLength="266.6" lengthAdjust="spacingAndGlyphs">Summarize the changelog for 2.4</text>
+<text x="69.6" y="214.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="214.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">9h</text>
+<text x="198.6" y="214.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.0M</text>
+<text x="250.2" y="214.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<text x="405.0" y="214.2" fill="#d7dae0" textLength="301.0" lengthAdjust="spacingAndGlyphs">Write integration tests for /orders</text>
 <text x="817.8" y="214.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="214.2" fill="#d7dae0" textLength="593.4" lengthAdjust="spacingAndGlyphs">Users get logged out at random. The access token sometimes expires in</text>
 <text x="1471.4" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="233.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="233.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="233.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">6d</text>
-<text x="207.2" y="233.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">46M</text>
-<text x="250.2" y="233.2" fill="#61afef" textLength="94.6" lengthAdjust="spacingAndGlyphs">game-engine</text>
-<text x="405.0" y="233.2" fill="#d7dae0" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
+<text x="69.6" y="233.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
+<text x="147.0" y="233.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">1d</text>
+<text x="198.6" y="233.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">888K</text>
+<text x="250.2" y="233.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<text x="405.0" y="233.2" fill="#d7dae0" textLength="129.0" lengthAdjust="spacingAndGlyphs">subagent Kepler</text>
 <text x="817.8" y="233.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="233.2" fill="#d7dae0" textLength="206.4" lengthAdjust="spacingAndGlyphs">the middle of a request.</text>
 <text x="1471.4" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="252.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="252.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="252.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="252.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">9d</text>
-<text x="198.6" y="252.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.8K</text>
-<text x="250.2" y="252.2" fill="#61afef" textLength="8.6" lengthAdjust="spacingAndGlyphs">-</text>
-<text x="405.0" y="252.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">(empty)</text>
+<text x="69.6" y="252.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
+<text x="147.0" y="252.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">3d</text>
+<text x="207.2" y="252.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">92K</text>
+<text x="250.2" y="252.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">scripts</text>
+<text x="405.0" y="252.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">exec ·</text>
+<text x="465.2" y="252.2" fill="#d7dae0" textLength="266.6" lengthAdjust="spacingAndGlyphs">Summarize the changelog for 2.4</text>
 <text x="817.8" y="252.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="252.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="271.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="271.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="271.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
-<text x="147.0" y="271.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">2w</text>
-<text x="207.2" y="271.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">59K</text>
-<text x="250.2" y="271.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">web-dashboard</text>
-<text x="405.0" y="271.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">exec ·</text>
-<text x="465.2" y="271.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Generate a commit message</text>
+<text x="69.6" y="271.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="271.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">6d</text>
+<text x="207.2" y="271.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">46M</text>
+<text x="250.2" y="271.2" fill="#61afef" textLength="94.6" lengthAdjust="spacingAndGlyphs">game-engine</text>
+<text x="405.0" y="271.2" fill="#d7dae0" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
 <text x="817.8" y="271.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="271.2" fill="#d7875f" font-weight="bold" textLength="68.8" lengthAdjust="spacingAndGlyphs">● Claude</text>
 <text x="1471.4" y="271.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="290.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="290.2" fill="#e5c07b" textLength="8.6" lengthAdjust="spacingAndGlyphs">◌</text>
-<text x="69.6" y="290.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
-<text x="147.0" y="290.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">3w</text>
-<text x="198.6" y="290.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">400K</text>
-<text x="250.2" y="290.2" fill="#61afef" textLength="43.0" lengthAdjust="spacingAndGlyphs">notes</text>
-<text x="405.0" y="290.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
-<text x="482.4" y="290.2" fill="#d7dae0" textLength="163.4" lengthAdjust="spacingAndGlyphs">Plan the Q4 roadmap</text>
+<text x="52.4" y="290.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="69.6" y="290.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="290.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">9d</text>
+<text x="198.6" y="290.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.8K</text>
+<text x="250.2" y="290.2" fill="#61afef" textLength="8.6" lengthAdjust="spacingAndGlyphs">-</text>
+<text x="405.0" y="290.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">(empty)</text>
 <text x="817.8" y="290.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="290.2" fill="#d7dae0" textLength="576.2" lengthAdjust="spacingAndGlyphs">Two requests can refresh the token at the same time: the second one</text>
 <text x="1471.4" y="290.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="309.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="309.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="309.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="309.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="207.2" y="309.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
-<text x="250.2" y="309.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
-<text x="405.0" y="309.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
-<text x="482.4" y="309.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
+<text x="69.6" y="309.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
+<text x="147.0" y="309.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">2w</text>
+<text x="207.2" y="309.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">59K</text>
+<text x="250.2" y="309.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">web-dashboard</text>
+<text x="405.0" y="309.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">exec ·</text>
+<text x="465.2" y="309.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Generate a commit message</text>
 <text x="817.8" y="309.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="309.2" fill="#d7dae0" textLength="593.4" lengthAdjust="spacingAndGlyphs">invalidates the first refresh token, so the next call fails with 401.</text>
 <text x="1471.4" y="309.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="328.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="328.2" fill="#e5c07b" textLength="8.6" lengthAdjust="spacingAndGlyphs">◌</text>
 <text x="69.6" y="328.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
-<text x="138.4" y="328.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">2mo</text>
-<text x="198.6" y="328.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.1M</text>
-<text x="250.2" y="328.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
-<text x="405.0" y="328.2" fill="#d7dae0" textLength="189.2" lengthAdjust="spacingAndGlyphs">Benchmark JSON parsers</text>
+<text x="147.0" y="328.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">3w</text>
+<text x="198.6" y="328.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">400K</text>
+<text x="250.2" y="328.2" fill="#61afef" textLength="43.0" lengthAdjust="spacingAndGlyphs">notes</text>
+<text x="405.0" y="328.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
+<text x="482.4" y="328.2" fill="#d7dae0" textLength="163.4" lengthAdjust="spacingAndGlyphs">Plan the Q4 roadmap</text>
 <text x="817.8" y="328.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="328.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="347.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="347.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="347.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="138.4" y="347.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">3mo</text>
-<text x="198.6" y="347.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">5.3M</text>
-<text x="250.2" y="347.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">website</text>
-<text x="405.0" y="347.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Migrate the blog to Astro</text>
+<text x="147.0" y="347.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
+<text x="207.2" y="347.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
+<text x="250.2" y="347.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
+<text x="405.0" y="347.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
+<text x="482.4" y="347.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="817.8" y="347.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="347.2" fill="#d7dae0" textLength="541.8" lengthAdjust="spacingAndGlyphs">I&#x27;ll serialize the refresh behind a single in-flight promise in</text>
 <text x="1471.4" y="347.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="366.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="366.2" fill="#e5c07b" textLength="8.6" lengthAdjust="spacingAndGlyphs">◌</text>
+<text x="69.6" y="366.2" fill="#87afd7" textLength="43.0" lengthAdjust="spacingAndGlyphs">codex</text>
+<text x="138.4" y="366.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">2mo</text>
+<text x="198.6" y="366.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.1M</text>
+<text x="250.2" y="366.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
+<text x="405.0" y="366.2" fill="#d7dae0" textLength="189.2" lengthAdjust="spacingAndGlyphs">Benchmark JSON parsers</text>
 <text x="817.8" y="366.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="366.2" fill="#56b6c2" textLength="129.0" lengthAdjust="spacingAndGlyphs">auth/refresh.ts</text>
 <text x="981.2" y="366.2" fill="#d7dae0" textLength="455.8" lengthAdjust="spacingAndGlyphs">and add a test that fires 10 concurrent requests with</text>
 <text x="1471.4" y="366.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="385.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="385.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="69.6" y="385.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="138.4" y="385.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">3mo</text>
+<text x="198.6" y="385.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">5.3M</text>
+<text x="250.2" y="385.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">website</text>
+<text x="405.0" y="385.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Migrate the blog to Astro</text>
 <text x="817.8" y="385.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="385.2" fill="#d7dae0" textLength="146.2" lengthAdjust="spacingAndGlyphs">an expired token.</text>
 <text x="1471.4" y="385.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
@@ -185,61 +185,41 @@
 <text x="817.8" y="480.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="480.2" fill="#d7875f" font-weight="bold" textLength="68.8" lengthAdjust="spacingAndGlyphs">● Claude</text>
 <text x="1471.4" y="480.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="499.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="499.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="499.2" fill="#d7dae0" textLength="43.0" lengthAdjust="spacingAndGlyphs">Done.</text>
 <text x="895.2" y="499.2" fill="#56b6c2" textLength="120.4" lengthAdjust="spacingAndGlyphs">refreshToken()</text>
 <text x="1024.2" y="499.2" fill="#d7dae0" textLength="395.6" lengthAdjust="spacingAndGlyphs">now reuses the pending refresh, requests retry</text>
 <text x="1471.4" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="518.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="18.0" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="518.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="518.2" fill="#d7dae0" textLength="232.2" lengthAdjust="spacingAndGlyphs">once after it resolves, and</text>
 <text x="1084.4" y="518.2" fill="#56b6c2" textLength="206.4" lengthAdjust="spacingAndGlyphs">auth.concurrency.test.ts</text>
 <text x="1299.4" y="518.2" fill="#d7dae0" textLength="137.6" lengthAdjust="spacingAndGlyphs">covers the race.</text>
 <text x="1471.4" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="537.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="537.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="537.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="537.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="293.2" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="344.8" y="537.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
-<text x="405.0" y="537.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="482.4" y="537.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="516.8" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
-<text x="826.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="537.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="537.2" fill="#d7dae0" textLength="163.4" lengthAdjust="spacingAndGlyphs">All 214 tests pass.</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="112.6" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
-<text x="181.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
-<text x="241.6" y="556.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
-<text x="319.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="379.2" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
-<text x="448.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
-<text x="508.2" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
-<text x="826.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
-<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
-<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="241.6" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="301.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="362.0" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="482.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
-<text x="826.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="575.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="181.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="241.6" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
-<text x="319.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
-<text x="379.2" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">find</text>
-<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
-<text x="491.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
-<text x="826.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="594.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
-<text x="104.0" y="613.2" fill="#7f848e" textLength="154.8" lengthAdjust="spacingAndGlyphs">abandoned branches</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="241.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="430.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="499.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="534.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="585.6" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="611.4" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">all keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f1">
@@ -266,77 +246,77 @@
 <text x="998.4" y="119.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">· 2.0M</text>
 <text x="1471.4" y="119.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<rect x="35.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="35.2" y="138.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
-<rect x="43.8" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="52.4" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="52.4" y="138.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
-<rect x="61.0" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="69.6" y="124.0" width="51.6" height="19" fill="#303030"/>
-<text x="69.6" y="138.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<rect x="121.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="129.8" y="124.0" width="34.4" height="19" fill="#303030"/>
-<text x="147.0" y="138.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<rect x="164.2" y="124.0" width="86.0" height="19" fill="#303030"/>
-<text x="198.6" y="138.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
-<rect x="250.2" y="124.0" width="137.6" height="19" fill="#303030"/>
-<text x="250.2" y="138.2" fill="#61afef" font-weight="bold" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<rect x="387.8" y="124.0" width="421.4" height="19" fill="#303030"/>
-<text x="405.0" y="138.2" fill="#d7dae0" font-weight="bold" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
-<text x="817.8" y="138.2" fill="#7f848e" textLength="421.4" lengthAdjust="spacingAndGlyphs">││ 2026-10-11 18:52 → 2026-10-11 19:22 · 019a0000</text>
+<text x="69.6" y="138.2" fill="#7f848e" textLength="378.4" lengthAdjust="spacingAndGlyphs">AGENT   AGE    SIZE  PROJECT           TITLE</text>
+<text x="817.8" y="138.2" fill="#7f848e" textLength="421.4" lengthAdjust="spacingAndGlyphs">││ 2026-10-12 15:47 → 2026-10-12 16:17 · 019a0000</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="157.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="157.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="157.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">9h</text>
-<text x="198.6" y="157.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.0M</text>
-<text x="250.2" y="157.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<text x="405.0" y="157.2" fill="#d7dae0" textLength="301.0" lengthAdjust="spacingAndGlyphs">Write integration tests for /orders</text>
-<text x="817.8" y="157.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ ──────────────────────────────────────────────────────────────────────── │</text>
+<text x="18.0" y="157.2" fill="#7f848e" textLength="1462.0" lengthAdjust="spacingAndGlyphs">├────────────────────────────────────────────────────────────────────────────────────────────┤│ ──────────────────────────────────────────────────────────────────────── │</text>
 <text x="18.0" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="176.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="176.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="176.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">6d</text>
-<text x="207.2" y="176.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">46M</text>
-<text x="250.2" y="176.2" fill="#61afef" textLength="94.6" lengthAdjust="spacingAndGlyphs">game-engine</text>
-<text x="405.0" y="176.2" fill="#d7dae0" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
+<rect x="35.2" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="35.2" y="176.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
+<rect x="43.8" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="52.4" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="52.4" y="176.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
+<rect x="61.0" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="69.6" y="162.0" width="51.6" height="19" fill="#303030"/>
+<text x="69.6" y="176.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<rect x="121.2" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="129.8" y="162.0" width="34.4" height="19" fill="#303030"/>
+<text x="147.0" y="176.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
+<rect x="164.2" y="162.0" width="86.0" height="19" fill="#303030"/>
+<text x="198.6" y="176.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
+<rect x="250.2" y="162.0" width="137.6" height="19" fill="#303030"/>
+<text x="250.2" y="176.2" fill="#61afef" font-weight="bold" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<rect x="387.8" y="162.0" width="421.4" height="19" fill="#303030"/>
+<text x="405.0" y="176.2" fill="#d7dae0" font-weight="bold" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
 <text x="817.8" y="176.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="195.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="195.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="195.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">9d</text>
-<text x="198.6" y="195.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.8K</text>
-<text x="250.2" y="195.2" fill="#61afef" textLength="8.6" lengthAdjust="spacingAndGlyphs">-</text>
-<text x="405.0" y="195.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">(empty)</text>
+<text x="147.0" y="195.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">9h</text>
+<text x="198.6" y="195.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.0M</text>
+<text x="250.2" y="195.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<text x="405.0" y="195.2" fill="#d7dae0" textLength="301.0" lengthAdjust="spacingAndGlyphs">Write integration tests for /orders</text>
 <text x="817.8" y="195.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="195.2" fill="#56b6c2" font-weight="bold" textLength="43.0" lengthAdjust="spacingAndGlyphs">● You</text>
 <text x="1471.4" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="214.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="214.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="214.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="207.2" y="214.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
-<text x="250.2" y="214.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
-<text x="405.0" y="214.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
-<text x="482.4" y="214.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
+<text x="147.0" y="214.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">6d</text>
+<text x="207.2" y="214.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">46M</text>
+<text x="250.2" y="214.2" fill="#61afef" textLength="94.6" lengthAdjust="spacingAndGlyphs">game-engine</text>
+<text x="405.0" y="214.2" fill="#d7dae0" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
 <text x="817.8" y="214.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="214.2" fill="#d7dae0" textLength="593.4" lengthAdjust="spacingAndGlyphs">Users get logged out at random. The access token sometimes expires in</text>
 <text x="1471.4" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="233.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="233.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="138.4" y="233.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">3mo</text>
-<text x="198.6" y="233.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">5.3M</text>
-<text x="250.2" y="233.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">website</text>
-<text x="405.0" y="233.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Migrate the blog to Astro</text>
+<text x="147.0" y="233.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">9d</text>
+<text x="198.6" y="233.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.8K</text>
+<text x="250.2" y="233.2" fill="#61afef" textLength="8.6" lengthAdjust="spacingAndGlyphs">-</text>
+<text x="405.0" y="233.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">(empty)</text>
 <text x="817.8" y="233.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="233.2" fill="#d7dae0" textLength="206.4" lengthAdjust="spacingAndGlyphs">the middle of a request.</text>
 <text x="1471.4" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="252.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="252.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="69.6" y="252.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="252.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
+<text x="207.2" y="252.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
+<text x="250.2" y="252.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
+<text x="405.0" y="252.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
+<text x="482.4" y="252.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="817.8" y="252.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="252.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="271.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="271.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="69.6" y="271.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="138.4" y="271.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">3mo</text>
+<text x="198.6" y="271.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">5.3M</text>
+<text x="250.2" y="271.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">website</text>
+<text x="405.0" y="271.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Migrate the blog to Astro</text>
 <text x="817.8" y="271.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="271.2" fill="#d7875f" font-weight="bold" textLength="68.8" lengthAdjust="spacingAndGlyphs">● Claude</text>
 <text x="1471.4" y="271.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
@@ -382,61 +362,41 @@
 <text x="817.8" y="480.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="480.2" fill="#d7875f" font-weight="bold" textLength="68.8" lengthAdjust="spacingAndGlyphs">● Claude</text>
 <text x="1471.4" y="480.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="499.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="499.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="499.2" fill="#d7dae0" textLength="43.0" lengthAdjust="spacingAndGlyphs">Done.</text>
 <text x="895.2" y="499.2" fill="#56b6c2" textLength="120.4" lengthAdjust="spacingAndGlyphs">refreshToken()</text>
 <text x="1024.2" y="499.2" fill="#d7dae0" textLength="395.6" lengthAdjust="spacingAndGlyphs">now reuses the pending refresh, requests retry</text>
 <text x="1471.4" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="518.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="18.0" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="518.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="518.2" fill="#d7dae0" textLength="232.2" lengthAdjust="spacingAndGlyphs">once after it resolves, and</text>
 <text x="1084.4" y="518.2" fill="#56b6c2" textLength="206.4" lengthAdjust="spacingAndGlyphs">auth.concurrency.test.ts</text>
 <text x="1299.4" y="518.2" fill="#d7dae0" textLength="137.6" lengthAdjust="spacingAndGlyphs">covers the race.</text>
 <text x="1471.4" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="537.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="537.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="537.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="537.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="293.2" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="344.8" y="537.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
-<text x="405.0" y="537.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="482.4" y="537.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="516.8" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
-<text x="826.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="537.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="537.2" fill="#d7dae0" textLength="163.4" lengthAdjust="spacingAndGlyphs">All 214 tests pass.</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="112.6" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
-<text x="181.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
-<text x="241.6" y="556.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
-<text x="319.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="379.2" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
-<text x="448.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
-<text x="508.2" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
-<text x="826.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
-<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
-<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="241.6" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="301.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="362.0" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="482.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
-<text x="826.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="575.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="181.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="241.6" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
-<text x="319.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
-<text x="379.2" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">find</text>
-<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
-<text x="491.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
-<text x="826.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="594.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
-<text x="104.0" y="613.2" fill="#7f848e" textLength="154.8" lengthAdjust="spacingAndGlyphs">abandoned branches</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="241.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="430.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="499.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="534.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="585.6" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="611.4" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">all keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f2">
@@ -463,76 +423,76 @@
 <text x="1007.0" y="119.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">· 46M</text>
 <text x="1471.4" y="119.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<rect x="35.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="35.2" y="138.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
-<rect x="43.8" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="52.4" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="52.4" y="138.2" fill="#98c379" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<rect x="61.0" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="69.6" y="124.0" width="51.6" height="19" fill="#303030"/>
-<text x="69.6" y="138.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<rect x="121.2" y="124.0" width="60.2" height="19" fill="#303030"/>
-<text x="147.0" y="138.2" fill="#d7dae0" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">6d</text>
-<rect x="181.4" y="124.0" width="51.6" height="19" fill="#303030"/>
-<text x="207.2" y="138.2" fill="#e5c07b" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">46M</text>
-<rect x="233.0" y="124.0" width="17.2" height="19" fill="#303030"/>
-<rect x="250.2" y="124.0" width="137.6" height="19" fill="#303030"/>
-<text x="250.2" y="138.2" fill="#61afef" font-weight="bold" textLength="94.6" lengthAdjust="spacingAndGlyphs">game-engine</text>
-<rect x="387.8" y="124.0" width="421.4" height="19" fill="#303030"/>
-<text x="405.0" y="138.2" fill="#d7dae0" font-weight="bold" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
-<text x="817.8" y="138.2" fill="#7f848e" textLength="421.4" lengthAdjust="spacingAndGlyphs">││ 2026-10-05 18:56 → 2026-10-05 19:26 · 019a0005</text>
+<text x="69.6" y="138.2" fill="#7f848e" textLength="378.4" lengthAdjust="spacingAndGlyphs">AGENT   AGE    SIZE  PROJECT           TITLE</text>
+<text x="817.8" y="138.2" fill="#7f848e" textLength="421.4" lengthAdjust="spacingAndGlyphs">││ 2026-10-06 15:51 → 2026-10-06 16:21 · 019a0005</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="157.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="157.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="157.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="207.2" y="157.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
-<text x="250.2" y="157.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
-<text x="405.0" y="157.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
-<text x="482.4" y="157.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
-<text x="817.8" y="157.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ ──────────────────────────────────────────────────────────────────────── │</text>
+<text x="18.0" y="157.2" fill="#7f848e" textLength="1462.0" lengthAdjust="spacingAndGlyphs">├────────────────────────────────────────────────────────────────────────────────────────────┤│ ──────────────────────────────────────────────────────────────────────── │</text>
 <text x="18.0" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="176.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="69.6" y="176.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="138.4" y="176.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">3mo</text>
-<text x="198.6" y="176.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">5.3M</text>
-<text x="250.2" y="176.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">website</text>
-<text x="405.0" y="176.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Migrate the blog to Astro</text>
+<rect x="35.2" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="35.2" y="176.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
+<rect x="43.8" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="52.4" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="52.4" y="176.2" fill="#98c379" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<rect x="61.0" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="69.6" y="162.0" width="51.6" height="19" fill="#303030"/>
+<text x="69.6" y="176.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<rect x="121.2" y="162.0" width="60.2" height="19" fill="#303030"/>
+<text x="147.0" y="176.2" fill="#d7dae0" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">6d</text>
+<rect x="181.4" y="162.0" width="51.6" height="19" fill="#303030"/>
+<text x="207.2" y="176.2" fill="#e5c07b" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">46M</text>
+<rect x="233.0" y="162.0" width="17.2" height="19" fill="#303030"/>
+<rect x="250.2" y="162.0" width="137.6" height="19" fill="#303030"/>
+<text x="250.2" y="176.2" fill="#61afef" font-weight="bold" textLength="94.6" lengthAdjust="spacingAndGlyphs">game-engine</text>
+<rect x="387.8" y="162.0" width="421.4" height="19" fill="#303030"/>
+<text x="405.0" y="176.2" fill="#d7dae0" font-weight="bold" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
 <text x="817.8" y="176.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="195.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="195.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="195.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">9h</text>
-<text x="198.6" y="195.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.0M</text>
-<text x="250.2" y="195.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<text x="405.0" y="195.2" fill="#d7dae0" textLength="301.0" lengthAdjust="spacingAndGlyphs">Write integration tests for /orders</text>
+<text x="147.0" y="195.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
+<text x="207.2" y="195.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
+<text x="250.2" y="195.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
+<text x="405.0" y="195.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
+<text x="482.4" y="195.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="817.8" y="195.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="195.2" fill="#56b6c2" font-weight="bold" textLength="43.0" lengthAdjust="spacingAndGlyphs">● You</text>
 <text x="1471.4" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="214.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
+<text x="52.4" y="214.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="214.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="214.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="198.6" y="214.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
-<text x="250.2" y="214.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
-<text x="405.0" y="214.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
+<text x="138.4" y="214.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">3mo</text>
+<text x="198.6" y="214.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">5.3M</text>
+<text x="250.2" y="214.2" fill="#61afef" textLength="60.2" lengthAdjust="spacingAndGlyphs">website</text>
+<text x="405.0" y="214.2" fill="#d7dae0" textLength="215.0" lengthAdjust="spacingAndGlyphs">Migrate the blog to Astro</text>
 <text x="817.8" y="214.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="214.2" fill="#d7dae0" textLength="335.4" lengthAdjust="spacingAndGlyphs">Profile the renderer and cut draw calls</text>
 <text x="1471.4" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="52.4" y="233.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="69.6" y="233.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="147.0" y="233.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">9d</text>
-<text x="198.6" y="233.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.8K</text>
-<text x="250.2" y="233.2" fill="#61afef" textLength="8.6" lengthAdjust="spacingAndGlyphs">-</text>
-<text x="405.0" y="233.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">(empty)</text>
+<text x="147.0" y="233.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">9h</text>
+<text x="198.6" y="233.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.0M</text>
+<text x="250.2" y="233.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<text x="405.0" y="233.2" fill="#d7dae0" textLength="301.0" lengthAdjust="spacingAndGlyphs">Write integration tests for /orders</text>
 <text x="817.8" y="233.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="252.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="252.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
+<text x="69.6" y="252.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="252.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
+<text x="198.6" y="252.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
+<text x="250.2" y="252.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<text x="405.0" y="252.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
 <text x="817.8" y="252.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="252.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="271.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="271.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="69.6" y="271.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="271.2" fill="#d7dae0" textLength="17.2" lengthAdjust="spacingAndGlyphs">9d</text>
+<text x="198.6" y="271.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">3.8K</text>
+<text x="250.2" y="271.2" fill="#61afef" textLength="8.6" lengthAdjust="spacingAndGlyphs">-</text>
+<text x="405.0" y="271.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">(empty)</text>
 <text x="817.8" y="271.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="271.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="290.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
@@ -568,54 +528,34 @@
 <text x="18.0" y="480.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="817.8" y="480.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="480.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="499.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="499.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="499.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="518.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="18.0" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="518.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="518.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="537.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="537.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="537.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="537.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="293.2" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="344.8" y="537.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
-<text x="405.0" y="537.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="482.4" y="537.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="516.8" y="537.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
-<text x="826.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="537.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="112.6" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
-<text x="181.4" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-X</text>
-<text x="241.6" y="556.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">archive</text>
-<text x="319.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="379.2" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
-<text x="448.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
-<text x="508.2" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
-<text x="826.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
-<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
-<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="241.6" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="301.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="362.0" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="482.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
-<text x="826.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="575.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="181.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="241.6" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
-<text x="319.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
-<text x="379.2" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">find</text>
-<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
-<text x="491.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
-<text x="826.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="594.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
-<text x="104.0" y="613.2" fill="#7f848e" textLength="154.8" lengthAdjust="spacingAndGlyphs">abandoned branches</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="241.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="430.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="499.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="534.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="585.6" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="611.4" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">all keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f3">
@@ -625,7 +565,7 @@
 <text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-03 19:26</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-04 16:21</text>
 <text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="387.8" y="81.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
 <text x="542.6" y="81.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
@@ -634,7 +574,7 @@
 <text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
 <text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="119.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-11 19:22</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-12 16:17</text>
 <text x="336.2" y="119.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
 <text x="387.8" y="119.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
 <text x="542.6" y="119.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
@@ -649,7 +589,7 @@
 <text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-03 19:26</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-04 16:21</text>
 <text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="387.8" y="81.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
 <text x="542.6" y="81.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
@@ -658,7 +598,7 @@
 <text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
 <text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="119.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-11 19:22</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-12 16:17</text>
 <text x="336.2" y="119.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
 <text x="387.8" y="119.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
 <text x="542.6" y="119.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
@@ -676,57 +616,43 @@
 <text x="18.0" y="81.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="35.2" y="81.2" fill="#56b6c2" font-weight="bold" textLength="60.2" lengthAdjust="spacingAndGlyphs">trash ❯</text>
 <text x="104.0" y="81.2" fill="#7f848e" textLength="120.4" lengthAdjust="spacingAndGlyphs">type to filter</text>
-<text x="783.4" y="81.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">1/1</text>
+<text x="783.4" y="81.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">2/2</text>
 <text x="817.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
-<text x="843.6" y="81.2" fill="#d7dae0" font-weight="bold" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
+<text x="843.6" y="81.2" fill="#d7dae0" textLength="206.4" lengthAdjust="spacingAndGlyphs">lethe: not a session id:</text>
 <text x="1471.4" y="81.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="100.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
-<text x="843.6" y="100.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="912.4" y="100.2" fill="#e5c07b" textLength="103.2" lengthAdjust="spacingAndGlyphs">in the trash</text>
-<text x="1032.8" y="100.2" fill="#7f848e" textLength="309.6" lengthAdjust="spacingAndGlyphs">019a0009-5c2e-7d41-9b6a-3f8e21c57139</text>
+<text x="843.6" y="100.2" fill="#d7dae0" textLength="163.4" lengthAdjust="spacingAndGlyphs">Try &#x27;lethe --help&#x27;.</text>
 <text x="1471.4" y="100.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="119.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">╭</text>
 <text x="35.2" y="119.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">trash · 1 session(s) · 11M</text>
 <text x="267.4" y="119.2" fill="#7f848e" textLength="567.6" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────╮│</text>
-<text x="843.6" y="119.2" fill="#61afef" textLength="172.0" lengthAdjust="spacingAndGlyphs">~/code/old-prototype</text>
 <text x="1471.4" y="119.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<rect x="35.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="35.2" y="138.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
-<rect x="43.8" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="52.4" y="124.0" width="8.6" height="19" fill="#303030"/>
-<text x="52.4" y="138.2" fill="#e5c07b" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">↺</text>
-<rect x="61.0" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="69.6" y="124.0" width="51.6" height="19" fill="#303030"/>
-<text x="69.6" y="138.2" fill="#d7875f" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<rect x="121.2" y="124.0" width="8.6" height="19" fill="#303030"/>
-<rect x="129.8" y="124.0" width="34.4" height="19" fill="#303030"/>
-<text x="147.0" y="138.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">0m</text>
-<rect x="164.2" y="124.0" width="17.2" height="19" fill="#303030"/>
-<rect x="181.4" y="124.0" width="51.6" height="19" fill="#303030"/>
-<text x="207.2" y="138.2" fill="#e5c07b" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
-<rect x="233.0" y="124.0" width="17.2" height="19" fill="#303030"/>
-<rect x="250.2" y="124.0" width="137.6" height="19" fill="#303030"/>
-<text x="250.2" y="138.2" fill="#61afef" font-weight="bold" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
-<rect x="387.8" y="124.0" width="17.2" height="19" fill="#303030"/>
-<rect x="405.0" y="124.0" width="86.0" height="19" fill="#303030"/>
-<text x="405.0" y="138.2" fill="#7f848e" font-weight="bold" textLength="77.4" lengthAdjust="spacingAndGlyphs">trashed ·</text>
-<rect x="491.0" y="124.0" width="318.2" height="19" fill="#303030"/>
-<text x="491.0" y="138.2" fill="#d7dae0" font-weight="bold" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
-<text x="817.8" y="138.2" fill="#7f848e" textLength="464.4" lengthAdjust="spacingAndGlyphs">││ trashed 2026-10-11 19:27 · 11M · Ctrl-R restores it</text>
+<text x="69.6" y="138.2" fill="#7f848e" textLength="378.4" lengthAdjust="spacingAndGlyphs">AGENT   AGE    SIZE  PROJECT           TITLE</text>
+<text x="817.8" y="138.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="817.8" y="157.2" fill="#7f848e" textLength="662.2" lengthAdjust="spacingAndGlyphs">││ ──────────────────────────────────────────────────────────────────────── │</text>
+<text x="18.0" y="157.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">├────────────────────────────────────────────────────────────────────────────────────────────┤│</text>
+<text x="1471.4" y="157.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<rect x="35.2" y="162.0" width="8.6" height="19" fill="#303030"/>
+<text x="35.2" y="176.2" fill="#c678dd" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">▌</text>
+<rect x="43.8" y="162.0" width="8.6" height="19" fill="#303030"/>
+<rect x="52.4" y="162.0" width="756.8" height="19" fill="#303030"/>
+<text x="69.6" y="176.2" fill="#d7dae0" font-weight="bold" textLength="378.4" lengthAdjust="spacingAndGlyphs">AGENT   AGE    SIZE  PROJECT           TITLE</text>
 <text x="817.8" y="176.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="176.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="52.4" y="195.2" fill="#e5c07b" textLength="8.6" lengthAdjust="spacingAndGlyphs">↺</text>
+<text x="69.6" y="195.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="147.0" y="195.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">0m</text>
+<text x="207.2" y="195.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
+<text x="250.2" y="195.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
+<text x="405.0" y="195.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">trashed ·</text>
+<text x="491.0" y="195.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="817.8" y="195.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
-<text x="843.6" y="195.2" fill="#56b6c2" font-weight="bold" textLength="43.0" lengthAdjust="spacingAndGlyphs">● You</text>
 <text x="1471.4" y="195.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="817.8" y="214.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
-<text x="843.6" y="214.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
 <text x="1471.4" y="214.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="233.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="817.8" y="233.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
@@ -779,33 +705,54 @@
 <text x="18.0" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="817.8" y="537.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="537.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="556.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
+<text x="18.0" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="18.0" y="575.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
+<text x="18.0" y="575.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
-<text x="86.8" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
-<text x="138.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-A</text>
-<text x="198.6" y="594.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
-<text x="241.6" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
-<text x="301.8" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">restore</text>
-<text x="379.2" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
-<text x="439.4" y="594.2" fill="#7f848e" textLength="120.4" lengthAdjust="spacingAndGlyphs">delete forever</text>
-<text x="577.0" y="594.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
-<text x="628.6" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="826.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="18.0" y="594.2" fill="#7f848e" textLength="817.0" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────────│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="613.2" fill="#7f848e" textLength="129.0" lengthAdjust="spacingAndGlyphs">leave the trash</text>
-<text x="258.8" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-P</text>
-<text x="319.0" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">preview</text>
-<text x="396.4" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
-<text x="430.8" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Tab</text>
+<text x="86.8" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">mark</text>
+<text x="138.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="241.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-D</text>
+<text x="301.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">delete</text>
+<text x="370.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-R</text>
+<text x="430.8" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
+<text x="499.6" y="613.2" fill="#56b6c2" textLength="25.8" lengthAdjust="spacingAndGlyphs">Esc</text>
+<text x="534.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="585.6" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="611.4" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">all keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f6">
 <text x="749" y="22.0" fill="#9da5b4" text-anchor="middle" font-size="13">lethe · Ctrl-R puts it back, exactly where it was</text>
-<text x="18.0" y="62.2" fill="#98c379" textLength="326.8" lengthAdjust="spacingAndGlyphs">✓ restored: Port the prototype to Rust</text>
-<text x="18.0" y="100.2" fill="#7f848e" textLength="189.2" lengthAdjust="spacingAndGlyphs">Press Enter to return…</text>
+<text x="18.0" y="62.2" fill="#d7dae0" font-weight="bold" textLength="163.4" lengthAdjust="spacingAndGlyphs">Delete 1 session(s)</text>
+<text x="190.0" y="62.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">(11M)</text>
+<text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="129.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-09-04 16:21</text>
+<text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
+<text x="387.8" y="81.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
+<text x="542.6" y="81.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">vscode ·</text>
+<text x="620.0" y="81.2" fill="#d7dae0" textLength="223.6" lengthAdjust="spacingAndGlyphs">Port the prototype to Rust</text>
+<text x="18.0" y="100.2" fill="#c678dd" font-weight="bold" textLength="258.0" lengthAdjust="spacingAndGlyphs">Skipped 1 protected session(s)</text>
+<text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
+<text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="129.8" y="119.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="137.6" lengthAdjust="spacingAndGlyphs">2026-10-12 16:17</text>
+<text x="336.2" y="119.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
+<text x="387.8" y="119.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
+<text x="542.6" y="119.2" fill="#d7dae0" textLength="292.4" lengthAdjust="spacingAndGlyphs">Fix the token refresh race in auth</text>
+<text x="69.6" y="138.2" fill="#7f848e" textLength="215.0" lengthAdjust="spacingAndGlyphs">↳ open in a running agent</text>
+<text x="18.0" y="157.2" fill="#7f848e" textLength="516.0" lengthAdjust="spacingAndGlyphs">Claude Code sessions go to the trash: lethe trash restore ID</text>
+<text x="18.0" y="195.2" fill="#d7dae0" textLength="240.8" lengthAdjust="spacingAndGlyphs">Delete 1 session(s)? [y/N] y</text>
+<text x="18.0" y="214.2" fill="#98c379" textLength="189.2" lengthAdjust="spacingAndGlyphs">✓ deleted 1 (0B freed)</text>
+<text x="18.0" y="252.2" fill="#7f848e" textLength="189.2" lengthAdjust="spacingAndGlyphs">Press Enter to return…</text>
+<text x="18.0" y="271.2" fill="#d7dae0" textLength="206.4" lengthAdjust="spacingAndGlyphs">lethe: not a session id:</text>
+<text x="18.0" y="290.2" fill="#d7dae0" textLength="163.4" lengthAdjust="spacingAndGlyphs">Try &#x27;lethe --help&#x27;.</text>
+<text x="18.0" y="328.2" fill="#7f848e" textLength="189.2" lengthAdjust="spacingAndGlyphs">Press Enter to return…</text>
 </g>
 </svg>

@@ -77,6 +77,8 @@ Everything the command line can do, the picker can do too.
 | `Ctrl-P` | show / hide the conversation preview |
 | `Ctrl-B` | disk usage and cleanup stats |
 | `Alt-B` | show or hide abandoned branches (`⑂`) in the preview, `Enter` and `Ctrl-E` |
+| `Ctrl-Y` | copy the command that resumes the session (`cd … && claude --resume …`) |
+| `F1` | show all keys, or only the essential ones (the default on short terminals) |
 | `Esc` | quit |
 
 In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good. Typing filters the list by title, project, agent or mode. Command-line filters apply too: `lethe --dir ~/work --older-than 2w`.

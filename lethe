@@ -1190,7 +1190,13 @@ render_conversation() {
                 elif $reset != "" then .out += [$line | inline | wrap]
                 else .out += [$line | wrap] end)
             | .out | join("\n");
-        def cut: if $preview == 1 and length > 1200 then .[:1200] + " …" else . end;
+        # Long messages in the preview stop at a line break (or a space), so
+        # that no **bold** or `code` marker is left open.
+        def cut: if $preview == 1 and length > 1200 then
+                .[:1200] as $head
+                | ($head | rindex("\n") // 0) as $nl
+                | (if $nl > 600 then $head[:$nl] else $head[:($head | rindex(" ") // 1200)] end) + " …"
+            else . end;
         def render:
             if .abandoned then
                 (if .role == "user" then $abandoned_you else $abandoned_agent end) + "\n"
@@ -1762,6 +1768,7 @@ cmd_pick() {
     prepare
 
     local state me track=() layout=() refresh label
+    export LETHE_COLUMNS=0
     state=$(mktemp -d "${TMPDIR:-/tmp}/lethe.XXXXXX")
     # shellcheck disable=SC2064 # expand now: $state is local to this function
     trap "rm -rf -- $(printf '%q' "$state")" EXIT
@@ -1769,6 +1776,8 @@ cmd_pick() {
     printf '%s\n' "${F_STATUS:-all}" >"$state/status"
     printf '%s\n' "$O_SORT" >"$state/sort"
     printf 'all\n' >"$state/filter"
+    # The full key list takes 5 lines: on short terminals start with one line.
+    if (($(tput lines 2>/dev/null || echo 50) >= 45)); then echo full; else echo short; fi >"$state/keys"
     printf 'active\n' >"$state/branches"
     : >"$state/grep"
     : >"$state/dir"
@@ -1784,6 +1793,7 @@ cmd_pick() {
     label=$(printf '%q' "$state/label")
     if [[ $features == *--footer=* && $features == *--list-border* ]]; then
         # fzf >= 0.63: separate panels, keys in a footer.
+        LETHE_COLUMNS=1
         layout=(
             --input-border=rounded --input-label=" lethe " --input-label-pos=2
             --list-border=rounded --list-label-pos=2
@@ -1795,6 +1805,7 @@ cmd_pick() {
             --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,bg+:236,info:8,ghost:8'
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
+            --header-lines=1 --header-lines-border=inline --color='header:8'
         )
         refresh="+transform-prompt($me __state prompt)+transform-footer($me __state footer)+reload($me __rows)"
     else
@@ -1826,6 +1837,8 @@ cmd_pick() {
         --bind="ctrl-b:execute($me __stats)" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
+        --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)" \
+        --bind="ctrl-y:execute-silent($me __copy {1})" \
         --bind="enter:execute($me __page {1})" ||
         true
 }
@@ -1855,8 +1868,15 @@ picker_setup() {
     prepare
 }
 
+# Column titles, first line of the picker's input (--header-lines=1).
+column_titles() {
+    [[ ${LETHE_COLUMNS:-} == 1 ]] || return 0
+    printf '\t  %-6s %4s  %6s  %-16s  %s\n' AGENT AGE SIZE PROJECT TITLE
+}
+
 internal_rows() {
     setup_colors always
+    column_titles
     if [[ $(<"$LETHE_STATE/filter") == trash ]]; then
         trash_rows
         return
@@ -1882,6 +1902,7 @@ internal_rows() {
 # Picker rows for the trash; ids are "trash:<entry>".
 trash_rows() {
     local entry id title cwd trashed size count=0 bytes=0 hbytes
+    column_titles
     while IFS= read -r entry; do
         IFS=$US read -r id title cwd trashed < <(jq -r --arg us "$US" \
             '[.id, (.title // ""), (.cwd // ""), (.trashed_at // 0 | tostring)] | join($us)' "$entry/manifest.json")
@@ -1965,10 +1986,16 @@ internal_state() {
             [[ $(cat "$dir/branches" 2>/dev/null) != all ]] || parts+=("⑂ all branches")
             printf '%s ❯ ' "$(join_by ' · ' "${parts[@]}")"
             ;;
+        keys)
+            value=$(<"$dir/keys")
+            if [[ $value == full ]]; then echo short; else echo full; fi >"$dir/keys"
+            ;;
         footer)
             setup_colors always
             local keys line out=()
-            if [[ $(<"$dir/filter") == trash ]]; then
+            if [[ $(cat "$dir/keys" 2>/dev/null) == short ]]; then
+                keys=("Tab:mark Enter:read Ctrl-D:delete Ctrl-R:resume Esc:quit F1:all_keys")
+            elif [[ $(<"$dir/filter") == trash ]]; then
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
                     "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit")
             else
@@ -1976,7 +2003,7 @@ internal_state() {
                     "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork"
                     "Ctrl-E:export Ctrl-B:stats Ctrl-T:agent Ctrl-S:status"
                     "Ctrl-F:filter Ctrl-W:project Ctrl-G:find Ctrl-O:sort"
-                    "Alt-B:abandoned_branches")
+                    "Ctrl-Y:copy_resume_command Alt-B:abandoned_branches F1:fewer_keys")
             fi
             for line in "${keys[@]}"; do
                 out=()
@@ -2094,6 +2121,27 @@ internal_export() {
     fi
     printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
     read -r </dev/tty || true
+}
+
+# Copy the command that resumes a session to the clipboard, with OSC 52 (kitty,
+# WezTerm, iTerm2, tmux with set-clipboard, ...) and any local clipboard tool.
+internal_copy() {
+    [[ $1 != trash:* ]] || return 0
+    local agent cwd command
+    REINDEX=0
+    init
+    IFS=$US read -r agent _ _ _ cwd _ < <(session_info "$1")
+    [[ -n $agent ]] || return 0
+    if [[ $agent == claude ]]; then command="claude --resume $1"; else command="codex resume $1"; fi
+    [[ ! -d $cwd ]] || command="cd $(printf '%q' "$cwd") && $command"
+    { printf '\e]52;c;%s\a' "$(printf '%s' "$command" | base64 | tr -d '\n')" >/dev/tty; } 2>/dev/null || true
+    if command -v wl-copy >/dev/null 2>&1 && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
+        printf '%s' "$command" | wl-copy 2>/dev/null || true
+    elif command -v xclip >/dev/null 2>&1 && [[ -n ${DISPLAY:-} ]]; then
+        printf '%s' "$command" | xclip -selection clipboard 2>/dev/null || true
+    elif command -v pbcopy >/dev/null 2>&1; then
+        printf '%s' "$command" | pbcopy || true
+    fi
 }
 
 internal_page() {
@@ -2229,6 +2277,7 @@ Picker keys:
   Ctrl-F filter: empty, orphans, missing, idle 30d+, idle 90d+, trash (Ctrl-R restores there)
   Ctrl-O sort by size  Ctrl-P preview  Ctrl-B stats  Esc quit
   Alt-B show or hide abandoned branches (⑂) in the preview, Enter and Ctrl-E
+  Ctrl-Y copy the command that resumes the session   F1 fewer or all keys
 
 Environment: CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, NO_COLOR, PAGER.
 EOF
@@ -2273,6 +2322,7 @@ main() {
         __page) REINDEX=0 && internal_page "$2" ;;
         __resume) internal_resume "$2" "${3:-}" ;;
         __export) REINDEX=0 && setup_colors always && internal_export "$2" ;;
+        __copy) internal_copy "$2" ;;
         __action) shift && internal_action "$@" ;;
         *) usage_error "unknown command: $cmd" ;;
     esac

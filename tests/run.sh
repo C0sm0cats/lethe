@@ -299,6 +299,16 @@ printf '%s\n' all >"$LETHE_STATE/filter"
 : >"$LETHE_STATE/grep"
 : >"$LETHE_STATE/dir"
 picker_ids() { "$LETHE" __rows | cut -f 1 | sort | tr '\n' ' '; }
+check "picker: column titles come first when the panel layout is on" \
+    '[[ $(LETHE_COLUMNS=1 "$LETHE" __rows | head -n 1) == *"AGENT"*"PROJECT"*"TITLE"* ]]'
+printf 'full\n' >"$LETHE_STATE/keys"
+"$LETHE" __state keys
+check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'
+"$LETHE" __state keys
+printf '#!/bin/sh\ncat >"%s/clipboard"\n' "$WORK" >"$WORK/bin/pbcopy" && chmod +x "$WORK/bin/pbcopy"
+WAYLAND_DISPLAY="" DISPLAY="" "$LETHE" __copy "$A" </dev/null
+check "picker: Ctrl-Y copies the command that resumes the session" \
+    '[[ $(<"$WORK/clipboard") == "cd $PROJ && codex resume $A" ]]' "$(cat "$WORK/clipboard" 2>/dev/null)"
 "$LETHE" __state filter
 check "picker: Ctrl-F shows empty sessions" '[[ $(picker_ids) == "$H $E " ]]' "$(picker_ids)"
 check "picker: prompt names the filter" '[[ $("$LETHE" __state prompt) == "all agents · empty ❯ " ]]'

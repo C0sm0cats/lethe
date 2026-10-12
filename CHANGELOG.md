@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Column titles (agent, age, size, project, title) at the top of the picker list.
+- On short terminals the footer shows the essential keys on one line; `F1` toggles the full list.
+  On a 40-line terminal the list shows 10 sessions instead of 7.
+- `Ctrl-Y` copies the command that resumes the selected session (OSC 52, `wl-copy`, `xclip` or `pbcopy`).
+- Long messages in the preview are cut at a line break, so `**bold**` and `` `code` `` are never left open.
+
 ## 0.3.1 — 2026-10-11
 
 - Alt-B is visible: the prompt shows `⑂ all branches`, and a long preview keeps every abandoned
