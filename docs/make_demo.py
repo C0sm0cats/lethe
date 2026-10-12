@@ -6,6 +6,7 @@ drives the real picker in a detached tmux session, captures the screen after
 each step and turns the captures into SVG frames.
 """
 import json
+import re
 import os
 import sqlite3
 import subprocess
@@ -150,7 +151,7 @@ def screen():
 
 # (caption, keys to press before the capture)
 STORY = [
-    ("Every Claude Code and Codex session, in one list", []),
+    ("Every Claude Code and Codex session, in one list", ["F1"]),
     ("Ctrl-T: one agent at a time", ["C-t"]),
     ("Ctrl-O: biggest sessions first", ["C-o", *["Up"] * 8]),
     ("Tab marks, Ctrl-D deletes, and open sessions are always skipped",
@@ -208,14 +209,13 @@ def frame_body(term, top):
             if back:
                 out.append(f'<rect x="{left:.1f}" y="{line_top:.1f}" width="{width:.1f}" height="{CELL_H}" '
                            f'fill="{back}"/>')
-            stripped = text.rstrip()
-            if stripped.strip():
-                lead = len(stripped) - len(stripped.lstrip())
-                stripped = stripped.lstrip()
-                weight = ' font-weight="bold"' if bold else ""
-                out.append(f'<text x="{left + lead * CELL_W:.1f}" y="{baseline:.1f}" fill="{fill}"{weight} '
-                           f'textLength="{len(stripped) * CELL_W:.1f}" lengthAdjust="spacingAndGlyphs">'
-                           f'{escape(stripped)}</text>')
+            # One element per word, placed on its own cell: viewers render runs of
+            # spaces differently, which would shift columns.
+            weight = ' font-weight="bold"' if bold else ""
+            for word in re.finditer(r"\S+", text):
+                out.append(f'<text x="{left + word.start() * CELL_W:.1f}" y="{baseline:.1f}" fill="{fill}"{weight} '
+                           f'textLength="{len(word.group()) * CELL_W:.1f}" lengthAdjust="spacingAndGlyphs">'
+                           f'{escape(word.group())}</text>')
     return out
 
 
