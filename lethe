@@ -1834,8 +1834,8 @@ cmd_pick() {
         --bind="ctrl-e:execute($me __export {1})" \
         --bind="ctrl-t:execute-silent($me __state agent)$refresh" \
         --bind="ctrl-s:execute-silent($me __state status)$refresh" \
-        --bind="ctrl-f:execute-silent($me __state filter)$refresh" \
-        --bind="ctrl-w:execute-silent($me __state dir {1})$refresh" \
+        --bind="ctrl-f:execute($me __choose filter)$refresh" \
+        --bind="ctrl-w:execute($me __choose dir {1})$refresh" \
         --bind="ctrl-g:execute-silent($me __state grep {q})+clear-query$refresh" \
         --bind="ctrl-o:execute-silent($me __state sort)+reload($me __rows)" \
         --bind="alt-b:execute-silent($me __state branches)+transform-prompt($me __state prompt)+refresh-preview" \
@@ -1871,6 +1871,94 @@ picker_setup() {
     [[ -z $value ]] || F_DIRS+=("$value")
     [[ $F_STATUS != all ]] || F_STATUS=""
     prepare
+}
+
+# choose_lines filter|dir [ID] — the choices of the Ctrl-F and Ctrl-W pickers:
+# "value<TAB>label" lines, with how many sessions and how much space each holds
+# under the current agent and status. With dir, the current choice (the
+# project of session ID) is the first line after "All projects".
+choose_lines() {
+    local kind=$1 current=${2:-} agent id archived recency date mode provider empty size cwd title path state rewinds
+    local -A n=() b=() pn=() pb=()
+    picker_setup
+    if [[ $kind == filter ]]; then
+        F_EMPTY=0 F_ORPHANS=0 F_MISSING=0 F_OLDER=""
+    elif [[ -s $LETHE_STATE/dir ]]; then
+        unset 'F_DIRS[-1]'
+    fi
+    setup_colors always
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
+        ((size >= 0)) || size=0
+        [[ $id != "$current" ]] || current=$cwd
+        add() { n[$1]=$((${n[$1]:-0} + 1)) && b[$1]=$((${b[$1]:-0} + size)); }
+        add all
+        ((!empty)) || add empty
+        [[ -z $cwd || -d $cwd ]] || add orphans
+        [[ $path == /* && -f $path ]] || [[ $agent != codex ]] || add missing
+        ((NOW - recency < 30 * 86400)) || add idle30
+        ((NOW - recency < 90 * 86400)) || add idle90
+        if [[ -n $cwd ]]; then
+            pn[$cwd]=$((${pn[$cwd]:-0} + 1))
+            pb[$cwd]=$((${pb[$cwd]:-0} + size))
+        fi
+    done < <(fetch_rows)
+    count() {
+        local hsize
+        human_size hsize "${2:-0}"
+        printf '%s%5d  %7s%s' "$C_DIM" "${1:-0}" "$hsize" "$C_RESET"
+    }
+    if [[ $kind == filter ]]; then
+        local key label entry tn=0 tb=0
+        while IFS= read -r entry; do
+            tn=$((tn + 1))
+            tb=$((tb + $(du -sk -- "$entry" | cut -f 1) * 1024))
+        done < <(trash_entries)
+        while IFS=: read -r key label; do
+            printf '%s\t%-40s %s\n' "$key" "$label" "$(count "${n[$key]:-0}" "${b[$key]:-0}")"
+        done <<'EOF'
+all:All sessions
+empty:Empty: no message, no reply
+orphans:Orphans: project directory is gone
+missing:Missing: Codex index without transcript
+idle30:Idle for 30 days or more
+idle90:Idle for 90 days or more
+EOF
+        printf 'trash\t%-40s %s\n' "Trash: deleted Claude Code sessions" "$(count "$tn" "$tb")"
+    else
+        local dir
+        printf '\t%-40s %s\n' "All projects" "$(count "${n[all]:-0}" "${b[all]:-0}")"
+        [[ -z $current || -z ${pn[$current]+x} ]] || {
+            short_path dir "$current"
+            fit_tail dir "${dir:--}" 40
+            printf '%s\t%s %s\n' "$current" "$dir" "$(count "${pn[$current]}" "${pb[$current]}")"
+        }
+        for dir in "${!pn[@]}"; do printf '%s\t%s\n' "${pb[$dir]}" "$dir"; done | sort -t $'\t' -k1,1nr |
+            while IFS=$'\t' read -r size cwd; do
+                [[ $cwd != "$current" ]] || continue
+                short_path dir "$cwd"
+                fit_tail dir "${dir:--}" 40
+                printf '%s\t%s %s\n' "$cwd" "$dir" "$(count "${pn[$cwd]}" "$size")"
+            done
+    fi
+}
+
+# Ctrl-F / Ctrl-W: pick a cleanup filter or a project, seeing what each holds.
+internal_choose() {
+    local kind=$1 current=${2:-} choice gutter=()
+    [[ $current != trash:* ]] || current=""
+    ! fzf --help 2>/dev/null | grep -q -- '--gutter' || gutter=(--gutter=' ')
+    choice=$(choose_lines "$kind" "$current" | fzf --ansi --layout=reverse --height=100% \
+        --border=rounded --border-label=" $([[ $kind == filter ]] && echo "cleanup filter" || echo "project · by size") " \
+        --delimiter=$'\t' --with-nth=2 --no-sort --pointer='▶' --prompt='❯ ' --info=inline-right \
+        --color='border:8,label:6:bold,bg+:236,pointer:5,prompt:6,info:8,header:8' \
+        "${gutter[@]}" \
+        --header="$(printf '%-40s %s' "" "sessions     size")" --header-first \
+        --bind="load:pos($([[ $kind == dir && -n $current ]] && echo 2 || echo 1))") || return 0
+    if [[ $kind == filter ]]; then
+        printf '%s\n' "${choice%%$'\t'*}" >"$LETHE_STATE/filter"
+    else
+        printf '%s' "${choice%%$'\t'*}" >"$LETHE_STATE/dir"
+    fi
 }
 
 # Column titles, first line of the picker's input (--header-lines=1).
@@ -1942,7 +2030,13 @@ internal_state() {
                 branches:all) value=active ;;
                 *) value=all ;;
             esac
+            if [[ $1 == status && $value == archived && $(<"$dir/agent") == claude ]]; then
+                value=all # only Codex sessions can be archived
+            fi
             printf '%s\n' "$value" >"$dir/$1"
+            if [[ $1 == agent && $value == claude && $(<"$dir/status") == archived ]]; then
+                printf 'all\n' >"$dir/status"
+            fi
             ;;
         filter)
             value=$(<"$dir/filter")
@@ -2300,8 +2394,9 @@ Safety:
 Picker keys:
   Tab mark  Ctrl-A mark all  Ctrl-D delete  Ctrl-X archive/unarchive  Enter read
   Ctrl-R resume  Ctrl-K fork  Ctrl-E export to ./lethe-ID.md
-  Ctrl-T agent  Ctrl-S status  Ctrl-W this project  Ctrl-G find the typed text in conversations
-  Ctrl-F filter: empty, orphans, missing, idle 30d+, idle 90d+, trash (Ctrl-R restores there)
+  Ctrl-T agent  Ctrl-S status  Ctrl-G find the typed text in conversations
+  Ctrl-F pick a cleanup filter (empty, orphans, missing, idle, trash) with counts and sizes
+  Ctrl-W pick a project, biggest first (the current session's project comes first)
   Ctrl-O sort by size  Ctrl-P preview  Ctrl-B stats  Esc quit
   Alt-B show or hide abandoned branches (⑂) in the preview, Enter and Ctrl-E
   Ctrl-Y copy the command that resumes the session   F1 fewer or all keys
@@ -2351,6 +2446,7 @@ main() {
         __export) REINDEX=0 && setup_colors always && internal_export "$2" ;;
         __copy) internal_copy "$2" ;;
         __marked) shift && internal_marked "$@" ;;
+        __choose) REINDEX=0 && internal_choose "$2" "${3:-}" ;;
         __action) shift && internal_action "$@" ;;
         *) usage_error "unknown command: $cmd" ;;
     esac

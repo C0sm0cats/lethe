@@ -157,7 +157,7 @@ STORY = [
     ("Tab marks, Ctrl-D deletes, and open sessions are always skipped",
      ["Down", "Tab", "Down", "Down", "Tab", "C-d"]),
     ("Deleted Claude Code sessions go to a restorable trash", ["text:y", "Enter"]),
-    ("Ctrl-F: empty, orphaned, idle sessions, and the trash", ["Enter", "sleep:2", *[k for _ in range(6) for k in ("C-f", "sleep:0.6")]]),
+    ("Ctrl-F: empty, orphaned, idle sessions, and the trash", ["Enter", "sleep:2", "C-f", "sleep:2", *["Down"] * 6, "Enter"]),
     ("Ctrl-R puts it back, exactly where it was", ["C-r"]),
 ]
 
@@ -165,6 +165,14 @@ STORY = [
 def record(root, codex, claude):
     env = (f"CODEX_HOME={codex} CLAUDE_CONFIG_DIR={claude} XDG_CACHE_HOME={root}/cache "
            f"XDG_DATA_HOME={root}/data HOME={FAKE_HOME} TERM=xterm-256color")
+    # Stand-ins for the agents: a stray key must never start the real ones.
+    bin_dir = os.path.join(root, "bin")
+    os.makedirs(bin_dir, exist_ok=True)
+    for agent in ("claude", "codex"):
+        with open(os.path.join(bin_dir, agent), "w") as file:
+            file.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(bin_dir, agent), 0o755)
+    env += f" PATH={bin_dir}:{os.environ['PATH']}"
     command = f"env {env} {os.path.join(ROOT, 'lethe')} pick; sleep 30"
     tmux("-f", "/dev/null", "new-session", "-d", "-s", "demo", "-x", str(COLUMNS), "-y", str(ROWS), command)
     frames = []

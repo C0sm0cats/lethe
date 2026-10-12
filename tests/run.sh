@@ -305,6 +305,16 @@ check "picker: column titles come first when the panel layout is on" \
 out=$(FZF_SELECT_COUNT=2 "$LETHE" __marked "$A" "$B")
 sum=$("$LETHE" list --json "$A" "$B" | jq '[.[].size] | add / 1024 * 10 | floor / 10')
 check "picker: the list label sums the marked sessions" '[[ $out == " 2 marked · ${sum}K ·"* ]]' "$out (expected ${sum}K)"
+out=$(REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines filter' _ "$LETHE" | perl -pe 's/\e\[[0-9;]*m//g')
+check "picker: Ctrl-F lists filters with their counts" \
+    '[[ $(grep "^empty" <<<"$out") =~ [[:space:]]2[[:space:]] && $(grep "^missing" <<<"$out") =~ [[:space:]]1[[:space:]] ]]' "$out"
+out=$(REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines dir "$2"' _ "$LETHE" "$B" | perl -pe 's/\e\[[0-9;]*m//g')
+check "picker: Ctrl-W lists projects, the current one first" \
+    '[[ $(sed -n 2p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
+printf 'claude\n' >"$LETHE_STATE/agent" && printf 'active\n' >"$LETHE_STATE/status"
+"$LETHE" __state status
+check "picker: Ctrl-S skips archived for Claude Code" '[[ $(<"$LETHE_STATE/status") == all ]]'
+printf 'all\n' >"$LETHE_STATE/agent"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
 check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'

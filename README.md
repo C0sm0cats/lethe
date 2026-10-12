@@ -70,8 +70,8 @@ Everything the command line can do, the picker can do too.
 | `Enter` | read the whole conversation in your pager |
 | `Ctrl-T` | show all agents, Claude Code only, or Codex only |
 | `Ctrl-S` | show all, active or archived sessions |
-| `Ctrl-F` | cleanup filter: empty → orphans → missing → idle 30d+ → idle 90d+ → trash |
-| `Ctrl-W` | only the project of the current session (press again for all projects) |
+| `Ctrl-F` | pick a cleanup filter (empty, orphans, missing, idle 30d+/90d+, trash), with counts and sizes |
+| `Ctrl-W` | pick a project, biggest first, the current session's project on top |
 | `Ctrl-G` | find the text you typed inside the conversations (press again to clear) |
 | `Ctrl-O` | sort by date or by size |
 | `Ctrl-P` | show / hide the conversation preview |
