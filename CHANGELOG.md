@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Enter reads the conversation on the full width of the terminal. With the preview shown, the
+  text was wrapped to the preview's width.
+
 ## 0.4.1 — 2026-10-12
 
 - Ctrl-C (or a kill) while a Claude Code session moves to the trash can no longer leave it half

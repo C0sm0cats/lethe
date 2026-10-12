@@ -1182,7 +1182,7 @@ subagent_summary() {
 # A dim horizontal line as wide as the preview (or 60 columns).
 rule() {
     local line
-    printf -v line '%*s' "${FZF_PREVIEW_COLUMNS:-60}" ''
+    printf -v line '%*s' "${FZF_PREVIEW_COLUMNS:-${COLUMNS:-60}}" ''
     printf '%s%s%s\n\n' "$C_DIM" "${line// /─}" "$C_RESET"
 }
 
@@ -1194,7 +1194,7 @@ render_conversation() {
         printf '%s(transcript file is missing: %s)%s\n' "$C_RED" "$path" "$C_RESET"
         return
     fi
-    local width=${FZF_PREVIEW_COLUMNS:-0}
+    local width=${FZF_PREVIEW_COLUMNS:-${COLUMNS:-0}}
     if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
     conversation=$(messages "$agent" "$path" "$O_BRANCHES" | jq -rs \
         --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
@@ -2330,7 +2330,11 @@ internal_copy() {
 
 internal_page() {
     picker_branches
-    export LESS=${LESS:--R}
+    # Enter reads the whole conversation on the full screen: fzf still exports the
+    # preview's size when the preview is shown, which would narrow the text.
+    unset FZF_PREVIEW_COLUMNS FZF_PREVIEW_LINES
+    COLUMNS=$( { tput cols </dev/tty; } 2>/dev/null || echo 80)
+    export LESS=${LESS:--R} COLUMNS
     setup_colors always
     if [[ $1 == trash:* ]]; then
         show_trash "$TRASH_DIR/${1#trash:}" | ${PAGER:-less}

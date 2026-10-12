@@ -431,6 +431,9 @@ printf '%s\n' '{"type":"assistant","cwd":"/w","timestamp":"2026-01-01T10:00:01.0
 out=$(NO_COLOR="" FZF_PREVIEW_COLUMNS=30 "$LETHE" __preview "$G" | perl -pe 's/\e\[[0-9;]*m//g')
 check "the preview wraps on words and renders light Markdown" \
     '[[ $out == *"Done with make test"* && $out != *"**"* ]] && ! awk "length > 30 { exit 1 }" <<<"$out"' "$out"
+out=$(FZF_PREVIEW_COLUMNS=30 PAGER=cat "$LETHE" __page "$G" </dev/null | perl -pe 's/\e\[[0-9;]*m//g')
+check "Enter reads the conversation full width, even with the preview shown" \
+    '[[ $out == *"here is a fairly long sentence that has to wrap"* ]]' "$out"
 
 reset_fixture
 # Ctrl-C while a session moves to the trash (the signal reaches the whole
