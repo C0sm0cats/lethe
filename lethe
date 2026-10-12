@@ -663,7 +663,11 @@ build_where() {
     [[ -z $F_OLDER ]] || where+=("recency < $(cutoff "$F_OLDER")")
     [[ -z $F_NEWER ]] || where+=("recency >= $(cutoff "$F_NEWER")")
     for dir in "${F_DIRS[@]}"; do
-        if [[ $dir == / ]]; then
+        if [[ $dir == =* ]]; then
+            # "=PATH": this project only, not the projects below it (picker's Ctrl-W).
+            dir=${dir#=}
+            dirs+=("cwd = '${dir//\'/\'\'}'")
+        elif [[ $dir == / ]]; then
             dirs+=("1")
         else
             dir=${dir//\'/\'\'}
@@ -1957,7 +1961,9 @@ internal_choose() {
     if [[ $kind == filter ]]; then
         printf '%s\n' "${choice%%$'\t'*}" >"$LETHE_STATE/filter"
     else
-        printf '%s' "${choice%%$'\t'*}" >"$LETHE_STATE/dir"
+        choice=${choice%%$'\t'*}
+        # The menu counts each project on its own, so it selects it on its own too.
+        printf '%s' "${choice:+=$choice}" >"$LETHE_STATE/dir"
     fi
 }
 
@@ -2059,7 +2065,7 @@ internal_state() {
             else
                 REINDEX=0
                 init
-                query "SELECT cwd FROM sessions WHERE id = '${2//\'/}';" >"$dir/dir"
+                printf '=%s' "$(query "SELECT cwd FROM sessions WHERE id = '${2//\'/}';")" >"$dir/dir"
             fi
             ;;
         prompt)
@@ -2080,7 +2086,7 @@ internal_state() {
             esac
             value=$(<"$dir/dir")
             if [[ -n $value ]]; then
-                short_path value "$value"
+                short_path value "${value#=}"
                 parts+=("$value")
             fi
             value=$(<"$dir/grep")

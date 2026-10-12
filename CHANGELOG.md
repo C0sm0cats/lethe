@@ -5,7 +5,8 @@
 - `Ctrl-F` opens a menu of cleanup filters, each with its number of sessions and size, instead of
   cycling through them (the trash was six presses away).
 - `Ctrl-W` opens a menu of projects sorted by size, with the current session's project on top
-  and "All projects" to go back.
+  and "All projects" to go back. A project is selected on its own, as counted in the menu
+  (`--dir` on the command line still includes the projects below).
 - `Ctrl-S` skips "archived" when showing Claude Code only (only Codex sessions can be archived).
 
 ## 0.3.3 — 2026-10-12

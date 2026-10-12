@@ -309,6 +309,9 @@ out=$(REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines 
 check "picker: Ctrl-F lists filters with their counts" \
     '[[ $(grep "^empty" <<<"$out") =~ [[:space:]]2[[:space:]] && $(grep "^missing" <<<"$out") =~ [[:space:]]1[[:space:]] ]]' "$out"
 out=$(REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines dir "$2"' _ "$LETHE" "$B" | perl -pe 's/\e\[[0-9;]*m//g')
+printf '=%s' "$PROJ" >"$LETHE_STATE/dir"
+check "picker: a project chosen with Ctrl-W excludes the projects below it" '[[ $(picker_ids) == "$A $C " ]]' "$(picker_ids)"
+: >"$LETHE_STATE/dir"
 check "picker: Ctrl-W lists projects, the current one first" \
     '[[ $(sed -n 2p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
 printf 'claude\n' >"$LETHE_STATE/agent" && printf 'active\n' >"$LETHE_STATE/status"
