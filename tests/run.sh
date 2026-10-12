@@ -313,6 +313,8 @@ check "picker: Ctrl-Y copies the command that resumes the session" \
 check "picker: Ctrl-F shows empty sessions" '[[ $(picker_ids) == "$H $E " ]]' "$(picker_ids)"
 check "picker: prompt names the filter" '[[ $("$LETHE" __state prompt) == "all agents · empty ❯ " ]]'
 printf '%s\n' trash >"$LETHE_STATE/filter"
+check "picker: the trash view has its column titles once" \
+    '[[ $(LETHE_COLUMNS=1 "$LETHE" __rows | grep -c AGENT) == 1 ]]' "$(LETHE_COLUMNS=1 "$LETHE" __rows)"
 check "picker: the trash view lists trashed sessions" '[[ $(picker_ids) == trash:claude-$G.* ]]' "$(picker_ids)"
 out=$("$LETHE" __preview "$("$LETHE" __rows | cut -f 1)")
 check "picker: trashed sessions can be read" '[[ $out == *"in the trash"* && $out == *"how should we cache"* ]]' "$out"

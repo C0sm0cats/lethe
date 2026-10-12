@@ -1902,7 +1902,6 @@ internal_rows() {
 # Picker rows for the trash; ids are "trash:<entry>".
 trash_rows() {
     local entry id title cwd trashed size count=0 bytes=0 hbytes
-    column_titles
     while IFS= read -r entry; do
         IFS=$US read -r id title cwd trashed < <(jq -r --arg us "$US" \
             '[.id, (.title // ""), (.cwd // ""), (.trashed_at // 0 | tostring)] | join($us)' "$entry/manifest.json")
@@ -1993,11 +1992,13 @@ internal_state() {
         footer)
             setup_colors always
             local keys line out=()
-            if [[ $(cat "$dir/keys" 2>/dev/null) == short ]]; then
+            if [[ $(cat "$dir/keys" 2>/dev/null) == short && $(<"$dir/filter") == trash ]]; then
+                keys=("Ctrl-R:restore Ctrl-D:delete_forever Ctrl-F:leave_the_trash Esc:quit F1:all_keys")
+            elif [[ $(cat "$dir/keys" 2>/dev/null) == short ]]; then
                 keys=("Tab:mark Enter:read Ctrl-D:delete Ctrl-R:resume Esc:quit F1:all_keys")
             elif [[ $(<"$dir/filter") == trash ]]; then
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
-                    "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit")
+                    "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit F1:fewer_keys")
             else
                 keys=("Tab:mark Ctrl-A:all Enter:read Ctrl-P:preview Esc:quit"
                     "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork"

@@ -130,6 +130,9 @@ def tmux(*args):
 
 def keys(*names, wait=1.2):
     for name in names:
+        if name.startswith("sleep:"):
+            time.sleep(float(name[6:]))
+            continue
         if name.startswith("text:"):
             tmux("send-keys", "-t", "demo", "-l", name[5:])
         else:
@@ -153,7 +156,7 @@ STORY = [
     ("Tab marks, Ctrl-D deletes, and open sessions are always skipped",
      ["Down", "Tab", "Down", "Down", "Tab", "C-d"]),
     ("Deleted Claude Code sessions go to a restorable trash", ["text:y", "Enter"]),
-    ("Ctrl-F: empty, orphaned, idle sessions, and the trash", ["Enter", *["C-f"] * 6]),
+    ("Ctrl-F: empty, orphaned, idle sessions, and the trash", ["Enter", "sleep:2", *[k for _ in range(6) for k in ("C-f", "sleep:0.6")]]),
     ("Ctrl-R puts it back, exactly where it was", ["C-r"]),
 ]
 
