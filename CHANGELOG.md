@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 — 2026-10-12
 
 - On small terminals (narrow and under 32 lines) the preview starts hidden, so the list shows
   15 sessions instead of 2 on 80×24; `Ctrl-P` shows it.
