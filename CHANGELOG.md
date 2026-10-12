@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.2 — 2026-10-12
 
 - Column titles (agent, age, size, project, title) at the top of the picker list.
 - On short terminals the footer shows the essential keys on one line; `F1` toggles the full list.

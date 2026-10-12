@@ -18,7 +18,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.3.1"
+readonly VERSION="0.3.2"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
