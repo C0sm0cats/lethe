@@ -46,6 +46,9 @@ physical() {
 CODEX_REAL=$(physical "$CODEX_DIR")
 CLAUDE_REAL=$(physical "$CLAUDE_DIR")
 printf -v NOW '%(%s)T' -1
+# Project column: wider when the list has room (fzf gives its width to reloads).
+PROJECT_WIDTH=16
+((${FZF_COLUMNS:-${COLUMNS:-0}} < 180)) || PROJECT_WIDTH=26
 
 # ── Output helpers ───────────────────────────────────────────────────────────
 
@@ -244,77 +247,77 @@ init_codex() {
 
 # ── Claude Code index ────────────────────────────────────────────────────────
 
-claude_mode() {
-    case $1 in
-        cli) printf 'cli' ;;
-        sdk-* | *-sdk) printf 'exec' ;;
-        *vscode*) printf 'vscode' ;;
-        *jetbrains*) printf 'jetbrains' ;;
-        "") printf 'unknown' ;;
-        *) printf '%s' "$1" ;;
-    esac
-}
+# CLAUDE_SUMMARY: the metadata of one transcript in a single pass (one jq per
+# file: indexing thousands of sessions is dominated by process starts). The
+# state is updated without `//`, which would make jq copy it on every line.
+readonly CLAUDE_SUMMARY='
+    def text_of: if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end;
+    reduce inputs as $line ({e: [], meta: null, custom: null, ai: null, summary: null, prompt: null,
+                             sub: false, model: null};
+        ($line | fromjson? | select(type == "object")) as $o
+        | (if .meta == null and $o.cwd != null and $o.timestamp != null then
+               .meta = [$o.cwd, (if $o.entrypoint == null then "" else $o.entrypoint end), $o.timestamp]
+           else . end)
+        | (if $o.type == "custom-title" then .custom = $o.customTitle
+           elif $o.type == "ai-title" then .ai = $o.aiTitle
+           elif $o.type == "summary" then .summary = $o.summary
+           else . end)
+        | (if ($o.type == "user" or $o.type == "assistant") and $o.isMeta != true and $o.isSidechain != true then
+               ($o.message.content) as $c
+               | (if $o.type == "assistant" then
+                      (if $o.message.model != null and ($o.message.model | startswith("claude")) then
+                           .model = $o.message.model else . end)
+                      | (if ($o.message.model != "<synthetic>") and ($c != null) and (($c | length) > 0) then
+                             .sub = true else . end)
+                  else
+                      ($c | if type == "string" then [.] else [.[]? | select(.type == "text") | .text] end
+                          | map(select(length > 0 and (startswith("<") | not)))) as $texts
+                      | (if ($texts | length) > 0 or ($c | type) == "array" and any($c[]; .type? == "image") then
+                             .sub = true else . end)
+                      | (if .prompt == null and ($texts | length) > 0 then .prompt = ($texts | join(" ")) else . end)
+                  end)
+           else . end)
+        | if $quiet then .e += [$o | entry] else . end)
+    | [(.meta // ["", "", ""])[],
+       (.custom // .ai // .summary // .prompt // ""),
+       (.model // ""), (if .sub then "0" else "1" end),
+       (if $quiet then (.e | branches | .rewinds | tostring) else "NULL" end)]
+    | map(tostring | gsub("[\t\n\r]"; " ")) | join($us)'
 
 # Print an INSERT statement with the metadata of one Claude transcript.
 claude_extract() {
-    local path=$1 mtime=$2 fsize=$3 id cwd="" entry="" created="" title prompt model size kb value substantive rewinds
+    local path=$1 mtime=$2 fsize=$3 id cwd entry created title model empty rewinds size kb quiet=false mode
     id=${path##*/}
     id=${id%.jsonl}
     [[ $id =~ ^$UUID_RE$ ]] || return 0
 
-    IFS=$US read -r cwd entry created < <(head -n 200 -- "$path" | jq -rRn --arg us "$US" '
-        first(inputs | fromjson? | select(.cwd? and .timestamp?))
-        | [.cwd, (.entrypoint // ""), .timestamp] | join($us)' 2>/dev/null) || true
-    title=$({ grep -E '"type":"(custom-title|ai-title|summary)"' -- "$path" || true; } | jq -rRn '
-        reduce (inputs | fromjson?) as $line ({};
-            if $line.type == "custom-title" then .custom = $line.customTitle
-            elif $line.type == "ai-title" then .ai = $line.aiTitle
-            else .summary = $line.summary end)
-        | .custom // .ai // .summary // empty' 2>/dev/null) || true
-    prompt=$({ grep -F '"type":"user"' -- "$path" || true; } | head -n 300 | jq -rRn '
-        first(inputs | fromjson?
-              | select(.isMeta != true and .isSidechain != true)
-              | .message.content
-              | if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end
-              | select(length > 0 and (startswith("<") | not))) // empty' 2>/dev/null) || true
-    # Empty: no reply from Claude and no user content (images count), only
-    # commands and injected context.
-    substantive=$({ grep -E '"type":"(user|assistant)"' -- "$path" || true; } | jq -rRn '
-        any(inputs | fromjson? | select(.isMeta != true and .isSidechain != true);
-            if .type == "assistant" then
-                (.message.model // "") != "<synthetic>" and ((.message.content // []) | length > 0)
-            else
-                .message.content
-                | if type == "string" then length > 0 and (startswith("<") | not)
-                  else any(.[]?; .type == "image"
-                                 or (.type == "text" and (.text | length > 0 and (startswith("<") | not))))
-                  end
-            end)' 2>/dev/null) || true
-    model=$({ grep -o '"model":"claude[^"]*"' -- "$path" || true; } | tail -n 1) || true
-    model=${model#'"model":"'}
-    model=${model%'"'}
+    # Abandoned branches (the ⑂ badge) are costly on long sessions, so they are
+    # left for later (NULL) while the transcript is being written.
+    ((NOW - mtime < RECENT_SECONDS)) || quiet=true
+    IFS=$US read -r cwd entry created title model empty rewinds < <(
+        { grep -E '"uuid"|"cwd"|"type":"(user|assistant|custom-title|ai-title|summary)"' -- "$path" || true; } |
+            jq -rRn --arg us "$US" --argjson quiet "$quiet" \
+                "def entry: $CLAUDE_ENTRIES; def branches: $CLAUDE_BRANCHES; $CLAUDE_SUMMARY" 2>/dev/null) || true
+    [[ $rewinds =~ ^([0-9]+|NULL)$ ]] || rewinds=0
     size=$fsize
     if [[ -d ${path%.jsonl} ]]; then
         kb=$(du -sk -- "${path%.jsonl}" 2>/dev/null | cut -f 1) || kb=0
         size=$((size + ${kb:-0} * 1024))
     fi
-    # Abandoned branches (edited or rewound prompts), for the ⑂ badge. Costly on
-    # long sessions, so left for later (NULL) while the transcript is being written.
-    rewinds=NULL
-    if ((NOW - mtime >= RECENT_SECONDS)); then
-        rewinds=$({ grep -E '"uuid"|"type":"(user|assistant)"' -- "$path" || true; } |
-            jq -cR "$CLAUDE_ENTRIES" | jq -s "$CLAUDE_BRANCHES | .rewinds" 2>/dev/null) || rewinds=0
-        [[ $rewinds =~ ^[0-9]+$ ]] || rewinds=0
-    fi
-    [[ -n $title ]] || title=$prompt
-    title=${title//[$'\t\n\r']/ }
     title=${title:0:200}
+    case $entry in
+        cli) mode=cli ;;
+        sdk-* | *-sdk) mode="exec" ;;
+        *vscode*) mode=vscode ;;
+        *jetbrains*) mode=jetbrains ;;
+        "") mode=unknown ;;
+        *) mode=$entry ;;
+    esac
+    if [[ -n $created ]]; then created="CAST(strftime('%s', '${created//\'/}') AS INTEGER)"; else created=$mtime; fi
 
     printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s);\n" \
-        "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" \
-        "$([[ -n $created ]] && printf "CAST(strftime('%%s', '%s') AS INTEGER)" "${created//\'/}" || echo "$mtime")" \
-        "${cwd//\'/\'\'}" "${title//\'/\'\'}" "$(claude_mode "$entry")" "${model//\'/\'\'}" \
-        "$([[ $substantive == true ]] && echo 0 || echo 1)" "$rewinds"
+        "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" "$created" \
+        "${cwd//\'/\'\'}" "${title//\'/\'\'}" "${mode//\'/}" "${model//\'/\'\'}" "${empty:-1}" "$rewinds"
 }
 
 # Bring the cache up to date: only new or modified transcripts are parsed.
@@ -345,19 +348,31 @@ init_claude() {
         printf 'BEGIN;\nCREATE TEMP TABLE seen (path TEXT PRIMARY KEY);\n'
         while IFS=$'\t' read -r mtime fsize path; do
             mtime=${mtime%.*}
+            [[ -n $path ]] || continue
             printf "INSERT OR IGNORE INTO seen VALUES ('%s');\n" "${path//\'/\'\'}"
             seen=$((seen + 1))
             [[ ${known[$path]:-} == "$mtime $fsize" ]] || stale+=("$mtime"$'\t'"$fsize"$'\t'"$path")
         done < <(file_stats "$CLAUDE_DIR/projects" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl')
         count=${#stale[@]}
+        # Transcripts are parsed in parallel, one job per CPU, each into its own file.
+        local jobs running=0 parts i=0
+        jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+        parts=$(mktemp -d "$CACHE_DIR/parts.XXXXXX")
         for path in "${stale[@]}"; do
             IFS=$'\t' read -r mtime fsize path <<<"$path"
-            claude_extract "$path" "$mtime" "$fsize"
-            done=$((done + 1))
-            if [[ -t 2 ]] && ((count > 20)); then
-                printf '\r\e[KIndexing Claude Code sessions… %d/%d' "$done" "$count" >&2
+            claude_extract "$path" "$mtime" "$fsize" >"$parts/$i" &
+            i=$((i + 1)) running=$((running + 1))
+            if ((running >= jobs)); then
+                wait -n || true
+                running=$((running - 1)) done=$((done + 1))
+                if [[ -t 2 ]] && ((count > 20)); then
+                    printf '\r\e[KIndexing Claude Code sessions… %d/%d' "$done" "$count" >&2
+                fi
             fi
         done
+        wait
+        for ((i = 0; i < count; i++)); do cat -- "$parts/$i"; done
+        rm -rf -- "$parts"
         printf 'DELETE FROM claude WHERE path NOT IN (SELECT path FROM seen);\nCOMMIT;\n'
     } >"$script"
     if [[ -t 2 ]] && ((count > 20)); then printf '\r\e[K' >&2; fi
@@ -703,7 +718,7 @@ build_where() {
 # is a prompt, type, displayed text, linked] for every entry of the main chain.
 # Messages without a uuid (older formats) are not linked: always shown.
 readonly CLAUDE_ENTRIES='
-    fromjson? | select(type == "object" and .isSidechain != true
+    select(type == "object" and .isSidechain != true
                        and (.uuid != null or .type == "user" or .type == "assistant"))
     | ((.type == "user" or .type == "assistant") and .isMeta != true) as $msg
     | (.message.content? // null) as $c
@@ -756,7 +771,7 @@ readonly CLAUDE_BRANCHES='
 messages() {
     if [[ $1 == claude ]]; then
         { grep -E '"uuid"|"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } |
-            jq -cR "$CLAUDE_ENTRIES" | jq -sc "$CLAUDE_BRANCHES" |
+            jq -cR "fromjson? | $CLAUDE_ENTRIES" | jq -sc "$CLAUDE_BRANCHES" |
             jq -c --arg branches "${3:-active}" \
                 '.messages[] | select($branches == "all" or (.abandoned | not))'
     else
@@ -790,8 +805,16 @@ messages() {
 
 session_matches() {
     grep -qiF -- "$F_GREP" "$2" 2>/dev/null || return 1
-    # Every branch: a session is found by anything it still contains.
-    messages "$1" "$2" all | jq -r '.text' | grep -iF -- "$F_GREP" >/dev/null
+    # Every branch: a session is found by anything it still contains. Claude Code
+    # needs no branch walk for that, so one jq reads the texts directly.
+    if [[ $1 == claude ]]; then
+        { grep -E '"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } | jq -rR '
+            fromjson? | select((.type == "user" or .type == "assistant") and .isMeta != true and .isSidechain != true)
+            | .message.content | if type == "string" then . else (.[]? | select(.type == "text") | .text) end
+            | select(startswith("<") | not)' 2>/dev/null | grep -iF -- "$F_GREP" >/dev/null
+    else
+        messages "$1" "$2" all | jq -r '.text' | grep -iF -- "$F_GREP" >/dev/null
+    fi
 }
 
 # ── Rows ─────────────────────────────────────────────────────────────────────
@@ -909,7 +932,7 @@ format_row() {
         "$HOME") project="~" ;;
         *) project=${cwd##*/} ;;
     esac
-    fit project "$project" 16
+    fit project "$project" "$PROJECT_WIDTH"
     if [[ -n $date ]]; then
         # Command-line layout: fixed widths, with the date.
         fit title "$tag$title" "$title_width"
@@ -925,7 +948,7 @@ format_row() {
 
 # row_header TITLE_WIDTH
 row_header() {
-    printf '%s  %-6s %4s  %-16s  %6s  %-16s  %s%s\n' "$C_DIM" "AGENT" "AGE" "LAST ACTIVITY" "SIZE" \
+    printf '%s  %-6s %4s  %-16s  %6s  %-*s  %s%s\n' "$C_DIM" "AGENT" "AGE" "LAST ACTIVITY" "SIZE" "$PROJECT_WIDTH" \
         "PROJECT" "TITLE" "$C_RESET"
 }
 
@@ -1830,10 +1853,11 @@ cmd_pick() {
             --footer="$("$SELF" __state footer)" --highlight-line --gutter=' '
             --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
             --color='border:8,label:7,input-label:6:bold,list-label:7,preview-label:7,footer:-1'
-            --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,bg+:236,info:8,ghost:8'
+            --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,info:8,ghost:8'
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
             --bind="multi:transform-list-label($me __marked {+1})"
+            --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)"
             --header-lines=1 --header-lines-border=inline --color='header:8'
         )
         refresh="+transform-prompt($me __state prompt)+transform-footer($me __state footer)+reload($me __rows)"
@@ -1846,7 +1870,11 @@ cmd_pick() {
         refresh="+transform-prompt($me __state prompt)+transform-header($me __state header)+reload($me __rows)"
     fi
 
-    "$SELF" __rows | SHELL=$(command -v bash) fzf \
+    if [[ -n ${NO_COLOR:-} ]]; then
+        layout+=(--color=bw)
+        export LETHE_FZF_COLORS=bw
+    fi
+    COLUMNS=$(tput cols 2>/dev/null || echo 80) "$SELF" __rows | SHELL=$(command -v bash) fzf \
         --ansi --multi --layout=reverse --height=100% --info=inline-right --no-hscroll \
         --delimiter=$'\t' --with-nth=2.. --tiebreak=index "${track[@]}" "${layout[@]}" \
         --prompt="$("$SELF" __state prompt)" --pointer='▌' --marker='✓' \
@@ -1866,7 +1894,6 @@ cmd_pick() {
         --bind="ctrl-b:execute($me __stats)" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
-        --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)" \
         --bind="ctrl-y:execute-silent($me __copy {1})" \
         --bind="enter:execute($me __page {1})" ||
         true
@@ -1984,7 +2011,7 @@ internal_choose() {
     choice=$(choose_lines "$kind" "$current" | fzf --ansi --layout=reverse --height=100% \
         --border=rounded --border-label=" $([[ $kind == filter ]] && echo "cleanup filter" || echo "project · by size") " \
         --delimiter=$'\t' --with-nth=2 --no-sort --pointer='▶' --prompt='❯ ' --info=inline-right \
-        --color='border:8,label:6:bold,bg+:236,pointer:5,prompt:6,info:8,header:8' \
+        --color="${LETHE_FZF_COLORS:-border:8,label:6:bold,pointer:5,prompt:6,info:8,header:8}" \
         "${gutter[@]}" \
         --header="$(printf '%-40s %s' "" "sessions     size")" --header-first \
         --bind="load:pos($pos)") || return 0
@@ -2000,7 +2027,7 @@ internal_choose() {
 # Column titles, first line of the picker's input (--header-lines=1).
 column_titles() {
     [[ ${LETHE_COLUMNS:-} == 1 ]] || return 0
-    printf '\t  %-6s %4s  %6s  %-16s  %s\n' AGENT AGE SIZE PROJECT TITLE
+    printf '\t  %-6s %4s  %6s  %-*s  %s\n' AGENT AGE SIZE "$PROJECT_WIDTH" PROJECT TITLE
 }
 
 internal_rows() {
@@ -2162,7 +2189,7 @@ internal_state() {
                 printf '%s\n' "Tab mark · Ctrl-A all · Ctrl-D delete · Ctrl-X archive · Enter read" \
                     "Ctrl-R resume · Ctrl-K fork · Ctrl-E export · Ctrl-B stats" \
                     "Ctrl-T agent · Ctrl-S status · Ctrl-F filter · Ctrl-W project" \
-                    "Ctrl-G find text · Ctrl-O sort · Ctrl-P preview · Alt-B branches · Esc quit"
+                    "Ctrl-G find · Ctrl-O sort · Ctrl-P preview · Ctrl-Y copy · Alt-B branches · Esc quit"
             fi
             ;;
     esac

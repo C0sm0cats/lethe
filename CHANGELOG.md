@@ -11,6 +11,13 @@
 - `trash restore` names the restored session; `resume` explains a session with no recorded
   directory; `Ctrl-W` does nothing in the trash; options before the command
   (`lethe --dir x list`) get a clear message.
+- Indexing is 2 to 5 times faster: one jq per transcript instead of five, run in parallel (one job
+  per CPU). 500 new Claude Code sessions: 13 s → 2.6 s; on a real 640 MB home: 5.5 s → 2.2 s.
+- `--grep` on Claude Code sessions reads the texts with one jq instead of three (1.4 to 2 times faster).
+- The project column widens on terminals of 180 columns or more.
+- `NO_COLOR` also turns off the picker's colors; the selected row follows fzf's color scheme, so
+  `--color=light` in `FZF_DEFAULT_OPTS` gives a readable light theme.
+- fzf before 0.63 works again (an `F1` binding needed a newer fzf). Checked with fzf 0.45 and bash 4.4.
 
 ## 0.4.0 — 2026-10-12
 

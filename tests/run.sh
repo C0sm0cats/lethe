@@ -416,7 +416,8 @@ reset_fixture
 chmod a-w "$CLAUDE_CONFIG_DIR/session-env"
 out=$("$LETHE" delete -y "$G" 2>&1) || true
 chmod u+w "$CLAUDE_CONFIG_DIR/session-env"
-check "a failed move to the trash puts everything back" \
+# (as root the read-only directory would not stop the move)
+((EUID == 0)) || check "a failed move to the trash puts everything back" \
     '[[ -f $CPROJ/$G.jsonl && -d $CPROJ/$G && -d $CLAUDE_CONFIG_DIR/file-history/$G && -z $(ls -A "$TRASH" 2>/dev/null) ]]' "$out"
 "$LETHE" delete -y "$G" >/dev/null 2>&1
 manifest=$(echo "$TRASH"/*/manifest.json)
