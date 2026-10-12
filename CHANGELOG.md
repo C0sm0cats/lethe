@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-10-12
 
 - `Ctrl-F` opens a menu of cleanup filters, each with its number of sessions and size, instead of
   cycling through them (the trash was six presses away). The cursor starts on the current filter.
