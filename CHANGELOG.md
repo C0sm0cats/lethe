@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 — 2026-10-13
 
 - Enter reads the conversation on the full width of the terminal. With the preview shown, the
   text was wrapped to the preview's width.
