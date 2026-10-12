@@ -1,0 +1,21 @@
+# AUR package (Arch, Manjaro): publish with an AUR account, see
+# https://wiki.archlinux.org/title/AUR_submission_guidelines. On a new release,
+# update pkgver and sha256sums (updpkgsums), then makepkg --printsrcinfo > .SRCINFO.
+pkgname=lethe
+pkgver=0.4.0
+pkgrel=1
+pkgdesc='Browse, resume and forget your Claude Code and Codex sessions'
+arch=('any')
+url='https://github.com/C0sm0cats/lethe'
+license=('MIT')
+depends=('bash' 'fzf' 'jq' 'sqlite')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('a85b01d7a6166a8c3ae0cfbf2d74ab92a7e5e0105df389a05f0dc1052c8203d5')
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 lethe "$pkgdir/usr/bin/lethe"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -d "$pkgdir/usr/share/bash-completion/completions"
+    ./lethe completion bash >"$pkgdir/usr/share/bash-completion/completions/lethe"
+}

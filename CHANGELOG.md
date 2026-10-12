@@ -18,6 +18,10 @@
 - `NO_COLOR` also turns off the picker's colors; the selected row follows fzf's color scheme, so
   `--color=light` in `FZF_DEFAULT_OPTS` gives a readable light theme.
 - fzf before 0.63 works again (an `F1` binding needed a newer fzf). Checked with fzf 0.45 and bash 4.4.
+- README: dependencies per system, `~/.local/bin` created by the install line, the `Ctrl-F` and
+  `Ctrl-W` menus in the features.
+- `packaging/`: a Homebrew formula and an AUR `PKGBUILD` (built and checked with makepkg), and
+  `docs/social-preview.png` for the repository's social preview.
 
 ## 0.4.0 — 2026-10-12
 

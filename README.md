@@ -14,11 +14,11 @@
 In Greek myth, Lethe is the river of forgetting. Your agents never forget: after a few weeks you have hundreds of sessions spread over `~/.claude` and `~/.codex`. There are one-shot runs, abandoned subagents, sessions you opened and closed, and transcripts of several hundred megabytes. Neither agent lets you see them all, let alone clean them up.
 
 ```sh
-curl -fsSL -o ~/.local/bin/lethe https://raw.githubusercontent.com/C0sm0cats/lethe/main/lethe && chmod +x ~/.local/bin/lethe
+mkdir -p ~/.local/bin && curl -fsSL -o ~/.local/bin/lethe https://raw.githubusercontent.com/C0sm0cats/lethe/main/lethe && chmod +x ~/.local/bin/lethe
 lethe
 ```
 
-One Bash file. No runtime, no daemon, no install step.
+One Bash file. No runtime, no daemon, no install step. It needs `fzf`, `jq` and `sqlite3` (see [Install](#install)).
 
 ## Features
 
@@ -28,17 +28,29 @@ One Bash file. No runtime, no daemon, no install step.
 - **Running sessions are untouchable.** Sessions open in a running agent, or active in the last 10 minutes, are detected and skipped. Always, even with `--yes`.
 - **Undo.** Deleted Claude Code sessions go to a trash and can be restored. Codex sessions can be archived instead of deleted.
 - **The conversation as it is now.** When you edit or rewind an earlier prompt in Claude Code, the old branch stays in the transcript. lethe shows the active branch only, marks sessions that have abandoned branches with `⑂N`, and shows those branches on demand (`Alt-B`, `--all-branches`).
-- **Find what to clean.** Empty sessions, sessions whose project folder is gone, idle ones, the biggest ones, or full-text search in your conversations.
+- **Find what to clean.** `Ctrl-F` and `Ctrl-W` open menus that show how many sessions and how much space each cleanup filter and each project holds: empty sessions, projects you deleted, idle ones, the biggest ones. Or search the text of every conversation.
 - **Scriptable.** `list --json`, `stats`, `--dry-run`, `--yes` for cron, and tab completion.
 
 ## Install
 
 ```sh
+mkdir -p ~/.local/bin
 curl -fsSL -o ~/.local/bin/lethe https://raw.githubusercontent.com/C0sm0cats/lethe/main/lethe
 chmod +x ~/.local/bin/lethe
 ```
 
-Requirements: bash 4.4+ (on macOS: `brew install bash`), `sqlite3`, `jq`, and `fzf` 0.45+ for the picker (0.63+ for the panel layout). It works with whichever agents you have; you don't need both.
+Make sure `~/.local/bin` is in your `PATH`. Packaging recipes for Homebrew and the AUR are in [`packaging/`](packaging/). For a fixed version, replace `main` with a release tag such as `v0.4.0`.
+
+Dependencies:
+
+| System | Command |
+| --- | --- |
+| macOS | `brew install bash fzf jq sqlite` |
+| Debian, Ubuntu | `sudo apt install fzf jq sqlite3` |
+| Fedora | `sudo dnf install fzf jq sqlite` |
+| Arch, Manjaro | `sudo pacman -S fzf jq sqlite` |
+
+Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout). lethe works with whichever agents you have; you don't need both.
 
 Tab completion: add `source <(lethe completion zsh)` to `~/.zshrc`, or `source <(lethe completion bash)` to `~/.bashrc`.
 
