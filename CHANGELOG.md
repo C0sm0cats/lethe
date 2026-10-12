@@ -3,7 +3,7 @@
 ## Unreleased
 
 - `Ctrl-F` opens a menu of cleanup filters, each with its number of sessions and size, instead of
-  cycling through them (the trash was six presses away).
+  cycling through them (the trash was six presses away). The cursor starts on the current filter.
 - `Ctrl-W` opens a menu of projects sorted by size, with the current session's project on top
   and "All projects" to go back. A project is selected on its own, as counted in the menu
   (`--dir` on the command line still includes the projects below).

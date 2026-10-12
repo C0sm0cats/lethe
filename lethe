@@ -1951,13 +1951,21 @@ internal_choose() {
     local kind=$1 current=${2:-} choice gutter=()
     [[ $current != trash:* ]] || current=""
     ! fzf --help 2>/dev/null | grep -q -- '--gutter' || gutter=(--gutter=' ')
+    # The cursor starts on what is selected now: the current filter, or the
+    # current session's project.
+    local pos=1 filters=(all empty orphans missing idle30 idle90 trash) i
+    if [[ $kind == filter ]]; then
+        for i in "${!filters[@]}"; do [[ ${filters[i]} != "$(<"$LETHE_STATE/filter")" ]] || pos=$((i + 1)); done
+    elif [[ -n $current ]]; then
+        pos=2
+    fi
     choice=$(choose_lines "$kind" "$current" | fzf --ansi --layout=reverse --height=100% \
         --border=rounded --border-label=" $([[ $kind == filter ]] && echo "cleanup filter" || echo "project · by size") " \
         --delimiter=$'\t' --with-nth=2 --no-sort --pointer='▶' --prompt='❯ ' --info=inline-right \
         --color='border:8,label:6:bold,bg+:236,pointer:5,prompt:6,info:8,header:8' \
         "${gutter[@]}" \
         --header="$(printf '%-40s %s' "" "sessions     size")" --header-first \
-        --bind="load:pos($([[ $kind == dir && -n $current ]] && echo 2 || echo 1))") || return 0
+        --bind="load:pos($pos)") || return 0
     if [[ $kind == filter ]]; then
         printf '%s\n' "${choice%%$'\t'*}" >"$LETHE_STATE/filter"
     else
