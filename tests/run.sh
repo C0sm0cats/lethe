@@ -301,6 +301,9 @@ printf '%s\n' all >"$LETHE_STATE/filter"
 picker_ids() { "$LETHE" __rows | cut -f 1 | sort | tr '\n' ' '; }
 check "picker: column titles come first when the panel layout is on" \
     '[[ $(LETHE_COLUMNS=1 "$LETHE" __rows | head -n 1) == *"AGENT"*"PROJECT"*"TITLE"* ]]'
+"$LETHE" __rows >/dev/null
+out=$(FZF_SELECT_COUNT=2 "$LETHE" __marked "$A" "$B")
+check "picker: the list label sums the marked sessions" '[[ $out == " 2 marked · 8.6K ·"* ]]' "$out"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
 check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'

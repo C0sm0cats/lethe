@@ -1809,6 +1809,7 @@ cmd_pick() {
             --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,bg+:236,info:8,ghost:8'
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
+            --bind="multi:transform-list-label($me __marked {+1})"
             --header-lines=1 --header-lines-border=inline --color='header:8'
         )
         refresh="+transform-prompt($me __state prompt)+transform-footer($me __state footer)+reload($me __rows)"
@@ -1888,7 +1889,9 @@ internal_rows() {
     picker_setup
     local agent id archived recency date mode provider empty size cwd title path state
     local count=0 bytes=0 open=0 hbytes
+    : >"$LETHE_STATE/sizes"
     while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
+        printf '%s\t%s\n' "$id" "$size" >>"$LETHE_STATE/sizes"
         format_row "$agent" "$archived" "$recency" "" "$mode" "$size" "$cwd" "$title" "$state" "" "$rewinds"
         printf '%s\t%s\n' "$id" "$REPLY"
         count=$((count + 1))
@@ -1906,12 +1909,14 @@ internal_rows() {
 # Picker rows for the trash; ids are "trash:<entry>".
 trash_rows() {
     local entry id title cwd trashed size count=0 bytes=0 hbytes
+    : >"$LETHE_STATE/sizes"
     while IFS= read -r entry; do
         IFS=$US read -r id title cwd trashed < <(jq -r --arg us "$US" \
             '[.id, (.title // ""), (.cwd // ""), (.trashed_at // 0 | tostring)] | join($us)' "$entry/manifest.json")
         size=$(($(du -sk -- "$entry" | cut -f 1) * 1024))
         format_row claude 0 "$trashed" "" trashed "$size" "$cwd" "$title" trash
         printf 'trash:%s\t%s\n' "${entry##*/}" "$REPLY"
+        printf 'trash:%s\t%s\n' "${entry##*/}" "$size" >>"$LETHE_STATE/sizes"
         count=$((count + 1))
         bytes=$((bytes + size))
     done < <(trash_entries)
@@ -2128,6 +2133,23 @@ internal_export() {
     read -r </dev/tty || true
 }
 
+# List label while sessions are marked: how many, and how much they take.
+internal_marked() {
+    local base id size total=0 hsize
+    base=$(<"$LETHE_STATE/label")
+    if ((${FZF_SELECT_COUNT:-0} == 0)); then
+        printf '%s' "$base"
+        return
+    fi
+    declare -A marked=()
+    for id; do marked[$id]=1; done
+    while IFS=$'\t' read -r id size; do
+        [[ -z ${marked[$id]+x} ]] || ((size < 0)) || total=$((total + size))
+    done <"$LETHE_STATE/sizes"
+    human_size hsize "$total"
+    printf ' %d marked · %s ·%s' "$FZF_SELECT_COUNT" "$hsize" "$base"
+}
+
 # Copy the command that resumes a session to the clipboard, with OSC 52 (kitty,
 # WezTerm, iTerm2, tmux with set-clipboard, ...) and any local clipboard tool.
 internal_copy() {
@@ -2328,6 +2350,7 @@ main() {
         __resume) internal_resume "$2" "${3:-}" ;;
         __export) REINDEX=0 && setup_colors always && internal_export "$2" ;;
         __copy) internal_copy "$2" ;;
+        __marked) shift && internal_marked "$@" ;;
         __action) shift && internal_action "$@" ;;
         *) usage_error "unknown command: $cmd" ;;
     esac

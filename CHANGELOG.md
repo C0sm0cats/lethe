@@ -4,6 +4,8 @@
 
 - On small terminals (narrow and under 32 lines) the preview starts hidden, so the list shows
   15 sessions instead of 2 on 80×24; `Ctrl-P` shows it.
+- While sessions are marked, the list title shows how many and how much space they take
+  (`3 marked · 42M · …`): what a deletion would free, before pressing `Ctrl-D`.
 
 ## 0.3.2 — 2026-10-12
 
