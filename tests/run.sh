@@ -328,7 +328,7 @@ printf 'recent\n' >"$LETHE_STATE/sort"
 printf 'stats\n' >"$LETHE_STATE/panel" && printf 'codex\n' >"$LETHE_STATE/agent"
 out=$(NO_COLOR=1 FZF_PREVIEW_COLUMNS=60 "$LETHE" __preview "$A")
 check "picker: Ctrl-B shows the stats of the listed sessions in the panel" \
-    '[[ $out == *"Disk usage of the sessions listed"* && $out == *"codex"* && $out != *"claude  "* ]] && ! awk "length > 60 { exit 1 }" <<<"$out"' "$out"
+    '[[ $out == *"Disk usage of the sessions listed"* && $out == *"codex"* && $out != *"claude  "* ]] && perl -CSD -ne "exit 1 if length > 61" <<<"$out"' "$out"
 printf 'conversation\n' >"$LETHE_STATE/panel" && printf 'all\n' >"$LETHE_STATE/agent"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
