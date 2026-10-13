@@ -2,7 +2,7 @@
 # https://wiki.archlinux.org/title/AUR_submission_guidelines. On a new release,
 # update pkgver and sha256sums (updpkgsums), then makepkg --printsrcinfo > .SRCINFO.
 pkgname=lethe
-pkgver=0.4.2
+pkgver=0.5.0
 pkgrel=1
 pkgdesc='Browse, resume and forget your Claude Code and Codex sessions'
 arch=('any')
@@ -10,7 +10,7 @@ url='https://github.com/C0sm0cats/lethe'
 license=('MIT')
 depends=('bash' 'fzf' 'jq' 'sqlite')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('657c81127b768bd2cd467a2aee20fe9d7b34cd7e431afe5a5190e10edfdeaf6c')
+sha256sums=('3d784c55795e243449fb0c7408d3bc1a562c4088d6b1342cdc0b0c2cf8e99e69')
 
 package() {
     cd "$pkgname-$pkgver"
