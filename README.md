@@ -87,7 +87,7 @@ Everything the command line can do, the picker can do too.
 | `Ctrl-G` | find the text you typed inside the conversations: the preview shows the messages that mention it, highlighted, and `Enter` opens on the first one (press again with an empty search to clear) |
 | `Ctrl-O` | sort by date, by size (biggest first) or oldest first |
 | `Ctrl-P` | show / hide the conversation preview |
-| `Ctrl-B` | disk usage and cleanup stats |
+| `Ctrl-B` | disk usage of the sessions listed, in the preview panel, following the filters (press again for the conversation) |
 | `Alt-B` | show or hide abandoned branches (`⑂`) in the preview, `Enter` and `Ctrl-E` |
 | `Ctrl-Y` | copy the command that resumes the session (`cd … && claude --resume …`) |
 | `F1` | show all keys, or only the essential ones (the default on short terminals) |

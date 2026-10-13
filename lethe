@@ -1033,7 +1033,11 @@ cmd_list() {
 cmd_stats() {
     parse_args "" "$@"
     prepare
+    stats_report
+}
 
+# stats_report — disk usage of the sessions matched by the current filters.
+stats_report() {
     local agent id archived recency date mode provider empty size cwd title path state
     local total=0 bytes=0 empties=0 missing=0 open=0 orphans=0 key bucket hsize i trash_bytes trash_count
     local buckets=("< 1 day" "< 1 week" "< 1 month" "< 3 months" "< 1 year" "older")
@@ -1066,12 +1070,27 @@ cmd_stats() {
         b_age[$bucket]=$((${b_age[$bucket]:-0} + size))
     done < <(fetch_rows)
 
-    printf '%s%s%s\n\n' "$C_BOLD" "$PROG" "$C_RESET"
+    # Sized to the preview panel (Ctrl-B) or the terminal: bars and paths shrink,
+    # and cleanup commands go on their own line when there is no room.
+    local width=${FZF_PREVIEW_COLUMNS:-${COLUMNS:-}} path_width bar_width hint_sep="  "
+    [[ -n $width ]] || width=$( { [[ -t 1 ]] && tput cols; } 2>/dev/null || echo 100)
+    path_width=$((width - 40))
+    ((path_width <= 36)) || path_width=36
+    ((path_width >= 14)) || path_width=14
+    bar_width=$((width - path_width - 22))
+    ((bar_width <= 20)) || bar_width=20
+    ((bar_width >= 4)) || bar_width=4
+    ((width >= 90)) || hint_sep=$'\n      '
+    if [[ -n ${FZF_PREVIEW_COLUMNS:-} ]]; then
+        printf '%sDisk usage of the sessions listed%s\n\n' "$C_BOLD" "$C_RESET"
+    else
+        printf '%s%s%s\n\n' "$C_BOLD" "$PROG" "$C_RESET"
+    fi
     local graph max
     for key in claude codex "codex (archived)"; do
         [[ -n ${n_agent[$key]+x} ]] || continue
         human_size hsize "${b_agent[$key]}"
-        bar graph "${b_agent[$key]}" "$bytes"
+        bar graph "${b_agent[$key]}" "$bytes" "$bar_width"
         printf '  %s%-18s%s %5d  %7s  %s%s%s\n' \
             "$([[ $key == claude ]] && echo "$C_CLAUDE" || echo "$C_CODEX")" "$key" "$C_RESET" \
             "${n_agent[$key]}" "$hsize" "$([[ $key == claude ]] && echo "$C_CLAUDE" || echo "$C_CODEX")" \
@@ -1087,16 +1106,16 @@ cmd_stats() {
     fi
     printf '\n'
     ((open == 0)) || printf '  %s◉%s %d session(s) open in a running agent (protected)\n' "$C_MAGENTA" "$C_RESET" "$open"
-    ((empties == 0)) || printf '  %s!%s %d empty session(s)  %s→ %s delete --empty%s\n' \
-        "$C_YELLOW" "$C_RESET" "$empties" "$C_DIM" "$PROG" "$C_RESET"
-    ((orphans == 0)) || printf '  %s!%s %d session(s) whose project directory is gone  %s→ %s delete --orphans%s\n' \
-        "$C_YELLOW" "$C_RESET" "$orphans" "$C_DIM" "$PROG" "$C_RESET"
-    ((missing == 0)) || printf '  %s!%s %d Codex session(s) indexed without transcript  %s→ %s delete --missing%s\n' \
-        "$C_YELLOW" "$C_RESET" "$missing" "$C_DIM" "$PROG" "$C_RESET"
+    ((empties == 0)) || printf '  %s!%s %d empty session(s)%s%s→ %s delete --empty%s\n' \
+        "$C_YELLOW" "$C_RESET" "$empties" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
+    ((orphans == 0)) || printf '  %s!%s %d session(s) whose project directory is gone%s%s→ %s delete --orphans%s\n' \
+        "$C_YELLOW" "$C_RESET" "$orphans" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
+    ((missing == 0)) || printf '  %s!%s %d Codex session(s) indexed without transcript%s%s→ %s delete --missing%s\n' \
+        "$C_YELLOW" "$C_RESET" "$missing" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     if ((trash_count)); then
         human_size hsize "$trash_bytes"
-        printf '  %s!%s %d session(s) in the trash, %s  %s→ %s trash empty%s\n' \
-            "$C_YELLOW" "$C_RESET" "$trash_count" "$hsize" "$C_DIM" "$PROG" "$C_RESET"
+        printf '  %s!%s %d session(s) in the trash, %s%s%s→ %s trash empty%s\n' \
+            "$C_YELLOW" "$C_RESET" "$trash_count" "$hsize" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     fi
     ((total)) || return 0
 
@@ -1106,7 +1125,7 @@ cmd_stats() {
     for i in "${!buckets[@]}"; do
         [[ -n ${n_age[$i]+x} ]] || continue
         human_size hsize "${b_age[$i]}"
-        bar graph "${b_age[$i]}" "$max"
+        bar graph "${b_age[$i]}" "$max" "$bar_width"
         # Older buckets are what cleaning is about: they get the warmer color.
         printf '  %-12s %5d  %7s  %s%s%s\n' "${buckets[i]}" "${n_age[$i]}" "$hsize" \
             "$( ((i >= 2)) && echo "$C_YELLOW" || echo "$C_DIM")" "$graph" "$C_RESET"
@@ -1124,8 +1143,8 @@ cmd_stats() {
         sort -t $'\t' -k1,1nr | head -n 10 |
         while IFS=$'\t' read -r size i key; do
             human_size hsize "$size"
-            bar graph "$size" "$max"
-            fit_tail key "$key" 36
+            bar graph "$size" "$max" "$bar_width"
+            fit_tail key "$key" "$path_width"
             printf '  %s%s%s %5d  %7s  %s%s%s\n' "$C_BLUE" "$key" "$C_RESET" "$i" "$hsize" \
                 "$C_CYAN" "$graph" "$C_RESET"
         done
@@ -1864,6 +1883,7 @@ cmd_pick() {
     printf '%s\n' "${F_STATUS:-all}" >"$state/status"
     printf '%s\n' "$O_SORT" >"$state/sort"
     printf 'all\n' >"$state/filter"
+    printf 'conversation\n' >"$state/panel"
     # The full key list takes 5 lines: on short terminals start with one line.
     if (($(tput lines 2>/dev/null || echo 50) >= 45)); then echo full; else echo short; fi >"$state/keys"
     printf 'active\n' >"$state/branches"
@@ -1932,7 +1952,7 @@ cmd_pick() {
         --bind="ctrl-g:execute-silent($me __state grep {q})+clear-query$refresh" \
         --bind="ctrl-o:execute-silent($me __state sort)$refresh" \
         --bind="alt-b:execute-silent($me __state branches)${refresh%+reload*}+refresh-preview" \
-        --bind="ctrl-b:execute($me __stats)" \
+        --bind="ctrl-b:execute-silent($me __state panel)+show-preview+refresh-preview${refresh%+reload*}" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
         --bind="ctrl-y:execute-silent($me __copy {1})" \
@@ -2121,7 +2141,7 @@ trash_rows() {
 internal_state() {
     local dir=$LETHE_STATE value
     case $1 in
-        agent | status | sort | branches)
+        agent | status | sort | branches | panel)
             value=$(<"$dir/$1")
             case $1:$value in
                 agent:all) value=claude ;;
@@ -2133,6 +2153,8 @@ internal_state() {
                 sort:oldest) value=recent ;;
                 branches:active) value=all ;;
                 branches:all) value=active ;;
+                panel:conversation) value=stats ;;
+                panel:stats) value=conversation ;;
                 *) value=all ;;
             esac
             if [[ $1 == status && $value == archived && $(<"$dir/agent") == claude ]]; then
@@ -2210,7 +2232,7 @@ internal_state() {
                 keys=("Tab:mark Enter:read Ctrl-D:delete Ctrl-R:resume Esc:quit F1:all_keys")
             elif [[ $(<"$dir/filter") == trash ]]; then
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
-                    "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit F1:fewer_keys")
+                    "Ctrl-F:leave_the_trash Ctrl-P:preview Ctrl-B:trash_size Esc:quit F1:fewer_keys")
             else
                 # The keys that switch a view show where they stand: [value].
                 local agent status filter project text sort branches
@@ -2227,7 +2249,8 @@ internal_state() {
                     "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork Ctrl-E:export"
                     "Ctrl-T:agent[$agent] Ctrl-S:status[$status] Ctrl-F:filter[$filter]"
                     "Ctrl-W:project[${project:-all}] Ctrl-G:find[${text:-off}] Ctrl-O:sort[$sort]"
-                    "Alt-B:abandoned_branches[$branches] Ctrl-Y:copy Ctrl-B:stats F1:fewer_keys")
+                    "Alt-B:abandoned_branches[$branches] Ctrl-B:stats[$(
+                        [[ $(cat "$dir/panel" 2>/dev/null) == stats ]] && echo on || echo off)] Ctrl-Y:copy F1:fewer_keys")
             fi
             local words
             for line in "${keys[@]}"; do
@@ -2423,6 +2446,17 @@ picker_branches() {
 internal_preview() {
     picker_branches
     setup_colors always
+    # Ctrl-B: the panel shows the stats of what the list shows, instead of a conversation.
+    if [[ $(cat "${LETHE_STATE:-}/panel" 2>/dev/null) == stats ]]; then
+        if [[ $(<"$LETHE_STATE/filter") == trash ]]; then
+            cmd_trash list
+        else
+            picker_setup
+            stats_report
+        fi
+        printf '\n%sCtrl-B shows the conversation again.%s\n' "$C_DIM" "$C_RESET"
+        return
+    fi
     # Ctrl-G: show where the searched text is.
     [[ ! -s ${LETHE_STATE:-}/grep ]] || FOCUS=$(<"$LETHE_STATE/grep")
     if [[ $1 == trash:* ]]; then
@@ -2430,12 +2464,6 @@ internal_preview() {
     else
         cmd_show --preview "$1"
     fi
-}
-
-internal_stats() {
-    export LESS=${LESS:--R}
-    setup_colors always
-    cmd_stats | ${PAGER:-less}
 }
 
 cmd_completion() {
@@ -2538,7 +2566,8 @@ Picker keys:
   Ctrl-T agent  Ctrl-S status  Ctrl-G find the typed text in conversations (preview shows where)
   Ctrl-F pick a cleanup filter (empty, orphans, missing, idle, trash) with counts and sizes
   Ctrl-W pick a project, biggest first (the current session's project comes first)
-  Ctrl-O sort: date, size, oldest  Ctrl-P preview  Ctrl-B stats  Esc quit
+  Ctrl-O sort: date, size, oldest  Ctrl-P preview  Esc quit
+  Ctrl-B disk usage of what the list shows, in the preview panel (press again for the conversation)
   Alt-B show or hide abandoned branches (⑂) in the preview, Enter and Ctrl-E
   Ctrl-Y copy the command that resumes the session   F1 fewer or all keys
 
@@ -2581,7 +2610,6 @@ main() {
         __rows) internal_rows ;;
         __state) internal_state "$2" "${3:-}" ;;
         __preview) REINDEX=0 && internal_preview "$2" ;;
-        __stats) REINDEX=0 && internal_stats ;;
         __page) REINDEX=0 && internal_page "$2" ;;
         __resume) internal_resume "$2" "${3:-}" ;;
         __export) REINDEX=0 && setup_colors always && internal_export "$2" ;;

@@ -325,6 +325,11 @@ check "picker: the footer shows where each switch stands" \
     '[[ $out == *"Ctrl-T agent: all"* && $out == *"Ctrl-O sort: size"* && $out == *"Ctrl-G find: off"* ]]' "$out"
 check "picker: the prompt shows a non-default sort" '[[ $("$LETHE" __state prompt) == *"by size"* ]]'
 printf 'recent\n' >"$LETHE_STATE/sort"
+printf 'stats\n' >"$LETHE_STATE/panel" && printf 'codex\n' >"$LETHE_STATE/agent"
+out=$(NO_COLOR=1 FZF_PREVIEW_COLUMNS=60 "$LETHE" __preview "$A")
+check "picker: Ctrl-B shows the stats of the listed sessions in the panel" \
+    '[[ $out == *"Disk usage of the sessions listed"* && $out == *"codex"* && $out != *"claude  "* ]] && ! awk "length > 60 { exit 1 }" <<<"$out"' "$out"
+printf 'conversation\n' >"$LETHE_STATE/panel" && printf 'all\n' >"$LETHE_STATE/agent"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
 check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'

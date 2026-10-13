@@ -11,6 +11,9 @@
 - Every key that switches a view shows where it stands in the footer (`Ctrl-T agent: claude`,
   `Ctrl-O sort: size`, `Ctrl-G find: off`, `Alt-B abandoned branches: shown`…), and the prompt
   now includes the sort when it is not by date. `Ctrl-O` and `Alt-B` update both at once.
+- `Ctrl-B` shows the disk usage in the preview panel instead of a pager page ending in `(END)`:
+  it follows the agent, filter and project shown, and pressing it again brings the conversation
+  back. `lethe stats` fits the terminal width (bars, paths, cleanup commands on their own line).
 
 ## 0.4.1 — 2026-10-12
 
