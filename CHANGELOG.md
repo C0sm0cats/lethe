@@ -4,6 +4,8 @@
 
 - `--help` is up to date (the cycles of `Ctrl-T`, `Ctrl-S`, `Ctrl-O`, the menus, `Ctrl-Y`, `F1`) and
   fits 80 columns.
+- README: the key table no longer breaks `Ctrl-A` over two lines on GitHub (shorter descriptions,
+  non-breaking hyphens), and `Ctrl-G` has its own short section.
 
 ## 0.5.0 — 2026-10-13
 - `Ctrl-G` (and `--grep`) search the transcripts in parallel: twice as fast. While a search is

@@ -73,27 +73,33 @@ Everything the command line can do, the picker can do too.
 | Key | Action |
 | --- | --- |
 | `Tab` | mark / unmark |
-| `Ctrl-A` | mark / unmark all visible sessions |
-| `Ctrl-D` | delete the marked sessions (or the current one) |
-| `Ctrl-X` | archive / unarchive (Codex) |
-| `Ctrl-R` | resume the session in its agent |
-| `Ctrl-K` | fork: continue in a copy of the session |
-| `Ctrl-E` | export the conversation to `./lethe-ID.md` |
+| `Ctrl‑A` | mark / unmark all visible sessions |
+| `Ctrl‑D` | delete the marked sessions (or the current one) |
+| `Ctrl‑X` | archive / unarchive (Codex) |
+| `Ctrl‑R` | resume the session in its agent |
+| `Ctrl‑K` | fork: continue in a copy of the session |
+| `Ctrl‑E` | export the conversation to `./lethe-ID.md` |
 | `Enter` | read the whole conversation in your pager |
-| `Ctrl-T` | show all agents, Claude Code only, or Codex only |
-| `Ctrl-S` | show all, active or archived sessions |
-| `Ctrl-F` | pick a cleanup filter (empty, orphans, missing, idle 30d+/90d+, trash), with counts and sizes |
-| `Ctrl-W` | pick a project, biggest first, the current session's project on top |
-| `Ctrl-G` | find the text you typed inside the conversations: the preview shows the messages that mention it, highlighted, and `Enter` opens on the first one (press again with an empty search to clear) |
-| `Ctrl-O` | sort by date, by size (biggest first) or oldest first |
-| `Ctrl-P` | show / hide the conversation preview |
-| `Ctrl-B` | disk usage of the sessions listed, in the preview panel, following the filters (press again for the conversation) |
-| `Alt-B` | show or hide abandoned branches (`⑂`) in the preview, `Enter` and `Ctrl-E` |
-| `Ctrl-Y` | copy the command that resumes the session (`cd … && claude --resume …`) |
-| `F1` | show all keys, or only the essential ones (the default on short terminals) |
+| `Ctrl‑Y` | copy the command that resumes the session |
+| `Ctrl‑T` | agent: all, Claude Code or Codex |
+| `Ctrl‑S` | status: all, active or archived |
+| `Ctrl‑F` | cleanup filter menu, with counts and sizes |
+| `Ctrl‑W` | project menu, biggest first |
+| `Ctrl‑G` | find the typed text in the conversations ([details](#searching-conversations)) |
+| `Ctrl‑O` | sort: by date, by size or oldest first |
+| `Ctrl‑P` | show / hide the preview |
+| `Ctrl‑B` | disk usage of the listed sessions, in the preview |
+| `Alt‑B` | show / hide abandoned branches (`⑂`) |
+| `F1` | all keys, or only the essential ones |
 | `Esc` | quit |
 
 In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good. Typing filters the list by title, project, agent or mode. Command-line filters apply too: `lethe --dir ~/work --older-than 2w`.
+
+The footer lists the keys and shows where each switch stands (`Ctrl‑T agent: claude`, `Ctrl‑O sort: size`…). The cleanup filter menu (`Ctrl‑F`) offers empty sessions, orphans (project directory gone), missing transcripts, sessions idle for 30 or 90 days, and the trash.
+
+### Searching conversations
+
+Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversation contains it, the preview shows only the messages that mention it, highlighted ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence. Press `Ctrl‑G` again with an empty search to clear it.
 
 | Icon | Meaning |
 | --- | --- |
@@ -103,7 +109,7 @@ In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good.
 | `◔` | active in the last 10 minutes: protected |
 | `✗` | indexed by Codex, but the transcript file is gone |
 | `↺` | in the trash, restorable |
-| `⑂N` | Claude Code session with N abandoned branches (edited or rewound prompts), hidden by default |
+| `⑂N` | N abandoned branches (edited or rewound prompts), hidden |
 
 Sizes over 10 MB are yellow, over 50 MB red.
 
@@ -137,12 +143,13 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | --- | --- |
 | `--claude`, `--codex` | one agent |
 | `--active`, `--archived` | session status |
-| `--older-than D`, `--newer-than D` | last activity; `D` is `12h`, `30d`, `8w`, `6m`, `1y` |
+| `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6m`, `1y` |
+| `--newer-than D` | last activity within `D` |
 | `--dir PATH` | sessions started in `PATH` or below it (repeatable) |
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
 | `--provider NAME` | `anthropic`, `openai`, … |
-| `--grep TEXT` | your messages or the agent's replies contain `TEXT` (case-insensitive, abandoned branches included) |
-| `--empty` | sessions with no message and no reply (commands only) |
+| `--grep TEXT` | the conversation contains `TEXT` (any case, any branch) |
+| `--empty` | sessions with no message and no reply |
 | `--orphans` | sessions whose project directory no longer exists |
 | `--missing` | Codex index entries whose transcript is gone |
 | `--keep N` | spares the `N` most recent sessions of each project |
