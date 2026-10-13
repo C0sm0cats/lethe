@@ -8,6 +8,8 @@
   `--archived`, and `--unarchived` (the former `--active`, still accepted).
 - The header of a conversation (`show`, preview, `Enter`) says running or idle the same way.
   `list --json` keeps its `status` field (`active` / `archived`) for scripts.
+- Colors follow the status: running sessions (`◉` `◔`) are green, idle ones (`●`) grey. Idle
+  sessions were green, which read as "running".
 
 ## 0.5.2 — 2026-10-13
 

@@ -919,17 +919,17 @@ format_row() {
     local agent=$1 archived=$2 recency=$3 date=$4 mode=$5 size=$6 cwd=$7 title=$8 state=$9
     local title_width=${10:-44} rewinds=${11:-0} icon age hsize size_color="" agent_color title_color=""
     if [[ $state == open ]]; then
-        icon="${C_MAGENTA}◉${C_RESET}"
+        icon="${C_GREEN}◉${C_RESET}"
     elif [[ $state == trash ]]; then
         icon="${C_YELLOW}↺${C_RESET}"
     elif ((size < 0)); then
         icon="${C_RED}✗${C_RESET}"
     elif [[ $state == recent ]]; then
-        icon="${C_CYAN}◔${C_RESET}"
+        icon="${C_GREEN}◔${C_RESET}"
     elif ((archived)); then
         icon="${C_YELLOW}◌${C_RESET}"
     else
-        icon="${C_GREEN}●${C_RESET}"
+        icon="${C_DIM}●${C_RESET}"
     fi
     # Size, colored by weight: what is worth cleaning stands out.
     if ((size < 0)); then
@@ -1117,7 +1117,7 @@ stats_report() {
         trash_bytes=$(($(du -sk -- "$TRASH_DIR" | cut -f 1) * 1024))
     fi
     printf '\n'
-    ((open == 0)) || printf '  %s◉%s %d session(s) open in a running agent (protected)\n' "$C_MAGENTA" "$C_RESET" "$open"
+    ((open == 0)) || printf '  %s◉%s %d session(s) open in a running agent (protected)\n' "$C_GREEN" "$C_RESET" "$open"
     ((empties == 0)) || printf '  %s!%s %d empty session(s)%s%s→ %s delete --empty%s\n' \
         "$C_YELLOW" "$C_RESET" "$empties" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     ((orphans == 0)) || printf '  %s!%s %d session(s) whose project directory is gone%s%s→ %s delete --orphans%s\n' \
@@ -1188,13 +1188,13 @@ cmd_show() {
         < <(session_info "$id")
     path=$(codex_path "$agent" "$id" "$path")
     if [[ -n ${OPEN[$id]+x} ]]; then
-        status="${C_MAGENTA}running (open in an agent)"
+        status="${C_GREEN}running (open in an agent)"
     elif ((NOW - epoch < RECENT_SECONDS)); then
-        status="${C_CYAN}running (active in the last 10 minutes)"
+        status="${C_GREEN}running (active in the last 10 minutes)"
     elif ((archived)); then
         status="${C_YELLOW}archived"
     else
-        status="${C_GREEN}idle"
+        status="${C_DIM}idle"
     fi
 
     if [[ -z $size && -f $path ]]; then size=$(wc -c <"$path"); fi
@@ -1759,7 +1759,7 @@ run_action() {
         printf '%s' "${lines[$op]}"
     done
     if ((${#skipped[@]})); then
-        printf '%s%sSkipped %d protected session(s)%s\n' "$C_BOLD" "$C_MAGENTA" $((${#skipped[@]} / 2)) "$C_RESET"
+        printf '%s%sSkipped %d protected session(s)%s\n' "$C_BOLD" "$C_GREEN" $((${#skipped[@]} / 2)) "$C_RESET"
         printf '%s\n' "${skipped[@]}"
     fi
     ((unsupported == 0)) || printf '%sSkipped %d Claude Code session(s): archiving is a Codex feature.%s\n' \
@@ -1806,13 +1806,13 @@ run_action() {
             checked=$SECONDS
         fi
         if [[ -n ${OPEN[$id]+x} || -n $OPEN_WARNING ]]; then
-            printf '%s◉ %s was opened meanwhile, skipped%s\n' "$C_MAGENTA" "$id" "$C_RESET" >&2
+            printf '%s◉ %s was opened meanwhile, skipped%s\n' "$C_GREEN" "$id" "$C_RESET" >&2
             skipped_now=$((skipped_now + 1))
             continue
         fi
         stamp=$(session_stamp "${PLAN_AGENT[$id]}" "${PLAN_PATH[$id]}")
         if [[ $stamp != "${PLAN_STAMP[$id]}" ]] && ! op_done "$op" "$id" "$(session_state "$id")"; then
-            printf '%s◔ %s changed since the plan was shown, skipped%s\n' "$C_CYAN" "$id" "$C_RESET" >&2
+            printf '%s◔ %s changed since the plan was shown, skipped%s\n' "$C_GREEN" "$id" "$C_RESET" >&2
             skipped_now=$((skipped_now + 1))
             continue
         fi
