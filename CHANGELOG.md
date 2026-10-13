@@ -7,6 +7,8 @@
   macOS) or fish, and prints the exact command to install missing dependencies for the system
   (Homebrew, apt, dnf, pacman, zypper, apk). Tested in CI on Linux and on macOS.
 - README: install section rewritten around the installer, with the manual steps as an alternative.
+- On macOS, lethe runs with Homebrew's bash even when `/usr/bin` (bash 3.2) comes first in the
+  `PATH`, instead of stopping with "bash >= 4.4 is required".
 
 ## 0.5.1 — 2026-10-13
 

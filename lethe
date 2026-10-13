@@ -14,7 +14,15 @@
 set -euo pipefail
 
 if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
+    # macOS ships bash 3.2 in /usr/bin: use Homebrew's bash when it is installed
+    # but not first in the PATH.
+    for newer in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        if [[ -x $newer && -z ${LETHE_REEXEC:-} ]]; then
+            LETHE_REEXEC=1 exec "$newer" "$0" "$@"
+        fi
+    done
     printf 'lethe: bash >= 4.4 is required (running %s)\n' "$BASH_VERSION" >&2
+    [[ $(uname -s) != Darwin ]] || printf 'On macOS: brew install bash\n' >&2
     exit 1
 fi
 
