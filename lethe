@@ -26,7 +26,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.5.2"
+readonly VERSION="0.5.3"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -572,8 +572,13 @@ parse_args() {
                 F_AGENT=$value
                 ;;
             --claude | --codex) F_AGENT=${opt#--} ;;
-            --running | --idle | --archived) F_STATUS=${opt#--} ;;
-            --active | --unarchived) F_STATUS=active ;;
+            --running | --idle | --archived | --active | --unarchived)
+                value=${opt#--}
+                [[ $value != unarchived ]] || value=active
+                [[ -z $F_STATUS || $F_STATUS == "$value" ]] ||
+                    usage_error "choose one status: --running, --idle, --archived or --unarchived"
+                F_STATUS=$value
+                ;;
             --older-than | --newer-than)
                 [[ $value =~ ^[0-9]+[hdwmy]$ ]] ||
                     usage_error "invalid duration '$value' (examples: 12h, 30d, 8w, 6m, 1y)"

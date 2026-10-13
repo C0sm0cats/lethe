@@ -252,6 +252,7 @@ check "the Claude index picks up modified transcripts" '[[ $out == *"Cache desig
 echo "safety"
 expect_status "unknown option" 2 list --bogus
 expect_status "invalid duration" 2 list --older-than 3x
+expect_status "two statuses at once" 2 list --running --idle
 expect_status "delete without filter is refused" 2 delete -y
 expect_status "an agent alone is not a filter" 2 delete --claude -y
 expect_status "--yes is not a list option" 2 list --yes

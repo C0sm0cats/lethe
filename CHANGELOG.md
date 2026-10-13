@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.5.3 — 2026-10-13
 
 - "active" meant "not archived", and read as "running". `Ctrl-S` now cycles all → running → idle
   → archived: running is the sessions open in an agent or active in the last 10 minutes (◉ ◔),
   idle the others that are not archived (●). On the command line: `--running`, `--idle`,
-  `--archived`, and `--unarchived` (the former `--active`, still accepted).
+  `--archived`, and `--unarchived` (the former `--active`, still accepted). Two of them at once
+  is an error instead of the last one winning.
 - The header of a conversation (`show`, preview, `Enter`) says running or idle the same way.
   `list --json` keeps its `status` field (`active` / `archived`) for scripts.
 - Colors follow the status: running sessions (`◉` `◔`) are green, idle ones (`●`) grey. Idle
