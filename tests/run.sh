@@ -200,6 +200,9 @@ expect_ids "no filter lists both agents" "$A $B $C $D $E $F $G $H $I"
 expect_ids "--claude" "$G $H $I" --claude
 expect_ids "--agent codex" "$A $B $C $D $E $F" --agent codex
 expect_ids "--archived" "$D" --archived
+expect_ids "--running: open or active in the last 10 minutes" "$E $I" --running
+expect_ids "--idle: neither running nor archived" "$A $B $C $F $G $H" --idle
+expect_ids "--unarchived (and its old name --active)" "$A $B $C $E $F $G $H $I" --active
 expect_ids "--older-than" "$A $C $F $G" --older-than 45d
 expect_ids "--newer-than" "$B $E" --newer-than 1w
 expect_ids "--dir includes subdirectories, both agents" "$A $B $C $G" --dir "$PROJ"
@@ -233,6 +236,9 @@ out=$("$LETHE" list --codex)
 check "untitled subagents are named after their nickname" '[[ $out == *"subagent Kepler"* ]]' "$out"
 out=$("$LETHE" stats)
 check "stats" '[[ $out == *Total*9* && $out == *"1 session(s) open"* ]]' "$out"
+out=$("$LETHE" show "$E" 2>&1; "$LETHE" show "$A" 2>&1)
+check "show: the status reads running or idle" \
+    '[[ $out == *"running (active in the last 10 minutes)"* && $out == *"  idle  "* ]]' "$out"
 out=$("$LETHE" show "$A")
 check "show (codex)" '[[ $out == *"please refactor the Parser"* && $out != *secretword* ]]' "$out"
 out=$("$LETHE" show "$G")
@@ -322,7 +328,14 @@ check "picker: a project chosen with Ctrl-W excludes the projects below it" '[[ 
 : >"$LETHE_STATE/dir"
 check "picker: Ctrl-W lists projects, the current one first" \
     '[[ $(sed -n 2p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
-printf 'claude\n' >"$LETHE_STATE/agent" && printf 'active\n' >"$LETHE_STATE/status"
+out=""
+for _ in 1 2 3 4; do "$LETHE" __state status && out+="$(<"$LETHE_STATE/status") "; done
+check "picker: Ctrl-S cycles running, idle, archived, all" '[[ $out == "running idle archived all " ]]' "$out"
+printf 'running\n' >"$LETHE_STATE/status"
+check "picker: Ctrl-S running lists the open and recent sessions" '[[ $(picker_ids) == "$I $E " ]]' "$(picker_ids)"
+check "picker: the prompt and footer show the status" \
+    '[[ $("$LETHE" __state prompt) == *running* && $(NO_COLOR=1 "$LETHE" __state footer) == *"Ctrl-S status: running"* ]]'
+printf 'claude\n' >"$LETHE_STATE/agent" && printf 'idle\n' >"$LETHE_STATE/status"
 "$LETHE" __state status
 check "picker: Ctrl-S skips archived for Claude Code" '[[ $(<"$LETHE_STATE/status") == all ]]'
 printf 'all\n' >"$LETHE_STATE/agent"

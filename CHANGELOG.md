@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- "active" meant "not archived", and read as "running". `Ctrl-S` now cycles all → running → idle
+  → archived: running is the sessions open in an agent or active in the last 10 minutes (◉ ◔),
+  idle the others that are not archived (●). On the command line: `--running`, `--idle`,
+  `--archived`, and `--unarchived` (the former `--active`, still accepted).
+- The header of a conversation (`show`, preview, `Enter`) says running or idle the same way.
+  `list --json` keeps its `status` field (`active` / `archived`) for scripts.
+
 ## 0.5.2 — 2026-10-13
 
 - One-line installer: `curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | sh`

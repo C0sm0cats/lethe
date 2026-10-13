@@ -572,7 +572,8 @@ parse_args() {
                 F_AGENT=$value
                 ;;
             --claude | --codex) F_AGENT=${opt#--} ;;
-            --active | --archived) F_STATUS=${opt#--} ;;
+            --running | --idle | --archived) F_STATUS=${opt#--} ;;
+            --active | --unarchived) F_STATUS=active ;;
             --older-than | --newer-than)
                 [[ $value =~ ^[0-9]+[hdwmy]$ ]] ||
                     usage_error "invalid duration '$value' (examples: 12h, 30d, 8w, 6m, 1y)"
@@ -686,7 +687,7 @@ build_where() {
     local where=() dirs=() dir ids
     [[ -z $F_AGENT ]] || where+=("agent = '$F_AGENT'")
     case $F_STATUS in
-        active) where+=("archived = 0") ;;
+        active | idle) where+=("archived = 0") ;;
         archived) where+=("archived = 1") ;;
     esac
     [[ -z $F_OLDER ]] || where+=("recency < $(cutoff "$F_OLDER")")
@@ -870,6 +871,9 @@ fetch_rows() {
         else
             state=""
         fi
+        # running: open or active in the last 10 minutes (◉ ◔); idle: neither (●).
+        [[ $F_STATUS != running || -n $state ]] || continue
+        [[ $F_STATUS != idle || -z $state ]] || continue
         line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}"
         if [[ -n $F_GREP ]]; then pending+=("$line"); else printf '%s\n' "$line"; fi
     done < <(query "
@@ -1179,16 +1183,18 @@ cmd_show() {
     need jq
     prepare
 
-    local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status rewinds
-    IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size _ rewinds \
+    local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status rewinds epoch
+    IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size epoch rewinds \
         < <(session_info "$id")
     path=$(codex_path "$agent" "$id" "$path")
     if [[ -n ${OPEN[$id]+x} ]]; then
-        status="${C_MAGENTA}open in a running agent"
+        status="${C_MAGENTA}running (open in an agent)"
+    elif ((NOW - epoch < RECENT_SECONDS)); then
+        status="${C_CYAN}running (active in the last 10 minutes)"
     elif ((archived)); then
         status="${C_YELLOW}archived"
     else
-        status="${C_GREEN}active"
+        status="${C_GREEN}idle"
     fi
 
     if [[ -z $size && -f $path ]]; then size=$(wc -c <"$path"); fi
@@ -2154,8 +2160,9 @@ internal_state() {
             case $1:$value in
                 agent:all) value=claude ;;
                 agent:claude) value=codex ;;
-                status:all) value=active ;;
-                status:active) value=archived ;;
+                status:all) value=running ;;
+                status:running) value=idle ;;
+                status:idle) value=archived ;;
                 sort:recent) value=size ;;
                 sort:size) value=oldest ;;
                 sort:oldest) value=recent ;;
@@ -2485,7 +2492,7 @@ cmd_completion() {
 _lethe() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]} cmd=${COMP_WORDS[1]}
     local commands="pick list stats show resume fork export delete archive unarchive trash completion help"
-    local filters="--claude --codex --agent --active --archived --older-than --newer-than --dir --mode
+    local filters="--claude --codex --agent --running --idle --archived --unarchived --older-than --newer-than --dir --mode
                    --provider --grep --empty --missing --orphans --keep --sort"
     case $prev in
         --dir) COMPREPLY=($(compgen -d -- "$cur")); return ;;
@@ -2535,7 +2542,9 @@ Usage:
 
 Filters (combined with AND):
   --claude, --codex       one agent only (also --agent NAME)
-  --active, --archived    only active or only archived sessions
+  --running               open in an agent or active in the last 10 min (◉ ◔)
+  --idle                  neither running nor archived (●)
+  --archived              archived (Codex); --unarchived: all but those
   --older-than DURATION   last activity before DURATION ago (12h, 30d, 6m, 1y)
   --newer-than DURATION   last activity within DURATION
   --dir PATH              started in PATH or below it (repeatable)
@@ -2573,7 +2582,7 @@ Picker keys (the footer shows them, with the state of each switch):
   Ctrl-D delete Ctrl-X (un)archive    Ctrl-R resume   Ctrl-K fork
   Ctrl-E export to ./lethe-ID.md      Ctrl-Y copy the resume command
   Ctrl-T agent: all, Claude Code, Codex
-  Ctrl-S status: all, active, archived
+  Ctrl-S status: all, running, idle, archived
   Ctrl-F cleanup filter menu: empty, orphans, missing, idle, trash
   Ctrl-W project menu, biggest first
   Ctrl-G find the typed text in conversations (the preview shows where)
