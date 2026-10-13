@@ -1930,8 +1930,8 @@ cmd_pick() {
         --bind="ctrl-f:execute($me __choose filter)$refresh" \
         --bind="ctrl-w:execute($me __choose dir {1})$refresh" \
         --bind="ctrl-g:execute-silent($me __state grep {q})+clear-query$refresh" \
-        --bind="ctrl-o:execute-silent($me __state sort)+reload($me __rows)" \
-        --bind="alt-b:execute-silent($me __state branches)+transform-prompt($me __state prompt)+refresh-preview" \
+        --bind="ctrl-o:execute-silent($me __state sort)$refresh" \
+        --bind="alt-b:execute-silent($me __state branches)${refresh%+reload*}+refresh-preview" \
         --bind="ctrl-b:execute($me __stats)" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
@@ -2190,6 +2190,10 @@ internal_state() {
             fi
             value=$(<"$dir/grep")
             [[ -z $value ]] || parts+=("text: $value")
+            case $(cat "$dir/sort" 2>/dev/null) in
+                size) parts+=("by size") ;;
+                oldest) parts+=("oldest first") ;;
+            esac
             [[ $(cat "$dir/branches" 2>/dev/null) != all ]] || parts+=("⑂ all branches")
             printf '%s ❯ ' "$(join_by ' · ' "${parts[@]}")"
             ;;
@@ -2208,17 +2212,36 @@ internal_state() {
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
                     "Ctrl-F:leave_the_trash Ctrl-P:preview Esc:quit F1:fewer_keys")
             else
+                # The keys that switch a view show where they stand: [value].
+                local agent status filter project text sort branches
+                agent=$(<"$dir/agent") status=$(<"$dir/status") filter=$(<"$dir/filter")
+                project=$(<"$dir/dir") text=$(<"$dir/grep") sort=$(<"$dir/sort")
+                branches=$(cat "$dir/branches" 2>/dev/null || echo active)
+                project=${project#=}
+                project=${project##*/}
+                project=${project// /_} text=${text// /_}
+                [[ $sort != recent ]] || sort="date"
+                [[ $branches != active ]] || branches=hidden
+                [[ $branches != all ]] || branches=shown
                 keys=("Tab:mark Ctrl-A:all Enter:read Ctrl-P:preview Esc:quit"
-                    "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork"
-                    "Ctrl-E:export Ctrl-B:stats Ctrl-T:agent Ctrl-S:status"
-                    "Ctrl-F:filter Ctrl-W:project Ctrl-G:find Ctrl-O:sort"
-                    "Ctrl-Y:copy_resume_command Alt-B:abandoned_branches F1:fewer_keys")
+                    "Ctrl-D:delete Ctrl-X:archive Ctrl-R:resume Ctrl-K:fork Ctrl-E:export"
+                    "Ctrl-T:agent[$agent] Ctrl-S:status[$status] Ctrl-F:filter[$filter]"
+                    "Ctrl-W:project[${project:-all}] Ctrl-G:find[${text:-off}] Ctrl-O:sort[$sort]"
+                    "Alt-B:abandoned_branches[$branches] Ctrl-Y:copy Ctrl-B:stats F1:fewer_keys")
             fi
+            local words
             for line in "${keys[@]}"; do
                 out=()
-                for value in $line; do
+                read -ra words <<<"$line"
+                for value in "${words[@]}"; do
                     value=${value//_/ }
-                    out+=("$C_CYAN${value%%:*}$C_RESET $C_DIM${value#*:}$C_RESET")
+                    local label=${value#*:} state=""
+                    if [[ $label == *\[*\] ]]; then
+                        state=${label#*\[}
+                        state="$C_DIM:$C_RESET $C_BOLD${state%\]}$C_RESET"
+                        label=${label%%\[*}
+                    fi
+                    out+=("$C_CYAN${value%%:*}$C_RESET $C_DIM$label$C_RESET$state")
                 done
                 printf '%s\n' "$(join_by '  ' "${out[@]}")"
             done

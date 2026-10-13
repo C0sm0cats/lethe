@@ -319,6 +319,12 @@ printf 'claude\n' >"$LETHE_STATE/agent" && printf 'active\n' >"$LETHE_STATE/stat
 "$LETHE" __state status
 check "picker: Ctrl-S skips archived for Claude Code" '[[ $(<"$LETHE_STATE/status") == all ]]'
 printf 'all\n' >"$LETHE_STATE/agent"
+printf 'full\n' >"$LETHE_STATE/keys" && printf 'size\n' >"$LETHE_STATE/sort"
+out=$(NO_COLOR=1 "$LETHE" __state footer)
+check "picker: the footer shows where each switch stands" \
+    '[[ $out == *"Ctrl-T agent: all"* && $out == *"Ctrl-O sort: size"* && $out == *"Ctrl-G find: off"* ]]' "$out"
+check "picker: the prompt shows a non-default sort" '[[ $("$LETHE" __state prompt) == *"by size"* ]]'
+printf 'recent\n' >"$LETHE_STATE/sort"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
 check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'

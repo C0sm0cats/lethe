@@ -62,11 +62,11 @@
 <text x="250.2" y="138.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">PROJECT</text>
 <text x="405.0" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">TITLE</text>
 <text x="817.8" y="138.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
-<text x="843.6" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="938.2" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:25</text>
+<text x="843.6" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="938.2" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">01:58</text>
 <text x="989.8" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">→</text>
-<text x="1007.0" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="1101.6" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:55</text>
+<text x="1007.0" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="1101.6" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:28</text>
 <text x="1153.2" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="1170.4" y="138.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">019a0000</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
@@ -387,38 +387,43 @@
 <text x="379.2" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
 <text x="448.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
 <text x="508.2" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
+<text x="559.8" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
+<text x="620.0" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
 <text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
-<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
-<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="241.6" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="301.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="362.0" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="482.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
+<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
+<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">agent:</text>
+<text x="172.8" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="215.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
+<text x="276.0" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">status:</text>
+<text x="344.8" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="387.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
+<text x="448.0" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">filter:</text>
+<text x="516.8" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
 <text x="817.8" y="575.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="181.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="241.6" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
-<text x="319.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
-<text x="379.2" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">find</text>
-<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
-<text x="491.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
+<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
+<text x="112.6" y="594.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">project:</text>
+<text x="190.0" y="594.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="233.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
+<text x="293.2" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">find:</text>
+<text x="344.8" y="594.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">off</text>
+<text x="387.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
+<text x="448.0" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">sort:</text>
+<text x="499.6" y="594.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">date</text>
 <text x="817.8" y="594.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">─│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-Y</text>
-<text x="112.6" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">copy</text>
-<text x="155.6" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
-<text x="215.8" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">command</text>
-<text x="293.2" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
-<text x="344.8" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">abandoned</text>
-<text x="430.8" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">branches</text>
-<text x="516.8" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
-<text x="542.6" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">fewer</text>
-<text x="594.2" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">keys</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
+<text x="104.0" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">abandoned</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">branches:</text>
+<text x="276.0" y="613.2" fill="#d7dae0" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">hidden</text>
+<text x="344.8" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-Y</text>
+<text x="405.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">copy</text>
+<text x="456.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
+<text x="516.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
+<text x="577.0" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="602.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">fewer</text>
+<text x="654.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f1">
@@ -476,11 +481,11 @@
 <text x="250.2" y="138.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">PROJECT</text>
 <text x="405.0" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">TITLE</text>
 <text x="817.8" y="138.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
-<text x="843.6" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="938.2" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:25</text>
+<text x="843.6" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="938.2" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">01:58</text>
 <text x="989.8" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">→</text>
-<text x="1007.0" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="1101.6" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:55</text>
+<text x="1007.0" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="1101.6" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:28</text>
 <text x="1153.2" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="1170.4" y="138.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">019a0000</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
@@ -740,38 +745,43 @@
 <text x="379.2" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
 <text x="448.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
 <text x="508.2" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
+<text x="559.8" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
+<text x="620.0" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
 <text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
-<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
-<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="241.6" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="301.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="362.0" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="482.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
+<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
+<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">agent:</text>
+<text x="172.8" y="575.2" fill="#d7dae0" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="241.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
+<text x="301.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">status:</text>
+<text x="370.6" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="413.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
+<text x="473.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">filter:</text>
+<text x="542.6" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
 <text x="817.8" y="575.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="181.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="241.6" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
-<text x="319.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
-<text x="379.2" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">find</text>
-<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
-<text x="491.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
+<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
+<text x="112.6" y="594.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">project:</text>
+<text x="190.0" y="594.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="233.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
+<text x="293.2" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">find:</text>
+<text x="344.8" y="594.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">off</text>
+<text x="387.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
+<text x="448.0" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">sort:</text>
+<text x="499.6" y="594.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">date</text>
 <text x="817.8" y="594.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">─│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-Y</text>
-<text x="112.6" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">copy</text>
-<text x="155.6" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
-<text x="215.8" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">command</text>
-<text x="293.2" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
-<text x="344.8" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">abandoned</text>
-<text x="430.8" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">branches</text>
-<text x="516.8" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
-<text x="542.6" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">fewer</text>
-<text x="594.2" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">keys</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
+<text x="104.0" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">abandoned</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">branches:</text>
+<text x="276.0" y="613.2" fill="#d7dae0" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">hidden</text>
+<text x="344.8" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-Y</text>
+<text x="405.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">copy</text>
+<text x="456.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
+<text x="516.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
+<text x="577.0" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="602.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">fewer</text>
+<text x="654.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f2">
@@ -781,10 +791,13 @@
 <text x="86.8" y="62.2" fill="#7f848e" textLength="1393.2" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────╮</text>
 <text x="18.0" y="81.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="35.2" y="81.2" fill="#56b6c2" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
-<text x="95.4" y="81.2" fill="#56b6c2" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">❯</text>
-<text x="112.6" y="81.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">type</text>
-<text x="155.6" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">to</text>
-<text x="181.4" y="81.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
+<text x="95.4" y="81.2" fill="#56b6c2" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="112.6" y="81.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">by</text>
+<text x="138.4" y="81.2" fill="#56b6c2" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">size</text>
+<text x="181.4" y="81.2" fill="#56b6c2" font-weight="bold" textLength="8.6" lengthAdjust="spacingAndGlyphs">❯</text>
+<text x="198.6" y="81.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">type</text>
+<text x="241.6" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="267.4" y="81.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
 <text x="783.4" y="81.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">6/6</text>
 <text x="817.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="81.2" fill="#d7dae0" font-weight="bold" textLength="60.2" lengthAdjust="spacingAndGlyphs">Profile</text>
@@ -799,8 +812,6 @@
 <text x="843.6" y="100.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="912.4" y="100.2" fill="#98c379" textLength="51.6" lengthAdjust="spacingAndGlyphs">active</text>
 <text x="981.2" y="100.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">cli</text>
-<text x="1015.6" y="100.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="1032.8" y="100.2" fill="#7f848e" textLength="129.0" lengthAdjust="spacingAndGlyphs">claude-opus-5-5</text>
 <text x="1471.4" y="100.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="18.0" y="119.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">╭</text>
 <text x="35.2" y="119.2" fill="#d7dae0" textLength="8.6" lengthAdjust="spacingAndGlyphs">6</text>
@@ -825,11 +836,11 @@
 <text x="250.2" y="138.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">PROJECT</text>
 <text x="405.0" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">TITLE</text>
 <text x="817.8" y="138.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
-<text x="843.6" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-06</text>
-<text x="938.2" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:29</text>
+<text x="843.6" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-07</text>
+<text x="938.2" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:02</text>
 <text x="989.8" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">→</text>
-<text x="1007.0" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-06</text>
-<text x="1101.6" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:59</text>
+<text x="1007.0" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-07</text>
+<text x="1101.6" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:32</text>
 <text x="1153.2" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="1170.4" y="138.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">019a0005</text>
 <text x="1471.4" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
@@ -993,38 +1004,43 @@
 <text x="379.2" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
 <text x="448.0" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-K</text>
 <text x="508.2" y="556.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">fork</text>
+<text x="559.8" y="556.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
+<text x="620.0" y="556.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
 <text x="817.8" y="556.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1471.4" y="556.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-E</text>
-<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">export</text>
-<text x="181.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
-<text x="241.6" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
-<text x="301.8" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
-<text x="362.0" y="575.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">agent</text>
-<text x="422.2" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
-<text x="482.4" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">status</text>
+<text x="52.4" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-T</text>
+<text x="112.6" y="575.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">agent:</text>
+<text x="172.8" y="575.2" fill="#d7dae0" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
+<text x="241.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-S</text>
+<text x="301.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">status:</text>
+<text x="370.6" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="413.6" y="575.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
+<text x="473.8" y="575.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">filter:</text>
+<text x="542.6" y="575.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
 <text x="817.8" y="575.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">╯│</text>
 <text x="1471.4" y="575.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-F</text>
-<text x="112.6" y="594.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">filter</text>
-<text x="181.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
-<text x="241.6" y="594.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">project</text>
-<text x="319.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
-<text x="379.2" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">find</text>
-<text x="430.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
-<text x="491.0" y="594.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">sort</text>
+<text x="52.4" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-W</text>
+<text x="112.6" y="594.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">project:</text>
+<text x="190.0" y="594.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="233.0" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-G</text>
+<text x="293.2" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">find:</text>
+<text x="344.8" y="594.2" fill="#d7dae0" font-weight="bold" textLength="25.8" lengthAdjust="spacingAndGlyphs">off</text>
+<text x="387.8" y="594.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-O</text>
+<text x="448.0" y="594.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">sort:</text>
+<text x="499.6" y="594.2" fill="#d7dae0" font-weight="bold" textLength="34.4" lengthAdjust="spacingAndGlyphs">size</text>
 <text x="817.8" y="594.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">─│</text>
 <text x="1471.4" y="594.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="52.4" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-Y</text>
-<text x="112.6" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">copy</text>
-<text x="155.6" y="613.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">resume</text>
-<text x="215.8" y="613.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">command</text>
-<text x="293.2" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
-<text x="344.8" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">abandoned</text>
-<text x="430.8" y="613.2" fill="#7f848e" textLength="68.8" lengthAdjust="spacingAndGlyphs">branches</text>
-<text x="516.8" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
-<text x="542.6" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">fewer</text>
-<text x="594.2" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">keys</text>
+<text x="52.4" y="613.2" fill="#56b6c2" textLength="43.0" lengthAdjust="spacingAndGlyphs">Alt-B</text>
+<text x="104.0" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">abandoned</text>
+<text x="190.0" y="613.2" fill="#7f848e" textLength="77.4" lengthAdjust="spacingAndGlyphs">branches:</text>
+<text x="276.0" y="613.2" fill="#d7dae0" font-weight="bold" textLength="51.6" lengthAdjust="spacingAndGlyphs">hidden</text>
+<text x="344.8" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-Y</text>
+<text x="405.0" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">copy</text>
+<text x="456.6" y="613.2" fill="#56b6c2" textLength="51.6" lengthAdjust="spacingAndGlyphs">Ctrl-B</text>
+<text x="516.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">stats</text>
+<text x="577.0" y="613.2" fill="#56b6c2" textLength="17.2" lengthAdjust="spacingAndGlyphs">F1</text>
+<text x="602.8" y="613.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">fewer</text>
+<text x="654.4" y="613.2" fill="#7f848e" textLength="34.4" lengthAdjust="spacingAndGlyphs">keys</text>
 <text x="826.4" y="613.2" fill="#7f848e" textLength="653.6" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────╯</text>
 </g>
 <g class="f3">
@@ -1036,8 +1052,8 @@
 <text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="164.2" y="81.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-09-04</text>
-<text x="258.8" y="81.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:59</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-09-05</text>
+<text x="258.8" y="81.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:32</text>
 <text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="387.8" y="81.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
 <text x="542.6" y="81.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">vscode</text>
@@ -1054,8 +1070,8 @@
 <text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
 <text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="119.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="164.2" y="119.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="258.8" y="119.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:55</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="258.8" y="119.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:28</text>
 <text x="336.2" y="119.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
 <text x="387.8" y="119.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
 <text x="542.6" y="119.2" fill="#d7dae0" textLength="25.8" lengthAdjust="spacingAndGlyphs">Fix</text>
@@ -1096,8 +1112,8 @@
 <text x="35.2" y="81.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="52.4" y="81.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="81.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">5w</text>
-<text x="164.2" y="81.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-09-04</text>
-<text x="258.8" y="81.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:59</text>
+<text x="164.2" y="81.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-09-05</text>
+<text x="258.8" y="81.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:32</text>
 <text x="344.8" y="81.2" fill="#e5c07b" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="387.8" y="81.2" fill="#61afef" textLength="111.8" lengthAdjust="spacingAndGlyphs">old-prototype</text>
 <text x="542.6" y="81.2" fill="#7f848e" textLength="51.6" lengthAdjust="spacingAndGlyphs">vscode</text>
@@ -1114,8 +1130,8 @@
 <text x="35.2" y="119.2" fill="#c678dd" textLength="8.6" lengthAdjust="spacingAndGlyphs">◉</text>
 <text x="52.4" y="119.2" fill="#d7875f" textLength="51.6" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="129.8" y="119.2" fill="#56b6c2" font-weight="bold" textLength="17.2" lengthAdjust="spacingAndGlyphs">4m</text>
-<text x="164.2" y="119.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="258.8" y="119.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:55</text>
+<text x="164.2" y="119.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="258.8" y="119.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:28</text>
 <text x="336.2" y="119.2" fill="#d7dae0" textLength="34.4" lengthAdjust="spacingAndGlyphs">2.0M</text>
 <text x="387.8" y="119.2" fill="#61afef" textLength="86.0" lengthAdjust="spacingAndGlyphs">api-server</text>
 <text x="542.6" y="119.2" fill="#d7dae0" textLength="25.8" lengthAdjust="spacingAndGlyphs">Fix</text>
@@ -1148,10 +1164,18 @@
 <text x="198.6" y="195.2" fill="#d7dae0" textLength="43.0" lengthAdjust="spacingAndGlyphs">[y/N]</text>
 <text x="250.2" y="195.2" fill="#d7dae0" textLength="8.6" lengthAdjust="spacingAndGlyphs">y</text>
 <text x="18.0" y="214.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">✓</text>
-<text x="35.2" y="214.2" fill="#98c379" textLength="60.2" lengthAdjust="spacingAndGlyphs">deleted</text>
-<text x="104.0" y="214.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">1</text>
-<text x="121.2" y="214.2" fill="#98c379" textLength="25.8" lengthAdjust="spacingAndGlyphs">(0B</text>
-<text x="155.6" y="214.2" fill="#98c379" textLength="51.6" lengthAdjust="spacingAndGlyphs">freed)</text>
+<text x="35.2" y="214.2" fill="#98c379" textLength="43.0" lengthAdjust="spacingAndGlyphs">moved</text>
+<text x="86.8" y="214.2" fill="#98c379" textLength="8.6" lengthAdjust="spacingAndGlyphs">1</text>
+<text x="104.0" y="214.2" fill="#98c379" textLength="17.2" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="129.8" y="214.2" fill="#98c379" textLength="25.8" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="164.2" y="214.2" fill="#98c379" textLength="43.0" lengthAdjust="spacingAndGlyphs">trash</text>
+<text x="215.8" y="214.2" fill="#98c379" textLength="43.0" lengthAdjust="spacingAndGlyphs">(11M,</text>
+<text x="267.4" y="214.2" fill="#98c379" textLength="43.0" lengthAdjust="spacingAndGlyphs">freed</text>
+<text x="319.0" y="214.2" fill="#98c379" textLength="34.4" lengthAdjust="spacingAndGlyphs">when</text>
+<text x="362.0" y="214.2" fill="#98c379" textLength="25.8" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="396.4" y="214.2" fill="#98c379" textLength="43.0" lengthAdjust="spacingAndGlyphs">trash</text>
+<text x="448.0" y="214.2" fill="#98c379" textLength="17.2" lengthAdjust="spacingAndGlyphs">is</text>
+<text x="473.8" y="214.2" fill="#98c379" textLength="68.8" lengthAdjust="spacingAndGlyphs">emptied)</text>
 <text x="18.0" y="252.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">Press</text>
 <text x="69.6" y="252.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">Enter</text>
 <text x="121.2" y="252.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">to</text>
@@ -1201,8 +1225,8 @@
 <text x="405.0" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">TITLE</text>
 <text x="817.8" y="138.2" fill="#7f848e" textLength="17.2" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="843.6" y="138.2" fill="#7f848e" textLength="60.2" lengthAdjust="spacingAndGlyphs">trashed</text>
-<text x="912.4" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-12</text>
-<text x="1007.0" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">16:59</text>
+<text x="912.4" y="138.2" fill="#7f848e" textLength="86.0" lengthAdjust="spacingAndGlyphs">2026-10-13</text>
+<text x="1007.0" y="138.2" fill="#7f848e" textLength="43.0" lengthAdjust="spacingAndGlyphs">02:33</text>
 <text x="1058.6" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="1075.8" y="138.2" fill="#7f848e" textLength="25.8" lengthAdjust="spacingAndGlyphs">11M</text>
 <text x="1110.2" y="138.2" fill="#7f848e" textLength="8.6" lengthAdjust="spacingAndGlyphs">·</text>

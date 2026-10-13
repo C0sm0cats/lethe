@@ -8,6 +8,9 @@
   active, the preview shows only the messages that mention the text, highlighted, with a count
   ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence.
 - `Ctrl-O` cycles by date → by size → oldest first; `--sort oldest` on the command line.
+- Every key that switches a view shows where it stands in the footer (`Ctrl-T agent: claude`,
+  `Ctrl-O sort: size`, `Ctrl-G find: off`, `Alt-B abandoned branches: shown`…), and the prompt
+  now includes the sort when it is not by date. `Ctrl-O` and `Alt-B` update both at once.
 
 ## 0.4.1 — 2026-10-12
 
