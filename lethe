@@ -2556,8 +2556,7 @@ Safety:
   are sessions active in the last 10 minutes (◔) unless --force is given.
   Each session is checked again right before it is changed, and left alone
   if it was opened or written to since the plan was shown.
-  Claude Code sessions go to a trash and can be restored:
-    $TRASH_DIR
+  Claude Code sessions go to a trash and can be restored (\`$PROG trash\`).
   Codex sessions are deleted with \`codex delete\`, which is permanent;
   archiving them is the reversible alternative.
 
