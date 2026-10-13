@@ -2512,13 +2512,13 @@ usage() {
 $PROG $VERSION — browse, resume and forget your Claude Code and Codex sessions
 
 Usage:
-  $PROG [pick] [FILTERS] [--sort size]   interactive browser (needs fzf)
-  $PROG list   [FILTERS] [--sort size] [--json | --ids]
+  $PROG [pick] [FILTERS] [--sort ORDER]  interactive browser (needs fzf)
+  $PROG list   [FILTERS] [--sort ORDER] [--json | --ids]
   $PROG stats  [FILTERS]                 disk usage and cleanup hints
   $PROG show   ID [--all-branches]       print a conversation
-  $PROG resume ID                        reopen a session in its agent and directory
-  $PROG fork   ID                        open a copy of a session, leaving the original as is
   $PROG export ID [--all-branches]       the conversation as Markdown, on stdout
+  $PROG resume ID                        reopen it in its agent and directory
+  $PROG fork   ID                        continue in a copy, original untouched
   $PROG delete    (FILTERS | ID...) [-n] [-y] [--force]
   $PROG archive   (FILTERS | ID...) [-n] [-y]      Codex only
   $PROG unarchive (FILTERS | ID...) [-n] [-y]      Codex only
@@ -2528,13 +2528,13 @@ Usage:
 Filters (combined with AND):
   --claude, --codex       one agent only (also --agent NAME)
   --active, --archived    only active or only archived sessions
-  --older-than DURATION   last activity before DURATION ago (12h, 30d, 8w, 6m, 1y)
+  --older-than DURATION   last activity before DURATION ago (12h, 30d, 6m, 1y)
   --newer-than DURATION   last activity within DURATION
   --dir PATH              started in PATH or below it (repeatable)
   --mode MODE             cli, exec, vscode, subagent, ...
   --provider NAME         model provider (anthropic, openai, ...)
   --grep TEXT             conversation contains TEXT (case-insensitive)
-  --empty                 sessions without any message (nor any reply)
+  --empty                 sessions with no message and no reply
   --missing               Codex index entries whose transcript file is gone
   --orphans               sessions whose project directory no longer exists
   --keep N                spare the N most recent sessions of each project
@@ -2547,8 +2547,8 @@ Options:
       --all               allow delete/archive without any filter
       --sort ORDER        recent (default), size (biggest first) or oldest
       --json, --ids       list output formats
-      --all-branches      show/export: include abandoned branches of Claude Code
-                          sessions (prompts edited or rewound), marked as such
+      --all-branches      show/export: include abandoned branches of Claude
+                          Code sessions (edited or rewound prompts), marked
   -h, --help, -V, --version
 
 Safety:
@@ -2556,22 +2556,27 @@ Safety:
   are sessions active in the last 10 minutes (◔) unless --force is given.
   Each session is checked again right before it is changed, and left alone
   if it was opened or written to since the plan was shown.
-  Claude Code sessions are moved to a trash ($TRASH_DIR) and can be
-  restored. Codex sessions are deleted with \`codex delete\`, which is permanent;
+  Claude Code sessions go to a trash and can be restored:
+    $TRASH_DIR
+  Codex sessions are deleted with \`codex delete\`, which is permanent;
   archiving them is the reversible alternative.
 
-Picker keys:
-  Tab mark  Ctrl-A mark all  Ctrl-D delete  Ctrl-X archive/unarchive  Enter read
-  Ctrl-R resume  Ctrl-K fork  Ctrl-E export to ./lethe-ID.md
-  Ctrl-T agent  Ctrl-S status  Ctrl-G find the typed text in conversations (preview shows where)
-  Ctrl-F pick a cleanup filter (empty, orphans, missing, idle, trash) with counts and sizes
-  Ctrl-W pick a project, biggest first (the current session's project comes first)
-  Ctrl-O sort: date, size, oldest  Ctrl-P preview  Esc quit
-  Ctrl-B disk usage of what the list shows, in the preview panel (press again for the conversation)
-  Alt-B show or hide abandoned branches (⑂) in the preview, Enter and Ctrl-E
-  Ctrl-Y copy the command that resumes the session   F1 fewer or all keys
+Picker keys (the footer shows them, with the state of each switch):
+  Tab mark      Ctrl-A mark all       Enter read the whole conversation
+  Ctrl-D delete Ctrl-X (un)archive    Ctrl-R resume   Ctrl-K fork
+  Ctrl-E export to ./lethe-ID.md      Ctrl-Y copy the resume command
+  Ctrl-T agent: all, Claude Code, Codex
+  Ctrl-S status: all, active, archived
+  Ctrl-F cleanup filter menu: empty, orphans, missing, idle, trash
+  Ctrl-W project menu, biggest first
+  Ctrl-G find the typed text in conversations (the preview shows where)
+  Ctrl-O sort: date, size, oldest     Ctrl-P show or hide the preview
+  Ctrl-B disk usage of the listed sessions, in the preview
+  Alt-B  show or hide abandoned branches (⑂)
+  F1     fewer or all keys in the footer     Esc quit
 
-Environment: CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, NO_COLOR, PAGER.
+Environment:
+  CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, NO_COLOR, PAGER
 EOF
 }
 

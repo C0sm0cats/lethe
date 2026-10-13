@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `--help` is up to date (the cycles of `Ctrl-T`, `Ctrl-S`, `Ctrl-O`, the menus, `Ctrl-Y`, `F1`) and
+  fits 80 columns.
+
 ## 0.5.0 — 2026-10-13
 - `Ctrl-G` (and `--grep`) search the transcripts in parallel: twice as fast. While a search is
   active, the preview shows only the messages that mention the text, highlighted, with a count
