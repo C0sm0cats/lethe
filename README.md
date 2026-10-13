@@ -39,7 +39,14 @@ curl -fsSL -o ~/.local/bin/lethe https://raw.githubusercontent.com/C0sm0cats/let
 chmod +x ~/.local/bin/lethe
 ```
 
-Make sure `~/.local/bin` is in your `PATH`. Packaging recipes for Homebrew and the AUR are in [`packaging/`](packaging/). For a fixed version, replace `main` with a release tag such as `v0.4.0`.
+If `lethe` is then "command not found", `~/.local/bin` is not in your `PATH` (the default on macOS). Add it to your shell's startup file and open a new terminal:
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc    # macOS, zsh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc   # Linux, bash
+```
+
+For a fixed version, replace `main` with a release tag such as `v0.5.1`. Packaging recipes for Homebrew and the AUR are in [`packaging/`](packaging/).
 
 Dependencies:
 

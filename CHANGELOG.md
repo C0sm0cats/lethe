@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- README: how to add `~/.local/bin` to the `PATH` (not there by default on macOS).
+
 ## 0.5.1 — 2026-10-13
 
 - `--help` is up to date (the cycles of `Ctrl-T`, `Ctrl-S`, `Ctrl-O`, the menus, `Ctrl-Y`, `F1`) and
