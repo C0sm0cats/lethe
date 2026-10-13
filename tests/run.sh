@@ -187,6 +187,11 @@ echo "portability"
 # macOS bash reads `$VAR●` as one name under some locales: brace them.
 out=$(perl -ne 'print "$.: $_" if /\$[A-Za-z_]\w*[^\x00-\x7f]/' "$LETHE")
 check "no unbraced variable before non-ASCII text" '[[ -z $out ]]' "$out"
+# The top CHANGELOG section is the next or current version, never an older one.
+version=$("$LETHE" --version | cut -d' ' -f2)
+top=$(grep -m1 '^## ' "$ROOT/CHANGELOG.md" | cut -d' ' -f2)
+check "CHANGELOG starts with Unreleased or the current version" '[[ $top == Unreleased || $top == "$version" ]]' \
+    "top: $top, version: $version"
 
 echo "filters"
 expect_ids "no filter lists both agents" "$A $B $C $D $E $F $G $H $I"
