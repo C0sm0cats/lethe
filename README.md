@@ -17,9 +17,7 @@ In Greek myth, Lethe is the river of forgetting. Your agents never forget: after
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | sh
 ```
 
-On Linux and macOS. The installer puts lethe in `~/.local/bin`, adds it to your `PATH`, and tells you the exact command to install anything missing (`fzf`, `jq`, `sqlite3`, a recent `bash`).
-
-One Bash file. No runtime, no daemon, no install step. It needs `fzf`, `jq` and `sqlite3` (see [Install](#install)).
+On Linux and macOS. The installer puts lethe in `~/.local/bin`, adds it to your `PATH`, and tells you the exact command to install anything missing (`fzf`, `jq`, `sqlite3`, a recent `bash`). lethe is one Bash file: no runtime, no daemon, nothing to build.
 
 ## Features
 
@@ -130,10 +128,6 @@ In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good.
 
 The footer lists the keys and shows where each switch stands (`Ctrl‑T agent: claude`, `Ctrl‑O sort: size`…). The cleanup filter menu (`Ctrl‑F`) offers empty sessions, orphans (project directory gone), missing transcripts, sessions idle for 30 or 90 days, and the trash.
 
-### Searching conversations
-
-Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversation contains it, the preview shows only the messages that mention it, highlighted ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence. Press `Ctrl‑G` again with an empty search to clear it.
-
 | Icon | Meaning |
 | --- | --- |
 | `●` | active session |
@@ -145,6 +139,10 @@ Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversati
 | `⑂N` | N abandoned branches (edited or rewound prompts), hidden |
 
 Sizes over 10 MB are yellow, over 50 MB red.
+
+### Searching conversations
+
+Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversation contains it, the preview shows only the messages that mention it, highlighted ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence. Press `Ctrl‑G` again with an empty search to clear it.
 
 ### Cleaning up from the command line
 
@@ -174,7 +172,7 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 
 | Filter | Matches |
 | --- | --- |
-| `--claude`, `--codex` | one agent |
+| `--claude`, `--codex` | one agent (also `--agent NAME`) |
 | `--active`, `--archived` | session status |
 | `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6m`, `1y` |
 | `--newer-than D` | last activity within `D` |
