@@ -42,9 +42,12 @@ chmod +x ~/.local/bin/lethe
 If `lethe` is then "command not found", `~/.local/bin` is not in your `PATH` (the default on macOS). Add it to your shell's startup file and open a new terminal:
 
 ```sh
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc    # macOS, zsh
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc   # Linux, bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc         # zsh: macOS default, created if missing
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc        # bash on Linux
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bash_profile  # bash on macOS
 ```
+
+`echo $SHELL` tells which shell you use.
 
 For a fixed version, replace `main` with a release tag such as `v0.5.1`. Packaging recipes for Homebrew and the AUR are in [`packaging/`](packaging/).
 
