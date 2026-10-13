@@ -14,9 +14,10 @@
 In Greek myth, Lethe is the river of forgetting. Your agents never forget: after a few weeks you have hundreds of sessions spread over `~/.claude` and `~/.codex`. There are one-shot runs, abandoned subagents, sessions you opened and closed, and transcripts of several hundred megabytes. Neither agent lets you see them all, let alone clean them up.
 
 ```sh
-mkdir -p ~/.local/bin && curl -fsSL -o ~/.local/bin/lethe https://raw.githubusercontent.com/C0sm0cats/lethe/main/lethe && chmod +x ~/.local/bin/lethe
-lethe
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | sh
 ```
+
+On Linux and macOS. The installer puts lethe in `~/.local/bin`, adds it to your `PATH`, and tells you the exact command to install anything missing (`fzf`, `jq`, `sqlite3`, a recent `bash`).
 
 One Bash file. No runtime, no daemon, no install step. It needs `fzf`, `jq` and `sqlite3` (see [Install](#install)).
 
@@ -34,12 +35,26 @@ One Bash file. No runtime, no daemon, no install step. It needs `fzf`, `jq` and 
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | sh
+```
+
+That is all. The [installer](install.sh) is short and readable; it:
+
+1. downloads `lethe` to `~/.local/bin` (another directory or a given release: `curl … | LETHE_BIN=/path LETHE_VERSION=v0.5.1 sh`);
+2. adds that directory to your `PATH` if needed, in the startup file of your shell (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` on macOS, fish), then asks you to open a new terminal;
+3. checks the dependencies and prints the command to install the missing ones for your system.
+
+Run it again to update lethe.
+
+**By hand**, if you prefer:
+
+```sh
 mkdir -p ~/.local/bin
 curl -fsSL -o ~/.local/bin/lethe https://raw.githubusercontent.com/C0sm0cats/lethe/main/lethe
 chmod +x ~/.local/bin/lethe
 ```
 
-If `lethe` is then "command not found", `~/.local/bin` is not in your `PATH` (the default on macOS). Add it to your shell's startup file and open a new terminal:
+If `lethe` is then "command not found", add `~/.local/bin` to your `PATH` (`echo $SHELL` tells your shell):
 
 ```sh
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc         # zsh: macOS default, created if missing
@@ -47,9 +62,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc        # bash on Linux
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bash_profile  # bash on macOS
 ```
 
-`echo $SHELL` tells which shell you use.
-
-For a fixed version, replace `main` with a release tag such as `v0.5.1`. Packaging recipes for Homebrew and the AUR are in [`packaging/`](packaging/).
+Packaging recipes for Homebrew and the AUR are in [`packaging/`](packaging/).
 
 Dependencies:
 

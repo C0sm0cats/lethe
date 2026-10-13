@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- README: how to add `~/.local/bin` to the `PATH` (not there by default on macOS).
+- One-line installer: `curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | sh`
+  downloads lethe, adds `~/.local/bin` to the `PATH` in the right file for zsh, bash (Linux and
+  macOS) or fish, and prints the exact command to install missing dependencies for the system
+  (Homebrew, apt, dnf, pacman, zypper, apk). Tested in CI on Linux and on macOS.
+- README: install section rewritten around the installer, with the manual steps as an alternative.
 
 ## 0.5.1 — 2026-10-13
 
