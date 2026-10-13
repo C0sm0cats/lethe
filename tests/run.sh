@@ -235,7 +235,7 @@ check "Claude titles come from ai-title" '[[ $out == *"Design the cache"* ]]' "$
 out=$("$LETHE" list --codex)
 check "untitled subagents are named after their nickname" '[[ $out == *"subagent Kepler"* ]]' "$out"
 out=$("$LETHE" stats)
-check "stats" '[[ $out == *Total*9* && $out == *"1 session(s) open"* ]]' "$out"
+check "stats" '[[ $out == *Total*9* && $out == *"2 running session(s), protected"*"list --running"* ]]' "$out"
 out=$("$LETHE" show "$E" 2>&1; "$LETHE" show "$A" 2>&1)
 check "show: the status reads running or idle" \
     '[[ $out == *"running (active in the last 10 minutes)"* && $out == *"  idle  "* ]]' "$out"

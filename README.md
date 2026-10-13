@@ -91,6 +91,7 @@ Tab completion: add `source <(lethe completion zsh)` to `~/.zshrc`, or `source <
 lethe                          # the picker
 lethe stats                    # what takes space, with cleanup suggestions
 lethe list --claude --sort size
+lethe list --running           # what is open right now
 lethe resume 01a11ee1          # unique id prefixes work everywhere
 lethe fork 01a11ee1            # a copy to continue in another direction
 lethe export 01a11ee1 > notes.md

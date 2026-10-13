@@ -10,6 +10,8 @@
   `list --json` keeps its `status` field (`active` / `archived`) for scripts.
 - Colors follow the status: running sessions (`◉` `◔`) are green, idle ones (`●`) grey. Idle
   sessions were green, which read as "running".
+- `stats` (and `Ctrl-B`), the `list` summary and the picker's list title count the running
+  sessions (◉ and ◔), not only the open ones; `stats` points to `lethe list --running`.
 
 ## 0.5.2 — 2026-10-13
 

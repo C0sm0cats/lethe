@@ -1032,12 +1032,12 @@ cmd_list() {
         printf '%s\n' "$REPLY"
         count=$((count + 1))
         if ((size >= 0)); then bytes=$((bytes + size)); else missing=$((missing + 1)); fi
-        [[ $state != open ]] || open=$((open + 1))
+        [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
     done < <(fetch_sorted)
 
     human_size hbytes "$bytes"
     printf '\n%s%d session(s) · %s' "$C_DIM" "$count" "$hbytes"
-    ((open == 0)) || printf ' · %d open' "$open"
+    ((open == 0)) || printf ' · %d running' "$open"
     ((missing == 0)) || printf ' · %d without transcript' "$missing"
     printf '%s\n' "$C_RESET"
 }
@@ -1059,7 +1059,7 @@ stats_report() {
     while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds; do
         ((size >= 0)) || { missing=$((missing + 1)) && size=0; }
         ((!empty)) || empties=$((empties + 1))
-        [[ $state != open ]] || open=$((open + 1))
+        [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
         [[ -z $cwd || -d $cwd ]] || orphans=$((orphans + 1))
         total=$((total + 1))
         bytes=$((bytes + size))
@@ -1117,7 +1117,8 @@ stats_report() {
         trash_bytes=$(($(du -sk -- "$TRASH_DIR" | cut -f 1) * 1024))
     fi
     printf '\n'
-    ((open == 0)) || printf '  %s◉%s %d session(s) open in a running agent (protected)\n' "$C_GREEN" "$C_RESET" "$open"
+    ((open == 0)) || printf '  %s◉%s %d running session(s), protected%s%s→ %s list --running%s\n' \
+        "$C_GREEN" "$C_RESET" "$open" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     ((empties == 0)) || printf '  %s!%s %d empty session(s)%s%s→ %s delete --empty%s\n' \
         "$C_YELLOW" "$C_RESET" "$empties" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     ((orphans == 0)) || printf '  %s!%s %d session(s) whose project directory is gone%s%s→ %s delete --orphans%s\n' \
@@ -2122,13 +2123,13 @@ internal_rows() {
         printf '%s\t%s\n' "$id" "$REPLY"
         count=$((count + 1))
         ((size < 0)) || bytes=$((bytes + size))
-        [[ $state != open ]] || open=$((open + 1))
+        [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
     done < <(fetch_sorted)
     : >"$LETHE_STATE/open"
     ((${#OPEN[@]} == 0)) || printf '%s\n' "${!OPEN[@]}" >"$LETHE_STATE/open"
     human_size hbytes "$bytes"
     printf ' %d session(s) · %s%s · %s ' "$count" "$hbytes" \
-        "$( ((open == 0)) || printf ' · %d open' "$open")" \
+        "$( ((open == 0)) || printf ' · %d running' "$open")" \
         "$(case $O_SORT in size) echo "by size" ;; oldest) echo "oldest first" ;; *) echo "by date" ;; esac)" >"$LETHE_STATE/label"
 }
 
