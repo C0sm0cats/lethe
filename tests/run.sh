@@ -190,7 +190,8 @@ check "no unbraced variable before non-ASCII text" '[[ -z $out ]]' "$out"
 # The top CHANGELOG section is the next or current version, never an older one.
 version=$("$LETHE" --version | cut -d' ' -f2)
 top=$(grep -m1 '^## ' "$ROOT/CHANGELOG.md" | cut -d' ' -f2)
-out=$("$LETHE" --help | awk 'length > 80')
+# Characters, not bytes: macOS awk counts the bytes of ◉ and ◔.
+out=$("$LETHE" --help | perl -CSD -ne 'print if length > 81')
 check "--help fits 80 columns" '[[ -z $out ]]' "$out"
 check "CHANGELOG starts with Unreleased or the current version" '[[ $top == Unreleased || $top == "$version" ]]' \
     "top: $top, version: $version"
