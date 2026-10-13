@@ -601,7 +601,7 @@ parse_args() {
                 ;;
             --sort)
                 allow sort
-                [[ $value == recent || $value == size ]] || usage_error "--sort takes 'recent' or 'size'"
+                [[ $value =~ ^(recent|size|oldest)$ ]] || usage_error "--sort takes 'recent', 'size' or 'oldest'"
                 O_SORT=$value
                 ;;
             --all) allow all && F_ALL=1 ;;
@@ -823,7 +823,8 @@ session_matches() {
 #   agent id archived recency date mode provider empty size cwd title path state rewinds
 # size is -1 when the transcript is missing; state is open, recent or "".
 fetch_rows() {
-    local where agent id archived recency date mode provider empty cwd title path size state rewinds
+    local where agent id archived recency date mode provider empty cwd title path size state rewinds line
+    local candidates=() pending=()
     where=$(build_where)
     load_sizes
     while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds; do
@@ -850,7 +851,9 @@ fetch_rows() {
         ((!F_MISSING || size < 0)) || continue
         ((!F_ORPHANS)) || [[ -n $cwd && ! -d $cwd ]] || continue
         if [[ -n $F_GREP ]]; then
-            ((size >= 0)) && session_matches "$agent" "$path" || continue
+            # Searched below, all at once.
+            ((size >= 0)) || continue
+            candidates+=("$agent$US$path")
         fi
         if [[ -n ${OPEN[$id]+x} ]]; then
             state=open
@@ -859,7 +862,8 @@ fetch_rows() {
         else
             state=""
         fi
-        printf '%s\n' "$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}"
+        line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}"
+        if [[ -n $F_GREP ]]; then pending+=("$line"); else printf '%s\n' "$line"; fi
     done < <(query "
         SELECT agent, id, archived, recency,
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
@@ -867,15 +871,33 @@ fetch_rows() {
           FROM ranked
          WHERE $where
          ORDER BY recency DESC, id DESC;")
+    ((${#pending[@]})) || return 0
+    # --grep: transcripts are searched in parallel, one job per CPU.
+    local found jobs running=0 i
+    found=$(mktemp -d "${TMPDIR:-/tmp}/lethe-grep.XXXXXX")
+    jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+    for i in "${!candidates[@]}"; do
+        { session_matches "${candidates[i]%%"$US"*}" "${candidates[i]#*"$US"}" && : >"$found/$i"; } &
+        running=$((running + 1))
+        if ((running >= jobs)); then
+            wait -n || true
+            running=$((running - 1))
+        fi
+    done
+    wait
+    for i in "${!pending[@]}"; do
+        [[ ! -e $found/$i ]] || printf '%s\n' "${pending[i]}"
+    done
+    rm -rf -- "$found"
 }
 
 # fetch_rows in the order requested with --sort (missing transcripts last).
 fetch_sorted() {
-    if [[ $O_SORT == size ]]; then
-        fetch_rows | sort -s -t "$US" -k9,9nr
-    else
-        fetch_rows
-    fi
+    case $O_SORT in
+        size) fetch_rows | sort -s -t "$US" -k9,9nr ;;
+        oldest) fetch_rows | sort -s -t "$US" -k4,4n ;;
+        *) fetch_rows ;;
+    esac
 }
 
 # format_row AGENT ARCHIVED RECENCY DATE MODE SIZE CWD TITLE STATE [TITLE_WIDTH] [REWINDS]
@@ -1202,7 +1224,8 @@ render_conversation() {
         --arg abandoned_agent "${C_DIM}○ $([[ $agent == claude ]] && echo Claude || echo Codex) (abandoned)$C_RESET" \
         --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
         --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
-        --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" '
+        --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" \
+        --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD" '
         def vlen: gsub("\u001b\\[[0-9;]*m"; "") | length;
         # Wrap on spaces to the preview width (fzf would cut words in two).
         def wrap: if $width == 0 or vlen <= $width then . else
@@ -1225,6 +1248,9 @@ render_conversation() {
             | .out | join("\n");
         # Long messages in the preview stop at a line break (or a space), so
         # that no **bold** or `code` marker is left open.
+        # The searched text (Ctrl-G), as a case-insensitive literal regex.
+        def focus_re: $focus | gsub("(?<c>[.*+?^${}()|\\[\\]\\\\/])"; "\\\(.c)");
+        def marked: if $focus == "" then . else gsub("(?<m>\(focus_re))"; $mark + .m + $reset; "i") end;
         def cut: if $preview == 1 and length > 1200 then
                 .[:1200] as $head
                 | ($head | rindex("\n") // 0) as $nl
@@ -1236,8 +1262,22 @@ render_conversation() {
                 + (.text | cut | split("\n") | map(wrap) | join("\n") | split("\n")
                    | map($dim + . + $reset) | join("\n")) + "\n"
             else
-                (if .role == "user" then $you else $agent end) + "\n" + (.text | cut | styled) + "\n"
+                (if .role == "user" then $you else $agent end) + "\n" + (.text | cut | styled | marked) + "\n"
             end;
+        # Ctrl-G: the preview shows the messages that contain the searched text.
+        (if $focus != "" and $preview == 1 then
+            length as $all
+            | map(select(.text | test(focus_re; "i"))) as $hits
+            | if ($hits | length) == 0 then
+                  [{role: "note", text: "", abandoned: false}]
+              else $hits end
+            | .[0].header = "\($hits | length) of \($all) messages mention “\($focus)”"
+         else . end) as $shown
+        | ($shown[0].header // null) as $header
+        | if $header != null then
+            $dim + $header + $reset + "\n\n"
+            + ($shown | map(select(.role != "note") | render) | join("\n"))
+          else $shown |
         # Long previews keep the start and the end, and every abandoned message
         # with the one before it, so that Alt-B always shows something.
         if $preview == 1 and length > 24 then
@@ -1250,7 +1290,8 @@ render_conversation() {
                      else [] end)
                   + [$all[$keep[$k]] | render])
             | join("\n")
-        else map(render) | join("\n") end')
+        else map(render) | join("\n") end
+          end')
     printf '%s\n' "${conversation:-${C_DIM}(no messages)${C_RESET}}"
 }
 
@@ -2052,9 +2093,9 @@ internal_rows() {
     : >"$LETHE_STATE/open"
     ((${#OPEN[@]} == 0)) || printf '%s\n' "${!OPEN[@]}" >"$LETHE_STATE/open"
     human_size hbytes "$bytes"
-    printf ' %d session(s) · %s%s · by %s ' "$count" "$hbytes" \
+    printf ' %d session(s) · %s%s · %s ' "$count" "$hbytes" \
         "$( ((open == 0)) || printf ' · %d open' "$open")" \
-        "$([[ $O_SORT == size ]] && echo size || echo date)" >"$LETHE_STATE/label"
+        "$(case $O_SORT in size) echo "by size" ;; oldest) echo "oldest first" ;; *) echo "by date" ;; esac)" >"$LETHE_STATE/label"
 }
 
 # Picker rows for the trash; ids are "trash:<entry>".
@@ -2088,7 +2129,8 @@ internal_state() {
                 status:all) value=active ;;
                 status:active) value=archived ;;
                 sort:recent) value=size ;;
-                sort:size) value=recent ;;
+                sort:size) value=oldest ;;
+                sort:oldest) value=recent ;;
                 branches:active) value=all ;;
                 branches:all) value=active ;;
                 *) value=all ;;
@@ -2335,11 +2377,18 @@ internal_page() {
     unset FZF_PREVIEW_COLUMNS FZF_PREVIEW_LINES
     COLUMNS=$( { tput cols </dev/tty; } 2>/dev/null || echo 80)
     export LESS=${LESS:--R} COLUMNS
+    # Ctrl-G: less opens on the first occurrence of the searched text.
+    local pager=() focus=""
+    read -ra pager <<<"${PAGER:-less}"
+    [[ ! -s ${LETHE_STATE:-}/grep ]] || focus=$(<"$LETHE_STATE/grep")
+    if [[ -n $focus && -z ${PAGER:-} ]]; then
+        pager=(less -i -p "$(printf '%s' "$focus" | sed 's/[][\\.*^$+?(){}|/]/\\&/g')")
+    fi
     setup_colors always
     if [[ $1 == trash:* ]]; then
-        show_trash "$TRASH_DIR/${1#trash:}" | ${PAGER:-less}
+        show_trash "$TRASH_DIR/${1#trash:}" | "${pager[@]}"
     else
-        cmd_show "$1" | ${PAGER:-less}
+        cmd_show "$1" | "${pager[@]}"
     fi
 }
 
@@ -2351,6 +2400,8 @@ picker_branches() {
 internal_preview() {
     picker_branches
     setup_colors always
+    # Ctrl-G: show where the searched text is.
+    [[ ! -s ${LETHE_STATE:-}/grep ]] || FOCUS=$(<"$LETHE_STATE/grep")
     if [[ $1 == trash:* ]]; then
         show_trash "$TRASH_DIR/${1#trash:}" 1
     else
@@ -2381,7 +2432,7 @@ _lethe() {
         --dir) COMPREPLY=($(compgen -d -- "$cur")); return ;;
         --agent) COMPREPLY=($(compgen -W "claude codex" -- "$cur")); return ;;
         --mode) COMPREPLY=($(compgen -W "cli exec vscode subagent" -- "$cur")); return ;;
-        --sort) COMPREPLY=($(compgen -W "recent size" -- "$cur")); return ;;
+        --sort) COMPREPLY=($(compgen -W "recent size oldest" -- "$cur")); return ;;
         --older-than | --newer-than) COMPREPLY=($(compgen -W "1d 1w 30d 3m 6m 1y" -- "$cur")); return ;;
     esac
     if ((COMP_CWORD == 1)); then
@@ -2443,7 +2494,7 @@ Options:
   -y, --yes               do not ask for confirmation
       --force             include sessions active in the last 10 minutes
       --all               allow delete/archive without any filter
-      --sort recent|size  order by last activity (default) or size
+      --sort ORDER        recent (default), size (biggest first) or oldest
       --json, --ids       list output formats
       --all-branches      show/export: include abandoned branches of Claude Code
                           sessions (prompts edited or rewound), marked as such
@@ -2461,10 +2512,10 @@ Safety:
 Picker keys:
   Tab mark  Ctrl-A mark all  Ctrl-D delete  Ctrl-X archive/unarchive  Enter read
   Ctrl-R resume  Ctrl-K fork  Ctrl-E export to ./lethe-ID.md
-  Ctrl-T agent  Ctrl-S status  Ctrl-G find the typed text in conversations
+  Ctrl-T agent  Ctrl-S status  Ctrl-G find the typed text in conversations (preview shows where)
   Ctrl-F pick a cleanup filter (empty, orphans, missing, idle, trash) with counts and sizes
   Ctrl-W pick a project, biggest first (the current session's project comes first)
-  Ctrl-O sort by size  Ctrl-P preview  Ctrl-B stats  Esc quit
+  Ctrl-O sort: date, size, oldest  Ctrl-P preview  Ctrl-B stats  Esc quit
   Alt-B show or hide abandoned branches (⑂) in the preview, Enter and Ctrl-E
   Ctrl-Y copy the command that resumes the session   F1 fewer or all keys
 

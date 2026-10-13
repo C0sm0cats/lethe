@@ -84,8 +84,8 @@ Everything the command line can do, the picker can do too.
 | `Ctrl-S` | show all, active or archived sessions |
 | `Ctrl-F` | pick a cleanup filter (empty, orphans, missing, idle 30d+/90d+, trash), with counts and sizes |
 | `Ctrl-W` | pick a project, biggest first, the current session's project on top |
-| `Ctrl-G` | find the text you typed inside the conversations (press again to clear) |
-| `Ctrl-O` | sort by date or by size |
+| `Ctrl-G` | find the text you typed inside the conversations: the preview shows the messages that mention it, highlighted, and `Enter` opens on the first one (press again with an empty search to clear) |
+| `Ctrl-O` | sort by date, by size (biggest first) or oldest first |
 | `Ctrl-P` | show / hide the conversation preview |
 | `Ctrl-B` | disk usage and cleanup stats |
 | `Alt-B` | show or hide abandoned branches (`⑂`) in the preview, `Enter` and `Ctrl-E` |

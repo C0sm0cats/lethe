@@ -4,6 +4,10 @@
 
 - Enter reads the conversation on the full width of the terminal. With the preview shown, the
   text was wrapped to the preview's width.
+- `Ctrl-G` (and `--grep`) search the transcripts in parallel: twice as fast. While a search is
+  active, the preview shows only the messages that mention the text, highlighted, with a count
+  ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence.
+- `Ctrl-O` cycles by date → by size → oldest first; `--sort oldest` on the command line.
 
 ## 0.4.1 — 2026-10-12
 

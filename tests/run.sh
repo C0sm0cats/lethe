@@ -214,6 +214,7 @@ mv "$WORK/other.moved" "$WORK/other"
 expect_ids "id prefix" "$G" 11111111
 expect_ids "--opt=value syntax" "$B" --mode=exec
 expect_status "invalid --sort" 2 list --sort name
+check "--sort oldest" '[[ $("$LETHE" list --ids --sort oldest --codex | head -n 1) == "$A" || $("$LETHE" list --ids --sort oldest --codex | head -n 1) == "$C" ]]' "$("$LETHE" list --ids --sort oldest --codex)"
 
 echo "output"
 order=$("$LETHE" list --ids --sort size --codex | tr '\n' ' ')
@@ -341,6 +342,9 @@ check "picker: Ctrl-W keeps the current project" '[[ $(picker_ids) == "$B " ]]' 
 "$LETHE" __state dir "$B"
 "$LETHE" __state grep parser
 check "picker: Ctrl-G searches the conversations" '[[ $(picker_ids) == "$A " ]]' "$(picker_ids)"
+out=$(NO_COLOR="" "$LETHE" __preview "$A" | perl -pe 's/\e\[[0-9;]*m//g')
+check "picker: with Ctrl-G the preview shows the messages that mention the text" \
+    '[[ $out == *"1 of 1 messages mention “parser”"* && $out == *"refactor the Parser"* ]]' "$out"
 out=$("$LETHE" __preview "$A")
 check "picker: an empty open-session list does not break the preview" '[[ $out == *Parser* ]]' "$out"
 unset LETHE_STATE LETHE_FILTERS
