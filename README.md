@@ -40,11 +40,21 @@ curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | s
 
 That is all. The [installer](install.sh) is short and readable; it:
 
-1. downloads `lethe` to `~/.local/bin` (another directory or a given release: `curl … | LETHE_BIN=/path LETHE_VERSION=v0.5.1 sh`);
+1. downloads `lethe` to `~/.local/bin`;
 2. adds that directory to your `PATH` if needed, in the startup file of your shell (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` on macOS, fish), then asks you to open a new terminal;
 3. checks the dependencies and prints the command to install the missing ones for your system.
 
 Run it again to update lethe.
+
+Two options, set in front of `sh`, if you need them:
+
+```sh
+# install a given release instead of the latest version
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.5.1 sh
+
+# install in another directory than ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
+```
 
 **By hand**, if you prefer:
 
