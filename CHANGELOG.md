@@ -1,9 +1,6 @@
 # Changelog
 
-## 0.4.2 — 2026-10-13
-
-- Enter reads the conversation on the full width of the terminal. With the preview shown, the
-  text was wrapped to the preview's width.
+## 0.5.0 — 2026-10-13
 - `Ctrl-G` (and `--grep`) search the transcripts in parallel: twice as fast. While a search is
   active, the preview shows only the messages that mention the text, highlighted, with a count
   ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence.
@@ -14,6 +11,11 @@
 - `Ctrl-B` shows the disk usage in the preview panel instead of a pager page ending in `(END)`:
   it follows the agent, filter and project shown, and pressing it again brings the conversation
   back. `lethe stats` fits the terminal width (bars, paths, cleanup commands on their own line).
+
+## 0.4.2 — 2026-10-13
+
+- Enter reads the conversation on the full width of the terminal. With the preview shown, the
+  text was wrapped to the preview's width.
 
 ## 0.4.1 — 2026-10-12
 
