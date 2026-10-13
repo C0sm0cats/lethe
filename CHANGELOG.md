@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 — 2026-10-13
 
 - `--help` is up to date (the cycles of `Ctrl-T`, `Ctrl-S`, `Ctrl-O`, the menus, `Ctrl-Y`, `F1`) and
   fits 80 columns.
