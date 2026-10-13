@@ -14,8 +14,10 @@ jobs:
       - run: tests/run.sh
       - name: install.sh on Linux (bash)
         run: |
-          SHELL=/bin/bash LETHE_VERSION=${{ github.sha }} sh install.sh
-          bash -ic 'lethe --version'
+          # A PATH without ~/.local/bin, as on a fresh machine: the installer must add it.
+          env PATH=/usr/bin:/bin SHELL=/bin/bash LETHE_VERSION=${{ github.sha }} sh install.sh | tee out
+          grep -q 'added to your PATH' out
+          env -i HOME="$HOME" TERM=dumb PATH=/usr/bin:/bin bash -ic 'lethe --version'
 
   macos:
     runs-on: macos-latest
@@ -26,5 +28,6 @@ jobs:
       - run: tests/run.sh
       - name: install.sh on a fresh macOS user (zsh)
         run: |
-          SHELL=/bin/zsh LETHE_VERSION=${{ github.sha }} sh install.sh
-          zsh -ic 'lethe --version'
+          env PATH=/usr/bin:/bin SHELL=/bin/zsh LETHE_VERSION=${{ github.sha }} sh install.sh | tee out
+          grep -q 'added to your PATH' out
+          env -i HOME="$HOME" TERM=dumb PATH=/usr/bin:/bin:/opt/homebrew/bin zsh -ic 'lethe --version'
