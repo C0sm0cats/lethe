@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.2 — 2026-10-13
 
 - One-line installer: `curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | sh`
   downloads lethe, adds `~/.local/bin` to the `PATH` in the right file for zsh, bash (Linux and
