@@ -1,3 +1,5 @@
+![lethe: the river of forgetting, where old sessions dissolve](docs/banner.png)
+
 # lethe
 
 **Browse, resume and forget your Claude Code and Codex sessions.** One picker for every conversation your AI coding agents left on disk. It never touches a session that is still running.
