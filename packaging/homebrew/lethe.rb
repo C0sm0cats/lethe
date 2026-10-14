@@ -4,8 +4,8 @@
 class Lethe < Formula
   desc "Browse, resume and forget your Claude Code and Codex sessions"
   homepage "https://github.com/C0sm0cats/lethe"
-  url "https://github.com/C0sm0cats/lethe/archive/refs/tags/v0.5.3.tar.gz"
-  sha256 "ff42ec31eeb27da8fc9c1e9b1155517346842dde146e2638895f21ec1e1fefb3"
+  url "https://github.com/C0sm0cats/lethe/archive/refs/tags/v0.6.0.tar.gz"
+  sha256 "5a85d0d5aea0bc5c5f6aeef3b9a9b687c6d55dbe4f17dc8d70fc489e1f83f93e"
   license "MIT"
 
   depends_on "bash"
