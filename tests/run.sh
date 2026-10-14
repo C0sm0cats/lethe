@@ -95,6 +95,8 @@ case \$1 in
     delete)
         # Test hook: write to another transcript while a deletion runs.
         if [[ -f "$WORK/on-delete" ]]; then echo '{}' >>"\$(cat "$WORK/on-delete")"; rm -f "$WORK/on-delete"; fi
+        # Test hook: remove another transcript while a deletion runs.
+        if [[ -f "$WORK/on-delete-rm" ]]; then rm -f -- "\$(cat "$WORK/on-delete-rm")"; rm -f "$WORK/on-delete-rm"; fi
         rm -f -- "\$path"
         sqlite3 "$DB" "DELETE FROM threads WHERE id = '\$id'; DELETE FROM thread_spawn_edges WHERE child_thread_id = '\$id';" ;;
     archive) sqlite3 "$DB" "UPDATE threads SET archived = 1 WHERE id = '\$id';" ;;
@@ -153,6 +155,24 @@ reset_fixture() {
     : >"$WORK/claude.log"
     rm -f "$WORK/on-delete"
     cp "$WORK/codex.fake" "$WORK/bin/codex"
+}
+
+# claude_chat ID AGE_DAYS CWD ROLE:TEXT... — a Claude Code transcript of linked messages.
+claude_chat() {
+    local id=$1 days=$2 cwd=$3 file=$CPROJ/$1.jsonl parent=null n=0 arg
+    shift 3
+    : >"$file"
+    for arg; do
+        n=$((n + 1))
+        jq -cn --arg role "${arg%%:*}" --arg text "${arg#*:}" --arg uuid "$id-$n" --argjson parent "$parent" \
+            --arg cwd "$cwd" '{type: $role, uuid: $uuid, parentUuid: $parent, cwd: $cwd,
+              timestamp: "2026-01-01T10:00:00.000Z",
+              message: (if $role == "user" then {role: "user", content: $text}
+                        else {role: "assistant", model: "claude-test-1", content: [{type: "text", text: $text}]} end)}' \
+            >>"$file"
+        parent="\"$id-$n\""
+    done
+    set_mtime "$(($(date +%s) - days * 86400))" "$file"
 }
 
 # ── Assertions ───────────────────────────────────────────────────────────────
@@ -218,7 +238,7 @@ expect_ids "--grep searches both agents, case-insensitive" "$A $G" --grep PARSER
 expect_ids "--grep ignores injected context" "" --grep secretword
 expect_ids "--grep ignores hidden reasoning" "" --grep hidden
 expect_ids "filters combine with AND" "$A $C" --codex --dir "$PROJ" --older-than 30d
-expect_ids "--keep spares the latest sessions of each project" "$D $F $H" --keep 1
+expect_ids "--keep spares the latest sessions of each project, both agents together" "$A $D $F $H $I" --keep 1
 mv "$WORK/other" "$WORK/other.moved"
 expect_ids "--orphans" "$D $E $F $H $I" --orphans
 mv "$WORK/other.moved" "$WORK/other"
@@ -329,7 +349,7 @@ printf '=%s' "$PROJ" >"$LETHE_STATE/dir"
 check "picker: a project chosen with Ctrl-W excludes the projects below it" '[[ $(picker_ids) == "$A $C " ]]' "$(picker_ids)"
 : >"$LETHE_STATE/dir"
 check "picker: Ctrl-W lists projects, the current one first" \
-    '[[ $(sed -n 2p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
+    '[[ $(sed -n 3p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
 out=""
 for _ in 1 2 3 4; do "$LETHE" __state status && out+="$(<"$LETHE_STATE/status") "; done
 check "picker: Ctrl-S cycles running, idle, archived, all" '[[ $out == "running idle archived all " ]]' "$out"
@@ -557,6 +577,207 @@ check "fork uses codex fork" 'grep -qx "fork $A" "$WORK/codex.log"' "$(cat "$WOR
 out=$("$LETHE" export "$A")
 check "export writes the conversation as Markdown" \
     '[[ $out == "# Refactor parser"* && $out == *"## You"* && $out == *"please refactor the Parser"* && $out != *secretword* ]]' "$out"
+
+echo "regressions"
+reset_fixture
+# shellcheck disable=SC2034 # used in the check below
+ids=$("$LETHE" list --ids | sort | tr '\n' ' ')
+out=$(cd "$PROJ" && "$LETHE" list --ids --dir / | sort | tr '\n' ' ')
+check "--dir / means every project" '[[ $out == "$ids" ]]' "$out"
+
+Q=44444444-0000-4000-8000-0000000000aa
+claude_chat "$Q" 3 "$PROJ" 'user:say "hello" to C:\temp' 'assistant:ok'
+expect_ids "--grep finds text with double quotes" "$Q" --grep 'say "hello"'
+expect_ids "--grep finds text with backslashes" "$Q" --grep 'C:\temp'
+
+T=55555555-0000-4000-8000-0000000000bb
+claude_chat "$T" 3 "$PROJ" 'user:<template> is not rendering'
+out=$("$LETHE" export "$T")
+check "a prompt starting with < is the user's text" '[[ $out == *"<template> is not rendering"* ]]' "$out"
+expect_ids "... and the session is not empty" "$H" --empty --claude
+out=$("$LETHE" list --claude --json | jq -r --arg id "$T" '.[] | select(.id == $id) | .title')
+check "... and it is the title" '[[ $out == "<template> is not rendering" ]]' "$out"
+
+X=66666666-0000-4000-8000-0000000000cc
+claude_chat "$X" 3 "$PROJ" $'user:fix it \e]0;TITLE\a now' $'assistant:done \e]52;c;cHduZWQ=\a \e[2J'
+out=$("$LETHE" list; "$LETHE" show "$X"; "$LETHE" export "$X")
+check "control characters from transcripts never reach the terminal" \
+    '[[ $out != *$'"'"'\e'"'"'* && $out != *$'"'"'\a'"'"'* && $out == *"fix it ]0;TITLE now"* ]]' "$(printf '%q' "$out")"
+
+Z=77777777-0000-4000-8000-0000000000dd
+claude_chat "$Z" 3 "$PROJ" 'user:first prompt' 'assistant:first reply'
+jq -cn '{type: "user", uuid: "z-sum", parentUuid: null, logicalParentUuid: "'"$Z"'-2", isCompactSummary: true,
+         isVisibleInTranscriptOnly: true, cwd: "/x", timestamp: "2026-01-01T10:00:00.000Z",
+         message: {role: "user", content: "This session is being continued from a previous conversation"}}' >>"$CPROJ/$Z.jsonl"
+jq -cn '{type: "user", uuid: "z-3", parentUuid: "z-sum", cwd: "/x", timestamp: "2026-01-01T10:00:00.000Z",
+         message: {role: "user", content: "after compaction"}}' >>"$CPROJ/$Z.jsonl"
+set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$Z.jsonl"
+out=$("$LETHE" export "$Z")
+check "compaction summaries are not shown as the user's messages" \
+    '[[ $out != *"being continued"* && $out == *"first prompt"* && $out == *"after compaction"* ]]' "$out"
+expect_ids "... nor searched" "" --grep "being continued"
+
+expect_status "trash empty refuses filters it would ignore" 2 trash empty --newer-than 1d -n
+expect_status "... --dir too" 2 trash empty --dir / -n
+"$LETHE" delete -y "$G" >/dev/null 2>&1
+out=$("$LETHE" trash empty --older-than 1d -n)
+check "trash empty --older-than says when nothing is old enough" '[[ $out == *"No session in the trash"*"1 in the trash"* ]]' "$out"
+
+reset_fixture
+# A PATH without any codex.
+nocodex=""
+IFS=: read -ra dirs <<<"$PATH"
+for dir in "${dirs[@]}"; do [[ $dir == "$WORK/bin" || -x $dir/codex ]] || nocodex+=${nocodex:+:}$dir; done
+mkdir -p "$WORK/bin-nocodex" && cp "$WORK/bin/claude" "$WORK/bin-nocodex/"
+out=$(PATH=$WORK/bin-nocodex:$nocodex "$LETHE" delete -n "$G" 2>&1)
+check "deleting Claude sessions does not need codex" '[[ $out == *"Delete 1 session"* ]]' "$out"
+out=$(PATH=$WORK/bin-nocodex:$nocodex "$LETHE" delete -n "$A" 2>&1) || true
+check "... Codex sessions do, with a clear message" '[[ $out == *"codex is not installed"* ]]' "$out"
+
+V1=01a02791-0000-7000-8000-000000000001 V2=01a02791-1111-7000-8000-000000000002
+codex_session "$V1" 3 0 cli openai "$PROJ" "First twin" "one"
+codex_session "$V2" 3 0 cli openai "$PROJ" "Second twin" "two"
+mkdir -p "$WORK/export" && printf 'active\n' >"$WORK/export/branches"
+(cd "$WORK/export" && for v in "$V1" "$V2"; do LETHE_STATE=$WORK/export "$LETHE" __export "$v" </dev/null >/dev/null 2>&1; done)
+out=$(cd "$WORK/export" && ls lethe-*.md | tr '\n' ' ')
+check "Ctrl-E exports sessions whose ids share 8 characters" '[[ $out == "lethe-01a02791-0000.md lethe-01a02791-1111.md " ]]' "$out"
+out=$(LETHE_STATE=$WORK/export "$LETHE" __preview "$V2" | sed -n 4p)
+check "... and the preview shows an id that can be used" '[[ $out == *"· 01a02791-1111" ]]' "$out"
+
+out=$("$LETHE" delete -n "$A" "$E")
+check "the plan says when subagents are included, even with a protected session" \
+    '[[ $out == *"Includes subagent sessions"* ]]' "$out"
+out=$("$LETHE" archive -n "$A" "$H")
+check "... and with a Claude session in an archive" '[[ $out == *"Includes subagent sessions"* ]]' "$out"
+
+expect_status "a duration out of range is refused" 2 list --older-than 999999y
+out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); fit a "プロジェクト" 16; fit b "日本語のテスト 🚀 emoji long" 20; printf "[%s][%s]" "$a" "$b"' _ "$LETHE")
+check "columns count wide characters twice" '[[ $out == "[プロジェクト    ][日本語のテスト 🚀 e…]" ]]' "$out"
+
+if [[ $(uname -s) == Linux ]]; then
+    out=$(STAT_KIND=gnu bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); STAT_KIND=gnu; file_stats "$2" -name "*.jsonl" | wc -l' _ "$LETHE" "$CPROJ")
+    check "file sizes and dates without find -printf (busybox)" '[[ $out == $(find "$CPROJ" -name "*.jsonl" | wc -l) ]]' "$out"
+fi
+
+reset_fixture
+B_FILE=$(codex_file "$B" 0)
+sqlite3 "$DB" "UPDATE threads SET updated_at = recency_at WHERE id = '$B';"
+set_mtime "$(($(date +%s) - 7200))" "$B_FILE"
+expect_ids "--older-than sees a Codex transcript written after the index" "$A $C $D $F $G $H $I" --older-than 1d
+expect_ids "--newer-than too" "$B $E" --newer-than 1d
+out=$("$LETHE" show "$B" | sed -n 4p)
+listed=$("$LETHE" list --json "$B" | jq -r '.[0].last_activity | fromdate | strflocaltime("%Y-%m-%d %H:%M")')
+check "show gives the date of the transcript, like list" '[[ $out == *"→ $listed"* && $listed == "$(date "+%Y-%m-%d")"* ]]' "$out (list: $listed)"
+sqlite3 "$DB" "UPDATE threads SET updated_at = $(date +%s) WHERE id = '$B';"
+set_mtime "$(date +%s)" "$B_FILE"
+expect_ids "a transcript moved by archive/unarchive is not activity" "$E $I" --running
+
+reset_fixture
+"$LETHE" archive -y "$A" >/dev/null 2>&1
+"$LETHE" unarchive -y "$A" >/dev/null 2>&1
+check "archive then unarchive brings the subagents back" '! archived "$A" && ! archived "$C"'
+
+sqlite3 "$DB" "ALTER TABLE threads ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0; UPDATE threads SET is_pinned = 1 WHERE id = '$D';"
+out=$("$LETHE" delete -n --older-than 1d --codex)
+check "pinned Codex sessions are kept by cleanups" '[[ $out == *"pinned in Codex"* && $(sed -n "/^Delete/,/^Skipped/p" <<<"$out") != *"Old idea"* ]]' "$out"
+out=$("$LETHE" delete -n "$D")
+check "... and changed when named" '[[ $(sed -n "/^Delete/,/^$/p" <<<"$out") == *"Old idea"* ]]' "$out"
+check "... and shown" '"$LETHE" list --json | jq -e "map(select(.id == \"$D\"))[0].pinned" >/dev/null && [[ $("$LETHE" list --archived) == *"pinned · "* ]]'
+
+sqlite3 "$DB" "UPDATE threads SET cwd = '/' WHERE id = '$D';"
+out=$("$LETHE" list --archived | sed -n 2p)
+check "a session started in / shows / as its project" '[[ $out =~ [0-9BKM]\ +/\ +pinned ]]' "$out"
+
+reset_fixture
+printf 'z\n' >"$WORK/on-delete-rm.target"
+printf '%s' "$CPROJ/$H.jsonl" >"$WORK/on-delete-rm"
+set_mtime "$(($(date +%s) - 30 * 86400))" "$CPROJ/$H.jsonl"
+out=$("$LETHE" delete -y "$A" "$H" 2>&1)
+check "a session removed by someone else is not reported as trashed" \
+    '[[ $out == *"1 session(s) were already deleted"* && $out != *"moved 1 to the trash"* ]]' "$out"
+
+reset_fixture
+mkdir -p "$WORK/st"
+printf 'all\n' >"$WORK/st/agent"; printf 'active\n' >"$WORK/st/status"; printf 'recent\n' >"$WORK/st/sort"
+printf 'all\n' >"$WORK/st/filter"; : >"$WORK/st/grep"; : >"$WORK/st/dir"; printf 'full\n' >"$WORK/st/keys"
+printf 'active\n' >"$WORK/st/branches"; printf 'conversation\n' >"$WORK/st/panel"
+st() { LETHE_STATE=$WORK/st LETHE_FILTERS=${2:-} "$LETHE" __state "$1"; }
+rows() { LETHE_STATE=$WORK/st LETHE_FILTERS=${1:-} "$LETHE" __rows | cut -f 1 | sort | tr '\n' ' '; }
+check "the picker says unarchived, not active" '[[ $(st prompt) == *unarchived* && $(st footer) == *"status: unarchived"* ]]' "$(st prompt)"
+printf 'all\n' >"$WORK/st/status"
+out=$(st prompt "--dir $(printf %q "$PROJ") --older-than 1y")
+check "the prompt shows the filters of the command line" '[[ $out == *proj* && $out == *"idle 1y+"* ]]' "$out"
+printf 'idle30\n' >"$WORK/st/filter"
+check "Ctrl-F narrows the command line's --older-than" '[[ $(rows "--older-than 1y") == "" ]]' "$(rows "--older-than 1y")"
+out=$(LETHE_STATE=$WORK/st LETHE_FILTERS="--older-than 1y" REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines filter' _ "$LETHE" | perl -pe 's/\e\[[0-9;]*m//g')
+check "... and its menu counts with it" '[[ $(grep "^all" <<<"$out") =~ [[:space:]]0[[:space:]] ]]' "$out"
+check "the menus have their column titles above the columns" '[[ $(head -n 1 <<<"$out") =~ ^$'"'"'\t'"'"'\ {41}sessions\ {5}size$ ]]' "$(head -n 1 <<<"$out")"
+printf 'all\n' >"$WORK/st/filter"
+printf '=%s' "$PROJ/sub" >"$WORK/st/dir"
+check "Ctrl-W narrows the command line's --dir" '[[ $(rows "--dir $(printf %q "$PROJ")") == "$B " ]]' "$(rows "--dir $PROJ")"
+printf '=/home/u/my_project' >"$WORK/st/dir"; printf 'snake_case' >"$WORK/st/grep"
+check "the footer keeps underscores" '[[ $(st footer) == *"project: my_project"* && $(st footer) == *"find: snake_case"* ]]' "$(st footer)"
+: >"$WORK/st/dir"; : >"$WORK/st/grep"
+sqlite3 "$DB" "UPDATE threads SET cwd = '' WHERE id = '$F';"
+rm -f "$WORK/st/choose-current"
+LETHE_STATE=$WORK/st REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines dir "$2"' _ "$LETHE" "$F" >/dev/null
+check "Ctrl-W does not preselect a project for a session without one" '[[ ! -e $WORK/st/choose-current ]]'
+printf 'm' >"$WORK/st/grep"
+claude_chat "$Q" 3 "$PROJ" 'user:make a **summary** of `main`' 'assistant:I made it'
+"$LETHE" list >/dev/null
+out=$(NO_COLOR="" LETHE_STATE=$WORK/st FZF_PREVIEW_COLUMNS=70 "$LETHE" __preview "$Q")
+check "Ctrl-G marks never break color codes" '[[ $out != *$'"'"'\e[1\e'"'"'* && $out != *$'"'"'\e[36\e'"'"'* ]]' "$(printf '%q' "$out")"
+: >"$WORK/st/grep"
+printf '#!/bin/sh\ncat >/dev/null\nprintf "%%s" "$LESS"\n' >"$WORK/bin/lesspager" && chmod +x "$WORK/bin/lesspager"
+out=$(LESS=-i PAGER=lesspager LETHE_STATE=$WORK/st "$LETHE" __page "$A" </dev/null)
+check "Enter keeps colors when LESS is set" '[[ $out == "-i -R" ]]' "$out"
+
+reset_fixture
+ln -s "$PROJ" "$WORK/link"
+expect_ids "--dir through a symlink" "$A $B $C $G" --dir "$WORK/link"
+if ((EUID != 0)); then
+    sqlite3 "$DB" "UPDATE threads SET cwd = '$WORK/locked/inner' WHERE id = '$B';"
+    mkdir -p "$WORK/locked/inner" && chmod 000 "$WORK/locked"
+    expect_ids "an unreachable project is not an orphan" "" --orphans --codex
+    chmod 755 "$WORK/locked"
+fi
+mkdir -p "$WORK/claude2/projects/-p"
+cp "$CPROJ/$G.jsonl" "$WORK/claude2/projects/-p/"
+CLAUDE_CONFIG_DIR=$WORK/claude2 "$LETHE" list >/dev/null
+"$LETHE" list >/dev/null
+check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v4-*.sqlite | wc -l) -eq 2 ]]'
+
+printf '{"display":"secret prompt","sessionId":"%s"}\n{"display":"other","sessionId":"%s"}\n' "$G" "$H" \
+    >"$CLAUDE_CONFIG_DIR/history.jsonl"
+"$LETHE" delete -y "$G" >/dev/null 2>&1
+check "deleting a Claude session takes its prompts out of the history" \
+    '! grep -q "secret prompt" "$CLAUDE_CONFIG_DIR/history.jsonl" && grep -q other "$CLAUDE_CONFIG_DIR/history.jsonl"'
+if ((EUID != 0)); then
+    chmod 555 "$CLAUDE_CONFIG_DIR/session-env"
+    "$LETHE" trash restore "${G:0:8}" >/dev/null 2>&1 || true
+    chmod 755 "$CLAUDE_CONFIG_DIR/session-env"
+    check "a failed restore leaves the session whole in the trash" '[[ ! -e $CPROJ/$G.jsonl ]]'
+fi
+"$LETHE" trash restore "${G:0:8}" >/dev/null 2>&1
+check "... and it can be restored afterwards, prompts included" \
+    '[[ -f $CPROJ/$G.jsonl && -d $CLAUDE_CONFIG_DIR/session-env/$G ]] && grep -q "secret prompt" "$CLAUDE_CONFIG_DIR/history.jsonl"'
+
+out=$(bash -c 'source <("$1" completion bash); COMP_WORDS=(lethe export 1234 --all); COMP_CWORD=3; _lethe; echo "${COMPREPLY[*]}"' _ "$LETHE")
+check "completion offers --all-branches" '[[ $out == --all-branches ]]' "$out"
+
+H2=$WORK/home-zdot
+mkdir -p "$H2/.config/zsh" "$WORK/fakecurl"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in -o) out=$2; shift;; esac; shift; done\necho "#!/bin/sh" > "$out"\n' \
+    >"$WORK/fakecurl/curl" && chmod +x "$WORK/fakecurl/curl"
+printf '# tools in %s/.local/bin/old\n' "$H2" >"$H2/.bashrc"
+env -i HOME="$H2" PATH="$WORK/fakecurl:/usr/bin:/bin" SHELL=/bin/bash sh "$ROOT/install.sh" >/dev/null 2>&1
+check "installer: a startup file that only mentions the directory gets the PATH line" \
+    'grep -qF "export PATH=\"$H2/.local/bin:\$PATH\"" "$H2/.bashrc"'
+if command -v zsh >/dev/null 2>&1; then
+    printf 'export ZDOTDIR=$HOME/.config/zsh\n' >"$H2/.zshenv"
+    env -i HOME="$H2" PATH="$WORK/fakecurl:/usr/bin:/bin" SHELL=/bin/zsh sh "$ROOT/install.sh" >/dev/null 2>&1
+    check "installer: zsh with ZDOTDIR" 'grep -qF "$H2/.local/bin" "$H2/.config/zsh/.zshrc"'
+fi
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

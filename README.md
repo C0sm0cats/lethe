@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | s
 That is all. The [installer](install.sh) is short and readable; it:
 
 1. downloads `lethe` to `~/.local/bin`;
-2. adds that directory to your `PATH` if needed, in the startup file of your shell (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` on macOS, fish), then asks you to open a new terminal;
+2. adds that directory to your `PATH` if needed, in the startup file of your shell (`~/.zshrc` or `$ZDOTDIR/.zshrc`, `~/.bashrc`, `~/.bash_profile` on macOS, fish), then asks you to open a new terminal;
 3. checks the dependencies and prints the command to install the missing ones for your system.
 
 Run it again to update lethe.
@@ -48,7 +48,7 @@ Two options, set in front of `sh`, if you need them:
 
 ```sh
 # install a given release instead of the latest version
-curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.5.3 sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.6.0 sh
 
 # install in another directory than ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
@@ -80,6 +80,7 @@ Dependencies:
 | Debian, Ubuntu | `sudo apt install fzf jq sqlite3` |
 | Fedora | `sudo dnf install fzf jq sqlite` |
 | Arch, Manjaro | `sudo pacman -S fzf jq sqlite` |
+| Alpine | `sudo apk add bash fzf jq sqlite` |
 
 Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout). lethe works with whichever agents you have; you don't need both.
 
@@ -125,7 +126,7 @@ Everything the command line can do, the picker can do too.
 | `F1` | all keys, or only the essential ones |
 | `Esc` | quit |
 
-In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good. Typing filters the list by title, project, agent or mode. Command-line filters apply too: `lethe --dir ~/work --older-than 2w`.
+In the trash view, `Ctrl-R` restores a session and `Ctrl-D` deletes it for good. Typing filters the list by title, project, agent or mode. Command-line filters apply too and show in the prompt: `lethe --dir ~/work --older-than 2w`. `Ctrl‑F` and `Ctrl‑W` narrow them further, and `--grep` becomes the `Ctrl‑G` search.
 
 The footer lists the keys and shows where each switch stands (`Ctrl‑T agent: claude`, `Ctrl‑O sort: size`…). The cleanup filter menu (`Ctrl‑F`) offers empty sessions, orphans (project directory gone), missing transcripts, sessions idle for 30 or 90 days, and the trash.
 
@@ -164,10 +165,10 @@ Destructive commands show the sessions they will change and ask for confirmation
 ```sh
 lethe trash                    # list trashed sessions
 lethe trash restore 7f3a       # put a session back, exactly where it was
-lethe trash empty --older-than 30d
+lethe trash empty --older-than 30d         # what was trashed more than 30 days ago
 ```
 
-The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites existing files.
+The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites existing files, and is all or nothing: if a file cannot be put back, the session stays whole in the trash.
 
 ### Filters
 
@@ -178,14 +179,14 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | `--unarchived` | all but archived sessions (formerly `--active`) |
 | `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6m`, `1y` |
 | `--newer-than D` | last activity within `D` |
-| `--dir PATH` | sessions started in `PATH` or below it (repeatable) |
+| `--dir PATH` | sessions started in `PATH` or below it (repeatable; symlinks are followed) |
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
 | `--provider NAME` | `anthropic`, `openai`, … |
 | `--grep TEXT` | the conversation contains `TEXT` (any case, any branch) |
 | `--empty` | sessions with no message and no reply |
-| `--orphans` | sessions whose project directory no longer exists |
+| `--orphans` | sessions whose project directory no longer exists (an unmounted disk or an unreadable parent does not count) |
 | `--missing` | Codex index entries whose transcript is gone |
-| `--keep N` | spares the `N` most recent sessions of each project |
+| `--keep N` | spares the `N` most recent sessions of each project, both agents together |
 | `ID…` | session ids or unique prefixes |
 
 ```sh
@@ -201,9 +202,10 @@ lethe list --json | jq -r '.[] | select(.size > 50000000) | "\(.agent) \(.id) \(
   - it was active in the last 10 minutes.
 
   Protection is checked when the plan is shown, and again right before each change: a session that was opened, written to or moved in the meantime is left alone. `--force` lifts only the 10-minute rule. If a running agent's open files cannot be listed, lethe changes nothing. Homes reached through symlinks (`~/.codex` in a dotfiles repo, say) are resolved.
+- **Pinned Codex sessions** are skipped by filters (`--older-than`, `--empty`…): only naming them, by id or in the picker, changes them.
 - **Subagents.** Deleting a Codex session also deletes the subagent sessions it spawned, children first. A subagent whose parent is running is protected, and so is the whole tree of any protected session. Claude Code subagent transcripts live inside their session and go with it.
 - **Codex** is changed only through its own CLI (`codex delete`, `codex archive`, `codex unarchive`). Every change is checked in its database afterwards.
-- **Claude Code** has no delete command. lethe moves the transcript and everything Claude Code keeps for that session (subagent transcripts, tool results, file history, session environment) to the trash, with a manifest to restore it. A session is moved entirely or not at all, and a restore only writes inside the Claude Code directory.
+- **Claude Code** has no delete command. lethe moves the transcript and everything Claude Code keeps for that session (subagent transcripts, tool results, file history, session environment, its prompts in the prompt history) to the trash, with a manifest to restore it. A session is moved entirely or not at all, and a restore only writes inside the Claude Code directory.
 - **Resume** refuses a session that is already open in a running agent (two agents writing one transcript would interleave it); fork it instead.
 - **Read-only by default.** Listing, searching and previewing never write to the agents' data. The Claude Code index is a cache in `~/.cache/lethe`.
 

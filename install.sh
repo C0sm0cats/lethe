@@ -3,7 +3,7 @@
 #
 # Downloads lethe to ~/.local/bin (or $LETHE_BIN), adds that directory to your
 # PATH if needed, and tells you exactly how to install anything missing.
-# LETHE_VERSION=v0.5.3 installs a given release instead of the latest code.
+# LETHE_VERSION=v0.6.0 installs a given release instead of the latest code.
 set -eu
 
 bin=${LETHE_BIN:-$HOME/.local/bin}
@@ -27,7 +27,8 @@ case ":$PATH:" in
     *":$bin:"*) ;;
     *)
         case ${SHELL##*/} in
-            zsh) rc=$HOME/.zshrc ;;
+            # zsh reads $ZDOTDIR/.zshrc; ZDOTDIR is often set in ~/.zshenv only.
+            zsh) rc=$(zsh -c 'printf %s "${ZDOTDIR:-$HOME}"' 2>/dev/null || printf %s "${ZDOTDIR:-$HOME}")/.zshrc ;;
             bash) if [ "$(uname -s)" = Darwin ]; then rc=$HOME/.bash_profile; else rc=$HOME/.bashrc; fi ;;
             fish) rc="" ;;
             *) rc=$HOME/.profile ;;
@@ -35,7 +36,7 @@ case ":$PATH:" in
         if [ -z "$rc" ]; then
             fish -c "fish_add_path $bin" 2>/dev/null || true
             say "✓ $bin added to your PATH (fish)"
-        elif ! grep -qs "$bin" "$rc"; then
+        elif ! grep -qsF "export PATH=\"$bin:\$PATH\"" "$rc"; then
             # shellcheck disable=SC2016 # $PATH is written literally, for the shell to expand
             printf '\n# Added by the lethe installer\nexport PATH="%s:$PATH"\n' "$bin" >>"$rc"
             say "✓ $bin added to your PATH in $rc"

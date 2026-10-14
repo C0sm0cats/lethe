@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.6.0 — 2026-10-14
+
+A bug hunt: 40 bugs found and fixed, almost all with a regression test.
+
+Safety:
+- Age filters (`--older-than`, `--newer-than`, the idle menus), the sort and `--keep` use the date of
+  the Codex transcript when it was written after the index, as the list did: a session used today
+  can no longer be selected as "idle for a month".
+- Archiving or unarchiving a Codex session is no longer taken for activity (it showed as "0m",
+  running and protected for 10 minutes).
+- Sessions pinned in Codex are skipped by filters; naming them (id, picker) still changes them.
+- `--orphans` no longer takes an unmounted disk or an unreadable parent for a deleted project.
+- `trash empty` refuses filters other than `--older-than` instead of ignoring them and emptying
+  the whole trash.
+- A restore that fails halfway puts everything back in the trash, so it can be retried; a
+  Ctrl-C cannot interrupt it.
+- Text from transcripts can no longer send control sequences to the terminal (clipboard, title,
+  clear screen).
+- In the picker, Ctrl-F and Ctrl-W narrow the command line's `--older-than` and `--dir` instead of
+  replacing or widening them; the prompt shows the command line's filters, and `--grep` becomes the
+  Ctrl-G search.
+- `--keep N` keeps N sessions of each project, both agents together, as documented.
+- Deleting a Claude Code session also takes its prompts out of `~/.claude/history.jsonl` (they are
+  restored with it).
+
+Correctness:
+- `--grep` and Ctrl-G find text with `"` or `\`.
+- Prompts that start with `<` (HTML, JSX…) are shown, exported, searched and used as titles; such a
+  session is no longer "empty".
+- Compaction summaries are no longer shown as messages typed by the user.
+- `--dir /` means every project; `--dir` through a symlink matches the sessions of its target.
+- Codex ids that share their first 8 characters: the preview shows a unique prefix, and Ctrl-E
+  exports both.
+- `show`, the preview and Enter give the same date and status as the list.
+- Deleting Claude Code sessions no longer needs the `codex` command; a session removed meanwhile
+  by something else is reported as such, not as moved to the trash.
+- Unarchiving a Codex session brings back the subagents archived with it.
+- The plan always says when it includes subagent sessions.
+- Durations out of range are refused instead of failing in SQL.
+- `trash empty --older-than` says when nothing is old enough instead of "The trash is empty".
+- Each Claude Code directory (`CLAUDE_CONFIG_DIR`) has its own index: switching profiles no longer
+  reindexes everything.
+
+Platforms:
+- macOS with the system bash first in the `PATH`: the picker works (its subcommands use
+  Homebrew's bash too).
+- Alpine Linux (busybox): sessions are listed and open sessions detected.
+- Installer: zsh with `ZDOTDIR` gets the `PATH` line in the right file, and a startup file that
+  merely mentions the directory no longer prevents it.
+
+Display:
+- Wide characters (CJK, emoji) keep the columns aligned; `lethe list` fits 80 columns; a session
+  started in `/` shows `/`.
+- Ctrl-G highlighting no longer breaks colors; Enter keeps colors with a custom `LESS`; the footer
+  keeps `_`; the picker says "unarchived" instead of "active"; Ctrl-W no longer preselects an
+  unrelated project; the menus' column titles sit above their columns.
+- Completion offers `--all-branches`, the options of each command, and trashed ids for
+  `trash restore`.
+
 ## 0.5.3 — 2026-10-13
 
 - "active" meant "not archived", and read as "running". `Ctrl-S` now cycles all → running → idle
