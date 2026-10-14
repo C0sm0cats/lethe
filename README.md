@@ -1,8 +1,6 @@
-![lethe: the river of forgetting, where old sessions dissolve](docs/banner.png)
+![lethe: browse, resume and forget your Claude Code and Codex sessions. Old session titles drift down the river of forgetting and dissolve.](docs/banner.png)
 
-# lethe
-
-**Browse, resume and forget your Claude Code and Codex sessions.** One picker for every conversation your AI coding agents left on disk. It never touches a session that is still running.
+One picker for every conversation your AI coding agents left on disk. It never touches a session that is still running.
 
 [![tests](https://github.com/C0sm0cats/lethe/actions/workflows/test.yml/badge.svg)](https://github.com/C0sm0cats/lethe/actions/workflows/test.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
