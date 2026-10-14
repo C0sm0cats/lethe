@@ -769,10 +769,12 @@ H2=$WORK/home-zdot
 mkdir -p "$H2/.config/zsh" "$WORK/fakecurl"
 printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in -o) out=$2; shift;; esac; shift; done\necho "#!/bin/sh" > "$out"\n' \
     >"$WORK/fakecurl/curl" && chmod +x "$WORK/fakecurl/curl"
-printf '# tools in %s/.local/bin/old\n' "$H2" >"$H2/.bashrc"
+rc=$H2/.bashrc
+[[ $(uname -s) != Darwin ]] || rc=$H2/.bash_profile
+printf '# tools in %s/.local/bin/old\n' "$H2" >"$rc"
 env -i HOME="$H2" PATH="$WORK/fakecurl:/usr/bin:/bin" SHELL=/bin/bash sh "$ROOT/install.sh" >/dev/null 2>&1
 check "installer: a startup file that only mentions the directory gets the PATH line" \
-    'grep -qF "export PATH=\"$H2/.local/bin:\$PATH\"" "$H2/.bashrc"'
+    'grep -qF "export PATH=\"$H2/.local/bin:\$PATH\"" "$rc"'
 if command -v zsh >/dev/null 2>&1; then
     printf 'export ZDOTDIR=$HOME/.config/zsh\n' >"$H2/.zshenv"
     env -i HOME="$H2" PATH="$WORK/fakecurl:/usr/bin:/bin" SHELL=/bin/zsh sh "$ROOT/install.sh" >/dev/null 2>&1
