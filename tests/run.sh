@@ -651,8 +651,11 @@ out=$("$LETHE" archive -n "$A" "$H")
 check "... and with a Claude session in an archive" '[[ $out == *"Includes subagent sessions"* ]]' "$out"
 
 expect_status "a duration out of range is refused" 2 list --older-than 999999y
-out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); fit a "プロジェクト" 16; fit b "日本語のテスト 🚀 emoji long" 20; printf "[%s][%s]" "$a" "$b"' _ "$LETHE")
-check "columns count wide characters twice" '[[ $out == "[プロジェクト    ][日本語のテスト 🚀 e…]" ]]' "$out"
+# Characters are counted as such only in a UTF-8 locale (bare containers use C).
+if [[ $(locale charmap 2>/dev/null) == UTF-8 ]]; then
+    out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); fit a "プロジェクト" 16; fit b "日本語のテスト 🚀 emoji long" 20; printf "[%s][%s]" "$a" "$b"' _ "$LETHE")
+    check "columns count wide characters twice" '[[ $out == "[プロジェクト    ][日本語のテスト 🚀 e…]" ]]' "$out"
+fi
 
 if [[ $(uname -s) == Linux ]]; then
     out=$(STAT_KIND=gnu bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); STAT_KIND=gnu; file_stats "$2" -name "*.jsonl" | wc -l' _ "$LETHE" "$CPROJ")

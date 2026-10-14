@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.6.0"
+readonly VERSION="0.6.1"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -958,7 +958,7 @@ messages() {
                   reduce ($all[]
                       | if .type == "response_item" and .payload.type == "agent_message" then
                             ([.payload.content[]? | select(.type == "input_text") | .text // ""] | join(" ")
-                             | capture("Message Type: (?<kind>[A-Z_]+)")?.kind // "MESSAGE") as $kind
+                             | ((capture("Message Type: (?<kind>[A-Z_]+)") // {}) | .kind // "MESSAGE")) as $kind
                             | "← \(if $kind == "NEW_TASK" then "task" else "message" end) from \(.payload.author // "?")"
                               + " (content encrypted by Codex)"
                         elif .type == "response_item" and .payload.type == "function_call"

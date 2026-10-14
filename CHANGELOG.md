@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 — 2026-10-14
 
 - Codex subagents of the multi-agent mode showed "(no messages)": their messages are encrypted by
   Codex. `show`, the preview, Enter and `export` now show what can be read: who gave them their
   task, the commands they ran, the files they edited and who they reported to.
+- README: a new banner, and a shorter introduction under it.
 
 ## 0.6.0 — 2026-10-14
 
