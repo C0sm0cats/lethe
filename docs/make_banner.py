@@ -1,5 +1,6 @@
+# The README banner: python3 docs/make_banner.py writes docs/banner.svg, then
+# rsvg-convert -w 2560 docs/banner.svg -o docs/banner.png
 import math, random
-# docs/banner.svg, then: rsvg-convert -w 2560 docs/banner.svg -o docs/banner.png
 random.seed(7)
 W, H = 1280, 320
 o = []
