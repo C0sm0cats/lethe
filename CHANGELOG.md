@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-10-14
+
+- Codex subagent sessions are tagged `subagent ·` in the list, the picker and the deletion plan,
+  like `exec ·` and `vscode ·`, whatever their title; untitled ones are named after their nickname
+  (`subagent · Kepler` instead of `subagent Kepler`).
+
 ## 0.6.1 — 2026-10-14
 
 - Codex subagents of the multi-agent mode showed "(no messages)": their messages are encrypted by

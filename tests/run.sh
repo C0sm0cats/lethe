@@ -254,7 +254,7 @@ check "list --json" '"$LETHE" list --json | jq -e "length == 9 and (map(select(.
 out=$("$LETHE" list --claude)
 check "Claude titles come from ai-title" '[[ $out == *"Design the cache"* ]]' "$out"
 out=$("$LETHE" list --codex)
-check "untitled subagents are named after their nickname" '[[ $out == *"subagent Kepler"* ]]' "$out"
+check "subagent sessions are tagged, and named after their nickname" '[[ $out == *"subagent · Kepler"* ]]' "$out"
 out=$("$LETHE" stats)
 check "stats" '[[ $out == *Total*9* && $out == *"2 running session(s), protected"*"list --running"* ]]' "$out"
 out=$("$LETHE" show "$E" 2>&1; "$LETHE" show "$A" 2>&1)

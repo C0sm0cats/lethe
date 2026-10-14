@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.6.1"
+readonly VERSION="0.6.2"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -303,7 +303,7 @@ init_codex() {
     source=$(codex_col source "''")
     title="COALESCE(NULLIF($(codex_col name "''"), ''), NULLIF($(codex_col title "''"), ''),
                     NULLIF($(codex_col preview "''"), ''), NULLIF($(codex_col first_user_message "''"), ''),
-                    'subagent ' || NULLIF($(codex_col agent_nickname "''"), ''), '')"
+                    NULLIF($(codex_col agent_nickname "''"), ''), '')"
     # Activity: the index, or the transcript when it was written after the index
     # (table mt, filled by init). Archiving and unarchiving move the transcript
     # and update updated_at with it: that is not activity.
@@ -1125,10 +1125,11 @@ format_row() {
         age_color=""
     fi
     [[ -n $title ]] || title="(empty)" title_color=$C_DIM
-    # The project name stays visible; uncommon modes are a dim tag before the title.
+    # The project name stays visible; modes other than cli are a dim tag before the
+    # title (subagent sessions included, so they stand out whatever their title).
     # ⑂N: N abandoned branches (edited or rewound prompts) are hidden.
     local tag="" project
-    [[ $mode == cli || $mode == subagent || $mode == unknown ]] || tag="$mode · "
+    [[ $mode == cli || $mode == unknown ]] || tag="$mode · "
     ((${rewinds:-0} == 0)) || tag="⑂$rewinds $tag"
     ((${pinned:-0} == 0)) || tag="pinned · $tag"
     case $cwd in

@@ -47,7 +47,7 @@ SESSIONS = [
     ("claude", 4 * MIN, "cli", "code/api-server", "Fix the token refresh race in auth", 2_100_000, 0, TOKEN_RACE, True),
     ("codex", 3 * HOUR, "cli", "code/web-dashboard", "Add dark mode to the settings page", 640_000, 0, [], False),
     ("claude", 9 * HOUR, "cli", "code/api-server", "Write integration tests for /orders", 3_200_000, 0, [], False),
-    ("codex", 1 * DAY, "subagent", "code/api-server", "subagent Kepler", 910_000, 0, [], False),
+    ("codex", 1 * DAY, "subagent", "code/api-server", "Kepler", 910_000, 0, [], False),
     ("codex", 3 * DAY, "exec", "code/scripts", "Summarize the changelog for 2.4", 95_000, 0, [], False),
     ("claude", 6 * DAY, "cli", "code/game-engine", "Profile the renderer and cut draw calls", 48_300_000, 0, [], False),
     ("claude", 9 * DAY, "cli", "", "", 4_000, 0, [], False),
