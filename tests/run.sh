@@ -781,6 +781,20 @@ if command -v zsh >/dev/null 2>&1; then
     check "installer: zsh with ZDOTDIR" 'grep -qF "$H2/.local/bin" "$H2/.config/zsh/.zshrc"'
 fi
 
+# A subagent of Codex's multi-agent mode: encrypted messages, readable actions.
+SA=01a12160-0000-7000-8000-0000000000ee
+codex_session "$SA" 3 0 '{"subagent":{"thread_spawn":{}}}' openai "$PROJ" "" ""
+{
+    printf '%s\n' '{"type":"response_item","payload":{"type":"agent_message","author":"/root","recipient":"/root/ui","content":[{"type":"input_text","text":"Message Type: NEW_TASK\nTask name: /root/ui\nSender: /root\nPayload:\n"},{"type":"encrypted_content","encrypted_content":"gAAAA"}]}}'
+    printf '%s\n' '{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["/bin/zsh","-lc","cat src/app.py"],"exit_code":0}}}'
+    printf '%s\n' '{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","changes":{"/p/src/app.py":{}}}}}'
+    printf '%s\n' '{"type":"response_item","payload":{"type":"function_call","name":"send_message","arguments":"{\"target\":\"/root\",\"message\":\"gAAAA\"}"}}'
+} >>"$(codex_file "$SA" 0)"
+set_mtime "$(($(date +%s) - 3 * 86400))" "$(codex_file "$SA" 0)"
+out=$("$LETHE" export "$SA")
+check "a Codex subagent with encrypted messages shows its commands and edits" \
+    '[[ $out == *"## Other agents"*"← task from /root"*"## Codex (subagent: commands and edits)"*"$ cat src/app.py"*"edited /p/src/app.py"*"→ message to /root"* && $out != *"## You"* ]]' "$out"
+
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))

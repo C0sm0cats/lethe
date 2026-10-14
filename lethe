@@ -928,8 +928,10 @@ messages() {
     else
         # Messages are response items, or voice transcript segments. Transcripts
         # with neither fall back to the user/agent message events.
-        { grep -E '"type":"(message|transcript_segment|user_message|agent_message)"' -- "$2" 2>/dev/null ||
-            true; } | jq -cRn "$JQ_INJECTED"'
+        # Subagents of Codex's multi-agent mode exchange encrypted messages: what
+        # can be shown is who talks to them, and the commands and edits they made.
+        { grep -E '"type":"(message|transcript_segment|user_message|agent_message|function_call|item_completed)"' -- "$2" \
+            2>/dev/null || true; } | jq -cRn "$JQ_INJECTED"'
             def clean: select((injected or startswith("# AGENTS.md instructions")) | not);
             [inputs | fromjson? | select(type == "object" and (.payload | type) == "object")] as $all
             | [$all[]
@@ -943,13 +945,37 @@ messages() {
                      {role: .payload.role, abandoned: false, text: (.payload.text // "")}
                  else empty end
                | select(.text != "")] as $primary
+            | [$all[]
+               | select(.type == "event_msg"
+                        and (.payload.type == "user_message" or .payload.type == "agent_message"))
+               | {role: (if .payload.type == "user_message" then "user" else "assistant" end),
+                  abandoned: false, text: (.payload.message // "" | tostring | clean)}
+               | select(.text != "")] as $events
             | if ($primary | length) > 0 then $primary[]
-              else $all[]
-                   | select(.type == "event_msg"
-                            and (.payload.type == "user_message" or .payload.type == "agent_message"))
-                   | {role: (if .payload.type == "user_message" then "user" else "assistant" end),
-                      abandoned: false, text: (.payload.message // "" | tostring | clean)}
-                   | select(.text != "")
+              elif ($events | length) > 0 then $events[]
+              else
+                  # One "activity" message per run of consecutive actions.
+                  reduce ($all[]
+                      | if .type == "response_item" and .payload.type == "agent_message" then
+                            ([.payload.content[]? | select(.type == "input_text") | .text // ""] | join(" ")
+                             | capture("Message Type: (?<kind>[A-Z_]+)")?.kind // "MESSAGE") as $kind
+                            | "← \(if $kind == "NEW_TASK" then "task" else "message" end) from \(.payload.author // "?")"
+                              + " (content encrypted by Codex)"
+                        elif .type == "response_item" and .payload.type == "function_call"
+                             and .payload.name == "send_message" then
+                            "→ message to \(.payload.arguments | fromjson? | .target // "?") (content encrypted by Codex)"
+                        elif .type == "event_msg" and .payload.type == "item_completed"
+                             and .payload.item.type == "CommandExecution" then
+                            "$ \(.payload.item.command | if type == "array" then last else tostring end)"
+                            + (if (.payload.item.exit_code // 0) != 0 then "   (exit \(.payload.item.exit_code))" else "" end)
+                        elif .type == "event_msg" and .payload.type == "item_completed"
+                             and .payload.item.type == "FileChange" then
+                            (.payload.item.changes // {} | keys[] | "edited \(.)")
+                        else empty end) as $line ([];
+                      if ($line | startswith("←")) then . + [{role: "user", activity: true, abandoned: false, text: $line}]
+                      elif (length > 0 and .[-1].role == "assistant") then .[-1].text += "\n" + $line
+                      else . + [{role: "assistant", activity: true, abandoned: false, text: $line}] end)
+                  | .[]
               end
             | .text |= '"$controls"
     fi
@@ -1427,6 +1453,8 @@ render_conversation() {
         --arg abandoned_you "${C_DIM}○ You (abandoned)$C_RESET" \
         --arg abandoned_agent "${C_DIM}○ $([[ $agent == claude ]] && echo Claude || echo Codex) (abandoned)$C_RESET" \
         --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
+        --arg other "$C_DIM${C_BOLD}● Other agents$C_RESET" \
+        --arg activity "$C_CODEX${C_BOLD}● Codex$C_RESET$C_DIM (subagent: commands and edits)$C_RESET" \
         --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
         --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" \
         --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD" '
@@ -1469,7 +1497,9 @@ render_conversation() {
                 + (.text | cut | split("\n") | map(wrap) | join("\n") | split("\n")
                    | map($dim + . + $reset) | join("\n")) + "\n"
             else
-                (if .role == "user" then $you else $agent end) + "\n" + (.text | cut | premark | styled | postmark) + "\n"
+                (if .activity then (if .role == "user" then $other else $activity end)
+                 elif .role == "user" then $you else $agent end)
+                + "\n" + (.text | cut | premark | styled | postmark) + "\n"
             end;
         # Ctrl-G: the preview shows the messages that contain the searched text.
         (if $focus != "" and $preview == 1 then
@@ -1520,7 +1550,8 @@ cmd_export() {
     printf -- '- Agent: %s (%s%s)\n- Project: `%s`\n- Session: `%s`\n- %s → %s\n\n' \
         "$name" "$mode" "${model:+, $model}" "$cwd" "$id" "$created" "$recency"
     messages "$agent" "$path" "$O_BRANCHES" | jq -r --arg name "$name" \
-        '"---\n\n## " + (if .role == "user" then "You" else $name end)
+        '"---\n\n## " + (if .activity then (if .role == "user" then "Other agents" else "\($name) (subagent: commands and edits)" end)
+                          elif .role == "user" then "You" else $name end)
          + (if .abandoned then " (abandoned)" else "" end) + "\n\n" + .text + "\n"'
 }
 
