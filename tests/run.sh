@@ -798,6 +798,40 @@ out=$("$LETHE" export "$SA")
 check "a Codex subagent with encrypted messages shows its commands and edits" \
     '[[ $out == *"## Other agents"*"← task from /root"*"## Codex (subagent: commands and edits)"*"$ cat src/app.py"*"edited /p/src/app.py"*"→ message to /root"* && $out != *"## You"* ]]' "$out"
 
+# Codex 0.163 compresses old transcripts: rollout-*.jsonl.zst, index unchanged.
+if command -v zstd >/dev/null 2>&1; then
+    reset_fixture
+    zstd -q --rm "$(codex_file "$A" 0)"
+    expect_ids "a compressed Codex transcript is not missing" "$F" --missing
+    out=$("$LETHE" export "$A")
+    check "... it can be read" '[[ $out == *"please refactor the Parser"* ]]' "$out"
+    expect_ids "... and searched" "$A $G" --grep PARSER
+    out=$("$LETHE" delete -n --missing)
+    check "... and delete --missing leaves it alone" '[[ $out != *"Refactor parser"* ]]' "$out"
+    exec 9<"$(codex_file "$A" 0).zst"
+    out=$("$LETHE" delete -n "$A")
+    exec 9<&-
+    check "... and it is protected while open" '[[ $out == *"open in a running agent"* ]]' "$out"
+    # A PATH like this one, without zstd: the directories holding it are replaced
+    # by copies made of links to everything else.
+    nozstd=""
+    IFS=: read -ra dirs <<<"$PATH"
+    for dir in "${dirs[@]}"; do
+        if [[ -x $dir/zstd ]]; then
+            mkdir -p "$WORK/nozstd$dir"
+            for tool in "$dir"/*; do
+                [[ ${tool##*/} == zstd* || ${tool##*/} == unzstd ]] || ln -sf "$tool" "$WORK/nozstd$dir/"
+            done
+            dir=$WORK/nozstd$dir
+        fi
+        nozstd+=${nozstd:+:}$dir
+    done
+    out=$(PATH=$nozstd "$LETHE" list --missing --ids)
+    check "without zstd, a compressed transcript is still not missing" '[[ $out == "$F" ]]' "$out"
+    out=$(PATH=$nozstd "$LETHE" show "$A" 2>&1)
+    check "... and show says how to read it" '[[ $out == *"install zstd"* ]]' "$out"
+fi
+
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))

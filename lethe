@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.6.2"
+readonly VERSION="0.6.3"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -247,6 +247,24 @@ fd_targets() {
     else
         # busybox: no -printf; `ls -l` shows "name -> target".
         ls -l "$@" 2>/dev/null | sed -n 's/^l.* -> //p'
+    fi
+}
+
+# transcript_cat FILE — the lines of a transcript. Codex compresses old ones
+# (rollout-*.jsonl.zst, codex-cli 0.163+); they need zstd to be read.
+transcript_cat() {
+    if [[ $1 == *.zst ]]; then
+        zstd -dcq -- "$1" 2>/dev/null
+    else
+        cat -- "$1" 2>/dev/null
+    fi
+}
+
+# Can this transcript be read? Sets REPLY to why not.
+transcript_readable() {
+    if [[ $1 == *.zst ]] && ! command -v zstd >/dev/null 2>&1; then
+        REPLY="compressed by Codex; install zstd to read it"
+        return 1
     fi
 }
 
@@ -528,8 +546,12 @@ load_sizes() {
         while IFS=$'\t' read -r mtime size path; do
             SIZES[$path]=$size
             MTIMES[$path]=${mtime%.*}
-            [[ ! $path =~ ($UUID_RE)\.jsonl$ ]] || ROLLOUTS[${BASH_REMATCH[1]}]=$path
-        done < <(file_stats "$dir" -type f -name 'rollout-*.jsonl')
+            # A plain transcript wins over a compressed copy of the same session.
+            if [[ $path =~ ($UUID_RE)\.jsonl(\.zst)?$ ]] &&
+                [[ -z ${ROLLOUTS[${BASH_REMATCH[1]}]+x} || $path == *.jsonl ]]; then
+                ROLLOUTS[${BASH_REMATCH[1]}]=$path
+            fi
+        done < <(file_stats "$dir" -type f \( -name 'rollout-*.jsonl' -o -name 'rollout-*.jsonl.zst' \))
     done
 }
 
@@ -556,7 +578,7 @@ mark_open_path() {
         rest=${rest%%/*}
         rest=${rest%.jsonl}
         [[ ! $rest =~ ^$UUID_RE$ ]] || OPEN[$rest]=1
-    elif [[ $path =~ ($UUID_RE)\.jsonl$ ]]; then
+    elif [[ $path =~ ($UUID_RE)\.jsonl(\.zst)?$ ]]; then
         OPEN[${BASH_REMATCH[1]}]=1
     fi
 }
@@ -586,14 +608,15 @@ detect_open() {
         fi
         if ((${#fds[@]})); then
             while IFS= read -r target; do
-                [[ $target == "$CODEX_REAL"/*rollout-*.jsonl || $target == "$CLAUDE_REAL"/projects/* ]] || continue
+                [[ $target == "$CODEX_REAL"/*rollout-*.jsonl || $target == "$CODEX_REAL"/*rollout-*.jsonl.zst ||
+                    $target == "$CLAUDE_REAL"/projects/* ]] || continue
                 mark_open_path "$target"
             done < <(fd_targets "${fds[@]}" | grep -F -e "$CODEX_REAL/" -e "$CLAUDE_REAL/projects/" || true)
         fi
     elif command -v lsof >/dev/null 2>&1; then
         while IFS= read -r target; do
             mark_open_path "${target#n}"
-        done < <(lsof -n -w -Fn 2>/dev/null | grep -E '^n.*\.jsonl$' || true)
+        done < <(lsof -n -w -Fn 2>/dev/null | grep -E '^n.*\.jsonl(\.zst)?$' || true)
     else
         OPEN_WARNING="neither /proc nor lsof is available to see which sessions are open"
     fi
@@ -930,8 +953,8 @@ messages() {
         # with neither fall back to the user/agent message events.
         # Subagents of Codex's multi-agent mode exchange encrypted messages: what
         # can be shown is who talks to them, and the commands and edits they made.
-        { grep -E '"type":"(message|transcript_segment|user_message|agent_message|function_call|item_completed)"' -- "$2" \
-            2>/dev/null || true; } | jq -cRn "$JQ_INJECTED"'
+        { transcript_cat "$2" |
+            grep -E '"type":"(message|transcript_segment|user_message|agent_message|function_call|item_completed)"' || true; } | jq -cRn "$JQ_INJECTED"'
             def clean: select((injected or startswith("# AGENTS.md instructions")) | not);
             [inputs | fromjson? | select(type == "object" and (.payload | type) == "object")] as $all
             | [$all[]
@@ -983,7 +1006,8 @@ messages() {
 
 session_matches() {
     # The transcript is JSON: a " or \ in the text is stored escaped.
-    grep -qiF -- "$F_GREP_RAW" "$2" 2>/dev/null || return 1
+    # grep -q stops reading at the first match: the reader may die of SIGPIPE.
+    { transcript_cat "$2" || true; } | grep -qiF -- "$F_GREP_RAW" || return 1
     # Every branch: a session is found by anything it still contains. Claude Code
     # needs no branch walk for that, so one jq reads the texts directly.
     if [[ $1 == claude ]]; then
@@ -1447,6 +1471,10 @@ render_conversation() {
         printf '%s(transcript file is missing: %s)%s\n' "$C_RED" "$path" "$C_RESET"
         return
     fi
+    if ! transcript_readable "$path"; then
+        printf '%s(transcript %s: %s)%s\n' "$C_YELLOW" "${path##*/}" "$REPLY" "$C_RESET"
+        return
+    fi
     local width=${FZF_PREVIEW_COLUMNS:-${COLUMNS:-0}}
     if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
     conversation=$(messages "$agent" "$path" "$O_BRANCHES" | jq -rs \
@@ -1543,6 +1571,7 @@ cmd_export() {
     IFS=$US read -r agent _ mode _ cwd title created recency path model _ < <(session_info "$id")
     path=$(codex_path "$agent" "$id" "$path")
     [[ -f $path ]] || die "the transcript of $id is missing: $path"
+    transcript_readable "$path" || die "the transcript of $id is $REPLY: $path"
     clean title
     clean cwd
     clean model

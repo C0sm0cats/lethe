@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y sqlite3 jq shellcheck
+      - run: sudo apt-get update && sudo apt-get install -y sqlite3 jq shellcheck zstd
       - run: shellcheck -S warning lethe tests/run.sh && shellcheck -s sh install.sh
       - run: tests/run.sh
       - name: install.sh on Linux (bash)
@@ -23,7 +23,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: brew install bash jq
+      - run: brew install bash jq zstd
       - run: bash --version | head -1 && sqlite3 --version
       - run: tests/run.sh
       - name: install.sh on a fresh macOS user (zsh)

@@ -48,7 +48,7 @@ Two options, set in front of `sh`, if you need them:
 
 ```sh
 # install a given release instead of the latest version
-curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.6.2 sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.6.3 sh
 
 # install in another directory than ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
@@ -76,13 +76,13 @@ Dependencies:
 
 | System | Command |
 | --- | --- |
-| macOS | `brew install bash fzf jq sqlite` |
-| Debian, Ubuntu | `sudo apt install fzf jq sqlite3` |
-| Fedora | `sudo dnf install fzf jq sqlite` |
-| Arch, Manjaro | `sudo pacman -S fzf jq sqlite` |
-| Alpine | `sudo apk add bash fzf jq sqlite` |
+| macOS | `brew install bash fzf jq sqlite zstd` |
+| Debian, Ubuntu | `sudo apt install fzf jq sqlite3 zstd` |
+| Fedora | `sudo dnf install fzf jq sqlite zstd` |
+| Arch, Manjaro | `sudo pacman -S fzf jq sqlite zstd` |
+| Alpine | `sudo apk add bash fzf jq sqlite zstd` |
 
-Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout). lethe works with whichever agents you have; you don't need both.
+Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout). `zstd` is only needed to read the old transcripts that Codex 0.163+ compresses; without it they are still listed, protected and deletable, just not readable or searchable. lethe works with whichever agents you have; you don't need both.
 
 Tab completion: add `source <(lethe completion zsh)` to `~/.zshrc`, or `source <(lethe completion bash)` to `~/.bashrc`.
 

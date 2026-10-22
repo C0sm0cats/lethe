@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.3 — 2026-10-22
+
+- Codex 0.163 compresses old transcripts (`rollout-*.jsonl.zst`) without updating its index:
+  lethe listed them as missing (✗), and `lethe delete --missing` (or the Ctrl-F "Missing" filter)
+  would have permanently deleted sessions that still exist. Compressed transcripts are now found,
+  sized, protected while open, read (`show`, preview, Enter, `export`) and searched (`--grep`,
+  Ctrl-G). Reading them needs `zstd`; without it they are still listed and never taken for
+  missing, and `show` says what to install.
+
 ## 0.6.2 — 2026-10-14
 
 - Codex subagent sessions are tagged `subagent ·` in the list, the picker and the deletion plan,

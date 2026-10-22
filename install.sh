@@ -3,7 +3,7 @@
 #
 # Downloads lethe to ~/.local/bin (or $LETHE_BIN), adds that directory to your
 # PATH if needed, and tells you exactly how to install anything missing.
-# LETHE_VERSION=v0.6.2 installs a given release instead of the latest code.
+# LETHE_VERSION=v0.6.3 installs a given release instead of the latest code.
 set -eu
 
 bin=${LETHE_BIN:-$HOME/.local/bin}
@@ -45,7 +45,7 @@ case ":$PATH:" in
         ;;
 esac
 
-# Dependencies: bash 4.4+, fzf, jq, sqlite3.
+# Dependencies: bash 4.4+, fzf, jq, sqlite3; zstd reads the transcripts Codex compresses.
 missing=""
 for tool in fzf jq sqlite3; do
     command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
@@ -56,24 +56,27 @@ if [ -n "$missing" ] || [ "$bash_ok" != yes ]; then
     say "lethe also needs:$missing$([ "$bash_ok" = yes ] || printf ' bash 4.4+')"
     if [ "$(uname -s)" = Darwin ]; then
         if command -v brew >/dev/null 2>&1; then
-            say "  brew install bash fzf jq sqlite"
+            say "  brew install bash fzf jq sqlite zstd"
         else
-            say "  Install Homebrew first (https://brew.sh), then: brew install bash fzf jq sqlite"
+            say "  Install Homebrew first (https://brew.sh), then: brew install bash fzf jq sqlite zstd"
         fi
     elif command -v apt-get >/dev/null 2>&1; then
-        say "  sudo apt install fzf jq sqlite3"
+        say "  sudo apt install fzf jq sqlite3 zstd"
     elif command -v dnf >/dev/null 2>&1; then
-        say "  sudo dnf install fzf jq sqlite"
+        say "  sudo dnf install fzf jq sqlite zstd"
     elif command -v pacman >/dev/null 2>&1; then
-        say "  sudo pacman -S fzf jq sqlite"
+        say "  sudo pacman -S fzf jq sqlite zstd"
     elif command -v zypper >/dev/null 2>&1; then
-        say "  sudo zypper install fzf jq sqlite3"
+        say "  sudo zypper install fzf jq sqlite3 zstd"
     elif command -v apk >/dev/null 2>&1; then
-        say "  sudo apk add bash fzf jq sqlite"
+        say "  sudo apk add bash fzf jq sqlite zstd"
     else
         say "  Install them with your package manager."
     fi
     say "Then run: lethe"
 else
     say "✓ fzf, jq, sqlite3 and bash 4.4+ found. Run: lethe"
+fi
+if ! command -v zstd >/dev/null 2>&1; then
+    say "  Optional: zstd, to read the old transcripts that Codex compresses (same package manager)."
 fi
