@@ -4,14 +4,15 @@
 class Lethe < Formula
   desc "Browse, resume and forget your Claude Code and Codex sessions"
   homepage "https://github.com/C0sm0cats/lethe"
-  url "https://github.com/C0sm0cats/lethe/archive/refs/tags/v0.6.2.tar.gz"
-  sha256 "408457494767d50ef83620fce15e0319af0e51858c243b627126fb5f26ccc57b"
+  url "https://github.com/C0sm0cats/lethe/archive/refs/tags/v0.6.3.tar.gz"
+  sha256 "f13debfa1ef9771fee6991c8f0dc1bdb56e9d2b9ec7b7dd44804383a957c55b4"
   license "MIT"
 
   depends_on "bash"
   depends_on "fzf"
   depends_on "jq"
   depends_on "sqlite"
+  depends_on "zstd"
 
   def install
     bin.install "lethe"
