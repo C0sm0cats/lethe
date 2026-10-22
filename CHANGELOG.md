@@ -26,6 +26,12 @@ Subagents:
 - Actions apply to what is selected, never to what is folded: Ctrl-D/Ctrl-X/Ctrl-R on a Claude
   subagent row or a dim context row explain and change nothing.
 
+Status:
+- "running" now means open in an agent (`◉`), as the agents and other tools count it. A session
+  closed in the last 10 minutes (`◔`, still protected) has a status of its own, **recent**:
+  `--recent`, and Ctrl-S cycles all → running → recent → idle → archived. `◔` is cyan, `stats` has
+  a line for each.
+
 Fixes:
 - A transcript with a NUL byte (a pasted log, for example) was taken for a binary file by `grep`
   and read only in part: one real session exported 162 of its 634 messages.

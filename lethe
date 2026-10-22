@@ -828,11 +828,11 @@ parse_args() {
                 F_AGENT=$value
                 ;;
             --claude | --codex) F_AGENT=${opt#--} ;;
-            --running | --idle | --archived | --active | --unarchived)
+            --running | --recent | --idle | --archived | --active | --unarchived)
                 value=${opt#--}
                 [[ $value != unarchived ]] || value=active
                 [[ -z $F_STATUS || $F_STATUS == "$value" ]] ||
-                    usage_error "choose one status: --running, --idle, --archived or --unarchived"
+                    usage_error "choose one status: --running, --recent, --idle, --archived or --unarchived"
                 F_STATUS=$value
                 ;;
             --older-than | --newer-than)
@@ -1199,8 +1199,10 @@ fetch_rows() {
         else
             state=""
         fi
-        # running: open or active in the last 10 minutes (◉ ◔); idle: neither (●).
-        [[ $F_STATUS != running || -n $state ]] || continue
+        # running: open in an agent (◉); recent: closed, but active in the last 10
+        # minutes (◔, still protected); idle: neither (●).
+        [[ $F_STATUS != running || $state == open ]] || continue
+        [[ $F_STATUS != recent || $state == recent ]] || continue
         [[ $F_STATUS != idle || -z $state ]] || continue
         line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}$US${pinned:-0}$US$parent$US${kids:-0}$US${kidsize:-0}$US${created:-0}"
         if [[ -n $F_GREP ]]; then pending+=("$line"); else printf '%s\n' "$line"; fi
@@ -1459,7 +1461,7 @@ format_row() {
     elif ((size < 0)); then
         icon="${C_RED}✗${C_RESET}"
     elif [[ $state == recent ]]; then
-        icon="${C_GREEN}◔${C_RESET}"
+        icon="${C_CYAN}◔${C_RESET}"
     elif ((archived)); then
         icon="${C_YELLOW}◌${C_RESET}"
     else
@@ -1610,7 +1612,7 @@ cmd_list() {
         [[ $kind == row || $kind == hidden ]] || continue
         count=$((count + 1))
         if ((size >= 0)); then bytes=$((bytes + size)); else missing=$((missing + 1)); fi
-        [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
+        [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
     done < <(fetch_sorted | tree_rows)
 
     human_size hbytes "$bytes"
@@ -1630,7 +1632,7 @@ cmd_stats() {
 stats_report() {
     local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local total=0 bytes=0 empties=0 missing=0 open=0 orphans=0 key bucket hsize i trash_bytes trash_count
-    local sub_n=0 sub_bytes=0 sub_in=0
+    local sub_n=0 sub_bytes=0 sub_in=0 recent=0
     local buckets=("< 1 day" "< 1 week" "< 1 month" "< 3 months" "< 1 year" "older")
     local limits=(86400 604800 2592000 7776000 31536000)
     declare -A n_agent=() b_agent=() n_mode=() n_dir=() b_dir=() n_age=() b_age=()
@@ -1646,7 +1648,8 @@ stats_report() {
             sub_n=$((sub_n + 1)) sub_bytes=$((sub_bytes + size))
         fi
         [[ $agent != codex ]] || ((${kids:-0} == 0)) || sub_in=$((sub_in + 1))
-        [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
+        [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
+        [[ $state != recent ]] || recent=$((recent + 1))
         ! dir_gone "$cwd" || orphans=$((orphans + 1))
         total=$((total + 1))
         bytes=$((bytes + size))
@@ -1712,6 +1715,8 @@ stats_report() {
     printf '\n'
     ((open == 0)) || printf '  %s◉%s %d running session(s), protected%s%s→ %s list --running%s\n' \
         "$C_GREEN" "$C_RESET" "$open" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
+    ((recent == 0)) || printf '  %s◔%s %d session(s) closed in the last 10 minutes, protected%s%s→ %s list --recent%s\n' \
+        "$C_CYAN" "$C_RESET" "$recent" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     ((empties == 0)) || printf '  %s!%s %d empty session(s)%s%s→ %s delete --empty%s\n' \
         "$C_YELLOW" "$C_RESET" "$empties" "$hint_sep" "$C_DIM" "$PROG" "$C_RESET"
     ((orphans == 0)) || printf '  %s!%s %d session(s) whose project directory is gone%s%s→ %s delete --orphans%s\n' \
@@ -1802,7 +1807,7 @@ cmd_show() {
     if [[ -n ${OPEN[$id]+x} ]]; then
         status="${C_GREEN}running (open in an agent)"
     elif ((NOW - epoch < RECENT_SECONDS)); then
-        status="${C_GREEN}running (active in the last 10 minutes)"
+        status="${C_CYAN}recent (closed, active in the last 10 minutes: protected)"
     elif ((archived)); then
         status="${C_YELLOW}archived"
     else
@@ -2997,7 +3002,7 @@ internal_rows() {
         printf '%s\t%s\n' "$id" "$size" >>"$LETHE_STATE/sizes"
         count=$((count + 1))
         ((size < 0)) || bytes=$((bytes + size))
-        [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
+        [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
     done < <(fetch_sorted | tree_rows)
     : >"$LETHE_STATE/open"
     ((${#OPEN[@]} == 0)) || printf '%s\n' "${!OPEN[@]}" >"$LETHE_STATE/open"
@@ -3036,7 +3041,8 @@ internal_state() {
                 agent:all) value=claude ;;
                 agent:claude) value=codex ;;
                 status:all) value=running ;;
-                status:running) value=idle ;;
+                status:running) value=recent ;;
+                status:recent) value=idle ;;
                 status:idle) value=archived ;;
                 sort:recent) value=size ;;
                 sort:size) value=oldest ;;
@@ -3520,7 +3526,7 @@ cmd_completion() {
 _lethe() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]} cmd=${COMP_WORDS[1]}
     local commands="pick list stats show resume fork export delete archive unarchive trash completion help"
-    local filters="--claude --codex --agent --running --idle --archived --unarchived --older-than --newer-than --dir --mode
+    local filters="--claude --codex --agent --running --recent --idle --archived --unarchived --older-than --newer-than --dir --mode
                    --provider --grep --empty --missing --orphans --keep --sort"
     COMPREPLY=()
     case $prev in
@@ -3583,8 +3589,9 @@ Usage:
 
 Filters (combined with AND):
   --claude, --codex       one agent only (also --agent NAME)
-  --running               open in an agent or active in the last 10 min (◉ ◔)
-  --idle                  neither running nor archived (●)
+  --running               open in an agent (◉)
+  --recent                closed, but active in the last 10 minutes (◔)
+  --idle                  neither, and not archived (●)
   --archived              archived (Codex); --unarchived: all but those
   --older-than DURATION   last activity before DURATION ago (12h, 30d, 6m, 1y)
   --newer-than DURATION   last activity within DURATION
@@ -3627,7 +3634,7 @@ Picker keys (the footer shows them, with the state of each switch):
   Ctrl-D delete Ctrl-X (un)archive    Ctrl-R resume   Ctrl-K fork
   Ctrl-E export to ./lethe-ID.md      Ctrl-Y copy the resume command
   Ctrl-T agent: all, Claude Code, Codex
-  Ctrl-S status: all, running, idle, archived
+  Ctrl-S status: all, running, recent, idle, archived
   Ctrl-F cleanup filter menu: empty, orphans, missing, idle, trash
   Ctrl-W project menu, biggest first
   Ctrl-G find the typed text in conversations (the preview shows where)

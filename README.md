@@ -118,7 +118,7 @@ Everything the command line can do, the picker can do too.
 | `Enter` | read the whole conversation in your pager |
 | `Ctrl‑Y` | copy the command that resumes the session |
 | `Ctrl‑T` | agent: all, Claude Code or Codex |
-| `Ctrl‑S` | status: all, running, idle or archived |
+| `Ctrl‑S` | status: all, running, recent, idle or archived |
 | `Ctrl‑F` | cleanup filter menu, with counts and sizes |
 | `Ctrl‑W` | project menu, biggest first |
 | `Ctrl‑G` | find the typed text in the conversations ([details](#searching-conversations)) |
@@ -139,7 +139,7 @@ The footer lists the keys and shows where each switch stands (`Ctrl‑T agent: c
 | `●` | idle session |
 | `◌` | archived session (Codex) |
 | `◉` | running: open in an agent, protected |
-| `◔` | running: active in the last 10 minutes, protected |
+| `◔` | recent: closed, but active in the last 10 minutes, protected |
 | `✗` | indexed by Codex, but the transcript file is gone |
 | `↺` | in the trash, restorable |
 | `⑂N` | N abandoned branches (edited or rewound prompts), hidden |
@@ -182,7 +182,7 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | Filter | Matches |
 | --- | --- |
 | `--claude`, `--codex` | one agent (also `--agent NAME`) |
-| `--running`, `--idle`, `--archived` | session status (`◉` `◔`, `●`, `◌`) |
+| `--running`, `--recent`, `--idle`, `--archived` | session status: open in an agent (`◉`), closed in the last 10 minutes (`◔`), neither (`●`), archived (`◌`) |
 | `--unarchived` | all but archived sessions (formerly `--active`) |
 | `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6m`, `1y` |
 | `--newer-than D` | last activity within `D` |

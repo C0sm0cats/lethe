@@ -221,7 +221,8 @@ expect_ids "no filter lists both agents" "$A $B $C $D $E $F $G $H $I"
 expect_ids "--claude" "$G $H $I" --claude
 expect_ids "--agent codex" "$A $B $C $D $E $F" --agent codex
 expect_ids "--archived" "$D" --archived
-expect_ids "--running: open or active in the last 10 minutes" "$E $I" --running
+expect_ids "--running: open in an agent" "$I" --running
+expect_ids "--recent: closed, active in the last 10 minutes" "$E" --recent
 expect_ids "--idle: neither running nor archived" "$A $B $C $F $G $H" --idle
 expect_ids "--unarchived (and its old name --active)" "$A $B $C $E $F $G $H $I" --active
 expect_ids "--older-than" "$A $C $F $G" --older-than 45d
@@ -259,10 +260,10 @@ out=$("$LETHE" list --codex --subagents)
 check "... unfolded with --subagents, named after their nickname, without the tag" \
     '[[ $out == *"▾ Refactor parser"* && $out == *"└─ Kepler"* && $out != *"subagent · Kepler"* ]]' "$out"
 out=$("$LETHE" stats)
-check "stats" '[[ $out == *Total*9* && $out == *"2 running session(s), protected"*"list --running"* ]]' "$out"
+check "stats" '[[ $out == *Total*9* && $out == *"1 running session(s), protected"*"list --running"* && $out == *"1 session(s) closed in the last 10 minutes, protected"*"list --recent"* ]]' "$out"
 out=$("$LETHE" show "$E" 2>&1; "$LETHE" show "$A" 2>&1)
 check "show: the status reads running or idle" \
-    '[[ $out == *"running (active in the last 10 minutes)"* && $out == *"  idle  "* ]]' "$out"
+    '[[ $out == *"recent (closed, active in the last 10 minutes: protected)"* && $out == *"  idle  "* ]]' "$out"
 out=$("$LETHE" show "$A")
 check "show (codex)" '[[ $out == *"please refactor the Parser"* && $out != *secretword* ]]' "$out"
 out=$("$LETHE" show "$G")
@@ -354,10 +355,13 @@ check "picker: a project chosen with Ctrl-W excludes the projects below it" '[[ 
 check "picker: Ctrl-W lists projects, the current one first" \
     '[[ $(sed -n 3p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
 out=""
-for _ in 1 2 3 4; do "$LETHE" __state status && out+="$(<"$LETHE_STATE/status") "; done
-check "picker: Ctrl-S cycles running, idle, archived, all" '[[ $out == "running idle archived all " ]]' "$out"
+for _ in 1 2 3 4 5; do "$LETHE" __state status && out+="$(<"$LETHE_STATE/status") "; done
+check "picker: Ctrl-S cycles running, recent, idle, archived, all" '[[ $out == "running recent idle archived all " ]]' "$out"
 printf 'running\n' >"$LETHE_STATE/status"
-check "picker: Ctrl-S running lists the open and recent sessions" '[[ $(picker_ids) == "$I $E " ]]' "$(picker_ids)"
+check "picker: Ctrl-S running lists the open sessions only" '[[ $(picker_ids) == "$I " ]]' "$(picker_ids)"
+printf 'recent\n' >"$LETHE_STATE/status"
+check "picker: Ctrl-S recent lists the sessions closed in the last 10 minutes" '[[ $(picker_ids) == "$E " ]]' "$(picker_ids)"
+printf 'running\n' >"$LETHE_STATE/status"
 check "picker: the prompt and footer show the status" \
     '[[ $("$LETHE" __state prompt) == *running* && $(NO_COLOR=1 "$LETHE" __state footer) == *"Ctrl-S status: running"* ]]'
 printf 'claude\n' >"$LETHE_STATE/agent" && printf 'idle\n' >"$LETHE_STATE/status"
@@ -676,7 +680,7 @@ listed=$("$LETHE" list --json "$B" | jq -r '.[0].last_activity | fromdate | strf
 check "show gives the date of the transcript, like list" '[[ $out == *"→ $listed"* && $listed == "$(date "+%Y-%m-%d")"* ]]' "$out (list: $listed)"
 sqlite3 "$DB" "UPDATE threads SET updated_at = $(date +%s) WHERE id = '$B';"
 set_mtime "$(date +%s)" "$B_FILE"
-expect_ids "a transcript moved by archive/unarchive is not activity" "$E $I" --running
+expect_ids "a transcript moved by archive/unarchive is not activity" "$E" --recent
 
 reset_fixture
 "$LETHE" archive -y "$A" >/dev/null 2>&1
