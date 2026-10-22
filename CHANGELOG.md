@@ -33,6 +33,9 @@ Status:
   a line for each.
 
 Fixes:
+- A Claude Code session that moved to another directory (a `cd`, `/cd`, or a resume elsewhere)
+  belongs to the project it is in now, not the one it started in: list, picker, `--dir`, Ctrl-W,
+  `--keep`, `--orphans` and resume (which starts there).
 - A transcript with a NUL byte (a pasted log, for example) was taken for a binary file by `grep`
   and read only in part: one real session exported 162 of its 634 messages.
 - Since 0.6.0, deleting a Claude Code session empties `~/.claude/history.jsonl` (the prompt history,

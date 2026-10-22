@@ -363,12 +363,14 @@ readonly JQ_INJECTED='def injected: test("^\\s*<[A-Za-z][A-Za-z0-9_:-]*>") and t
 # state is updated without `//`, which would make jq copy it on every line.
 readonly CLAUDE_SUMMARY='
     def text_of: if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end;
-    reduce inputs as $line ({e: [], meta: null, custom: null, ai: null, summary: null, prompt: null,
+    reduce inputs as $line ({e: [], meta: null, cwd: null, custom: null, ai: null, summary: null, prompt: null,
                              sub: false, model: null};
         ($line | fromjson? | select(type == "object")) as $o
         | (if .meta == null and $o.cwd != null and $o.timestamp != null then
                .meta = [$o.cwd, (if $o.entrypoint == null then "" else $o.entrypoint end), $o.timestamp]
            else . end)
+        # The project is where the session is now: it can move (cd, /cd).
+        | (if $o.cwd != null and ($o.cwd | type) == "string" and $o.isSidechain != true then .cwd = $o.cwd else . end)
         | (if $o.type == "custom-title" then .custom = $o.customTitle
            elif $o.type == "ai-title" then .ai = $o.aiTitle
            elif $o.type == "summary" then .summary = $o.summary
@@ -390,6 +392,7 @@ readonly CLAUDE_SUMMARY='
                   end)
            else . end)
         | if $quiet then .e += [$o | entry] else . end)
+    | (if .cwd != null and .meta != null then .meta[0] = .cwd else . end)
     | [(.meta // ["", "", ""])[],
        (.custom // .ai // .summary // .prompt // ""),
        (.model // ""), (if .sub then "0" else "1" end),

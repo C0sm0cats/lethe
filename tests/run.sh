@@ -945,6 +945,15 @@ printf '\000\n' >>"$CPROJ/$N.jsonl"
 set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$N.jsonl"
 check "a transcript with a NUL byte is read entirely" '[[ $("$LETHE" export "$N" | grep -c "^## ") -eq 4 ]]' "$("$LETHE" export "$N")"
 
+# A Claude session that moved to another directory: its project is where it is now.
+M=99999999-0000-4000-8000-0000000000cd
+claude_chat "$M" 3 "$WORK/other" 'user:start here' 'assistant:ok'
+jq -cn --arg cwd "$PROJ" '{type: "user", uuid: "m-3", parentUuid: null, cwd: $cwd, timestamp: "2026-01-02T10:00:00.000Z",
+    message: {role: "user", content: "now over there"}}' >>"$CPROJ/$M.jsonl"
+set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$M.jsonl"
+expect_ids "a session that moved belongs to the project it is in now" "$M" --dir "$PROJ" --claude --grep "over there"
+expect_ids "... not to the one it started in" "" --dir "$WORK/other" --claude --grep "over there"
+
 # Codex 0.163 compresses old transcripts: rollout-*.jsonl.zst, index unchanged.
 if command -v zstd >/dev/null 2>&1; then
     reset_fixture
