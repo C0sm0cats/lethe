@@ -927,6 +927,20 @@ out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); NO_COLOR=1; setup_color
     format_row codex 0 0 "2026-01-01 00:00" subagent 1000 /x "A very long title" "" 20 0 0 "" gone; echo "$REPLY"' _ "$LETHE" | perl -CSD -ne 'print if length > 81')
 check "tree rows fit 80 columns" '[[ -z $out ]]' "$out"
 
+# A NUL byte (a pasted log) must not make grep take a file for binary.
+reset_fixture
+{ printf '{"display":"keep me","sessionId":"other"}\n'; printf '{"display":"pasted \000 log","sessionId":"other2"}\n'
+  printf '{"display":"bye","sessionId":"%s"}\n' "$H"; } >"$CLAUDE_CONFIG_DIR/history.jsonl"
+"$LETHE" delete -y "$H" >/dev/null 2>&1
+check "a NUL byte in the prompt history does not empty it" \
+    '[[ $(grep -ac "" "$CLAUDE_CONFIG_DIR/history.jsonl") -eq 2 ]] && grep -aq "keep me" "$CLAUDE_CONFIG_DIR/history.jsonl"'
+N=99999999-0000-4000-8000-0000000000ab
+claude_chat "$N" 3 "$PROJ" 'user:first prompt' 'assistant:first answer' 'user:second prompt' 'assistant:last answer'
+perl -pi -e 's/first answer/first \\u0000 answer/; s/"first answer"/"first answer"/' "$CPROJ/$N.jsonl"
+printf '\000\n' >>"$CPROJ/$N.jsonl"
+set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$N.jsonl"
+check "a transcript with a NUL byte is read entirely" '[[ $("$LETHE" export "$N" | grep -c "^## ") -eq 4 ]]' "$("$LETHE" export "$N")"
+
 # Codex 0.163 compresses old transcripts: rollout-*.jsonl.zst, index unchanged.
 if command -v zstd >/dev/null 2>&1; then
     reset_fixture

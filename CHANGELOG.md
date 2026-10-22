@@ -27,7 +27,11 @@ Subagents:
   subagent row or a dim context row explain and change nothing.
 
 Fixes:
-- Transcripts that `grep` takes for binary (a NUL byte in a pasted log) were read only in part.
+- A transcript with a NUL byte (a pasted log, for example) was taken for a binary file by `grep`
+  and read only in part: one real session exported 162 of its 634 messages.
+- Since 0.6.0, deleting a Claude Code session empties `~/.claude/history.jsonl` (the prompt history,
+  of every session) when that file holds a NUL byte, for the same reason. It is now read as text,
+  and lethe replaces it only if no line was lost.
 
 ## 0.6.3 — 2026-10-22
 
