@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.6.3"
+readonly VERSION="0.7.0"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -342,7 +342,12 @@ init_codex() {
                $(codex_col tokens_used 0) AS tokens,
                NULL AS size,
                0 AS rewinds,
-               COALESCE($(codex_col is_pinned 0), 0) AS pinned
+               COALESCE($(codex_col is_pinned 0), 0) AS pinned,
+               $( ((HAS_EDGES)) && echo "(SELECT e.parent_thread_id FROM cx.thread_spawn_edges AS e
+                                          WHERE e.child_thread_id = t.id)" || echo NULL) AS parent,
+               $( ((HAS_EDGES)) && echo "(SELECT COUNT(*) FROM cx.thread_spawn_edges AS e
+                                          WHERE e.parent_thread_id = t.id)" || echo 0) AS kids,
+               0 AS kidsize
           FROM cx.threads AS t"
 }
 
@@ -391,9 +396,58 @@ readonly CLAUDE_SUMMARY='
        (if $quiet then (.e | branches | .rewinds | tostring) else "NULL" end)]
     | map(tostring | gsub("[\t\n\r]"; " ")) | join($us)'
 
+# claude_subagent_fields ID PATH — the subagents of Claude Code session ID (PATH
+# is its transcript): the agent-*.jsonl files of <session>/subagents, regular
+# files only, with what their .meta.json says. One line each:
+#   agent file size started type description model effort tool_use_id
+claude_subagent_fields() {
+    local path=$2 file agent meta kind description model effort tool started size
+    [[ -d ${path%.jsonl}/subagents && ! -L ${path%.jsonl} && ! -L ${path%.jsonl}/subagents ]] || return 0
+    for file in "${path%.jsonl}"/subagents/agent-*.jsonl; do
+        [[ -f $file && ! -L $file ]] || continue
+        agent=${file##*/agent-}
+        agent=${agent%.jsonl}
+        [[ $agent =~ ^[A-Za-z0-9_-]+$ ]] || continue
+        kind="" description="" model="" effort="" tool=""
+        meta=${file%.jsonl}.meta.json
+        if [[ -f $meta && ! -L $meta ]]; then
+            IFS=$US read -r kind description model effort tool < <(jq -r --arg us "$US" '
+                [.agentType, .description, .model, .effort, .toolUseId]
+                | map(if type == "string" then gsub("[\\x{0}-\\x{1f}\\x{7f}-\\x{9f}]"; " ") else "" end)
+                | join($us)' -- "$meta" 2>/dev/null) || true
+        fi
+        # Without a meta file, the parent's tool result names the agent.
+        if [[ -z $tool ]]; then
+            tool=$({ grep -aF -- "\"agentId\":\"$agent\"" "$path" 2>/dev/null || true; } | jq -r '
+                .message.content[]? | select(.type? == "tool_result") | .tool_use_id // empty' 2>/dev/null |
+                head -n 1) || true
+        fi
+        [[ $tool =~ ^[A-Za-z0-9_-]*$ ]] || tool=""
+        started=$(head -n 1 -- "$file" | jq -r '.timestamp // empty' 2>/dev/null) || started=""
+        size=$(wc -c <"$file")
+        printf '%s\n' "$agent$US$file$US${size//[[:space:]]/}$US${started//$US/}$US$kind$US${description:0:200}$US$model$US$effort$US$tool"
+    done
+}
+
+# claude_subagents ID PATH — SQL rows of claude_sub for the subagents of session ID.
+claude_subagents() {
+    local id=$1 agent file size started kind description model effort tool
+    printf "DELETE FROM claude_sub WHERE session = '%s';\n" "$id"
+    while IFS=$US read -r agent file size started kind description model effort tool; do
+        if [[ -n $started ]]; then
+            started="CAST(strftime('%s', '${started//\'/}') AS INTEGER)"
+        else
+            started=0
+        fi
+        printf "INSERT OR REPLACE INTO claude_sub VALUES ('%s', '%s', '%s', %d, %s, '%s', '%s', '%s', '%s', '%s');\n" \
+            "$id" "$agent" "${file//\'/\'\'}" "$size" "$started" "${kind//\'/\'\'}" \
+            "${description//\'/\'\'}" "${model//\'/\'\'}" "${effort//\'/\'\'}" "$tool"
+    done < <(claude_subagent_fields "$id" "$2")
+}
+
 # Print an INSERT statement with the metadata of one Claude transcript.
 claude_extract() {
-    local path=$1 mtime=$2 fsize=$3 id cwd entry created title model empty rewinds size kb quiet=false mode
+    local path=$1 mtime=$2 fsize=$3 subkey=${4:-} id cwd entry created title model empty rewinds size kb quiet=false mode
     id=${path##*/}
     id=${id%.jsonl}
     [[ $id =~ ^$UUID_RE$ ]] || return 0
@@ -402,8 +456,8 @@ claude_extract() {
     # left for later (NULL) while the transcript is being written.
     ((NOW - mtime < RECENT_SECONDS)) || quiet=true
     IFS=$US read -r cwd entry created title model empty rewinds < <(
-        { grep -E '"uuid"|"cwd"|"type":"(user|assistant|custom-title|ai-title|summary)"' -- "$path" || true; } |
-            jq -rRn --arg us "$US" --argjson quiet "$quiet" \
+        { grep -aE '"uuid"|"cwd"|"type":"(user|assistant|custom-title|ai-title|summary)"' -- "$path" || true; } |
+            jq -rRn --arg us "$US" --argjson quiet "$quiet" --argjson side false \
                 "$JQ_INJECTED def entry: $CLAUDE_ENTRIES; def branches: $CLAUDE_BRANCHES; $CLAUDE_SUMMARY" 2>/dev/null) || true
     [[ $rewinds =~ ^([0-9]+|NULL)$ ]] || rewinds=0
     size=$fsize
@@ -422,9 +476,14 @@ claude_extract() {
     esac
     if [[ -n $created ]]; then created="CAST(strftime('%s', '${created//\'/}') AS INTEGER)"; else created=$mtime; fi
 
-    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s);\n" \
+    local subs subsize
+    # SUBKEY: "count:newest mtime:total size" of its subagent transcripts.
+    read -r subs _ subsize <<<"${subkey//:/ }"
+    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s, %d, %d, '%s');\n" \
         "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" "$created" \
-        "${cwd//\'/\'\'}" "${title//\'/\'\'}" "${mode//\'/}" "${model//\'/\'\'}" "${empty:-1}" "$rewinds"
+        "${cwd//\'/\'\'}" "${title//\'/\'\'}" "${mode//\'/}" "${model//\'/\'\'}" "${empty:-1}" "$rewinds" \
+        "${subs:-0}" "${subsize:-0}" "${subkey//\'/}"
+    claude_subagents "$id" "$path"
 }
 
 # Bring the cache up to date: only new or modified transcripts are parsed.
@@ -434,23 +493,39 @@ init_claude() {
     mkdir -p "$CACHE_DIR"
     # One index per Claude Code directory: profiles (CLAUDE_CONFIG_DIR) do not
     # wipe each other's.
-    CLAUDE_CACHE=$CACHE_DIR/claude-v4-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
-    rm -f -- "$CACHE_DIR"/claude-v[123].sqlite
+    CLAUDE_CACHE=$CACHE_DIR/claude-v5-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
+    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v4-*.sqlite
     # The picker preview only reads the index that the list has just refreshed.
     [[ $REINDEX == 1 || ! -f $CLAUDE_CACHE ]] || return 0
     sqlite3 -cmd '.timeout 5000' "$CLAUDE_CACHE" "CREATE TABLE IF NOT EXISTS claude (
         path TEXT PRIMARY KEY, id TEXT, mtime INTEGER, fsize INTEGER, size INTEGER, created INTEGER,
-        cwd TEXT, title TEXT, mode TEXT, model TEXT, empty INTEGER, rewinds INTEGER);"
+        cwd TEXT, title TEXT, mode TEXT, model TEXT, empty INTEGER, rewinds INTEGER,
+        subs INTEGER, subsize INTEGER, subkey TEXT);
+        CREATE TABLE IF NOT EXISTS claude_sub (
+        session TEXT, agent TEXT, path TEXT, size INTEGER, started INTEGER, type TEXT, description TEXT,
+        model TEXT, effort TEXT, tooluse TEXT, PRIMARY KEY (session, agent));"
 
-    local path mtime fsize pending script count=0 done=0 seen=0
-    declare -A known=()
+    local path mtime fsize pending script count=0 done=0 seen=0 subkey
+    declare -A known=() subkeys=()
     local -a stale=()
-    while IFS=$US read -r path mtime fsize pending; do
-        known[$path]="$mtime $fsize"
+    # Subagent transcripts grow, or appear, without the session's own transcript
+    # changing: their count, newest date and total size are part of the key.
+    local dir
+    declare -A sub_count=() sub_newest=() sub_total=()
+    while IFS=$'\t' read -r mtime fsize path; do
+        mtime=${mtime%.*}
+        dir=${path%/subagents/*}
+        sub_count[$dir]=$((${sub_count[$dir]:-0} + 1))
+        sub_total[$dir]=$((${sub_total[$dir]:-0} + fsize))
+        ((mtime <= ${sub_newest[$dir]:-0})) || sub_newest[$dir]=$mtime
+    done < <(file_stats "$CLAUDE_DIR/projects" -mindepth 4 -maxdepth 4 -type f -path '*/subagents/agent-*.jsonl')
+    for dir in "${!sub_count[@]}"; do subkeys[$dir.jsonl]="${sub_count[$dir]}:${sub_newest[$dir]}:${sub_total[$dir]}"; done
+    while IFS=$US read -r path mtime fsize pending subkey; do
+        known[$path]="$mtime $fsize $subkey"
         # The badge was left for later: compute it once the session is quiet.
         if [[ -n $pending ]] && ((NOW - mtime >= RECENT_SECONDS)); then known[$path]=pending; fi
     done < <(sqlite3 -cmd '.timeout 5000' -separator "$US" "$CLAUDE_CACHE" \
-        "SELECT path, mtime, fsize, CASE WHEN rewinds IS NULL THEN 1 ELSE '' END FROM claude;")
+        "SELECT path, mtime, fsize, CASE WHEN rewinds IS NULL THEN 1 ELSE '' END, subkey FROM claude;")
 
     script=$(mktemp "$CACHE_DIR/update.XXXXXX")
     {
@@ -460,7 +535,9 @@ init_claude() {
             [[ -n $path ]] || continue
             printf "INSERT OR IGNORE INTO seen VALUES ('%s');\n" "${path//\'/\'\'}"
             seen=$((seen + 1))
-            [[ ${known[$path]:-} == "$mtime $fsize" ]] || stale+=("$mtime"$'\t'"$fsize"$'\t'"$path")
+            subkey=${subkeys[$path]:-0:0:0}
+            [[ ${known[$path]:-} == "$mtime $fsize $subkey" ]] ||
+                stale+=("$mtime"$'\t'"$fsize"$'\t'"$subkey"$'\t'"$path")
         done < <(file_stats "$CLAUDE_DIR/projects" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl')
         count=${#stale[@]}
         # Transcripts are parsed in parallel, one job per CPU, each into its own file.
@@ -468,8 +545,8 @@ init_claude() {
         jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
         parts=$(mktemp -d "$CACHE_DIR/parts.XXXXXX")
         for path in "${stale[@]}"; do
-            IFS=$'\t' read -r mtime fsize path <<<"$path"
-            claude_extract "$path" "$mtime" "$fsize" >"$parts/$i" &
+            IFS=$'\t' read -r mtime fsize subkey path <<<"$path"
+            claude_extract "$path" "$mtime" "$fsize" "$subkey" >"$parts/$i" &
             i=$((i + 1)) running=$((running + 1))
             if ((running >= jobs)); then
                 wait -n || true
@@ -482,7 +559,8 @@ init_claude() {
         wait
         for ((i = 0; i < count; i++)); do cat -- "$parts/$i"; done
         rm -rf -- "$parts"
-        printf 'DELETE FROM claude WHERE path NOT IN (SELECT path FROM seen);\nCOMMIT;\n'
+        printf 'DELETE FROM claude WHERE path NOT IN (SELECT path FROM seen);\n'
+        printf 'DELETE FROM claude_sub WHERE session NOT IN (SELECT id FROM claude);\nCOMMIT;\n'
     } >"$script"
     if [[ -t 2 ]] && ((count > 20)); then printf '\r\e[K' >&2; fi
     if ((count == 0 && seen == ${#known[@]})); then
@@ -523,14 +601,33 @@ init() {
         # Named columns: with no Codex part this SELECT names the view's columns.
         parts+=("SELECT 'claude' AS agent, id, 0 AS archived, mtime AS recency, created, mode,
                         'anthropic' AS provider, empty, cwd, title, path, model, 0 AS tokens, size,
-                        COALESCE(rewinds, 0) AS rewinds, 0 AS pinned FROM cl.claude")
+                        COALESCE(rewinds, 0) AS rewinds, 0 AS pinned, NULL AS parent,
+                        COALESCE(subs, 0) AS kids, COALESCE(subsize, 0) AS kidsize FROM cl.claude")
     fi
     ((${#parts[@]})) || die "no sessions found: neither $CODEX_DIR nor $CLAUDE_DIR/projects exists"
     PRELUDE+="CREATE TEMP VIEW sessions AS $(join_by ' UNION ALL ' "${parts[@]}");"
-    # rank: 1 for the most recent session of each project, both agents together
-    # (subagent sessions are ranked apart: they go with the session that started them).
-    PRELUDE+="CREATE TEMP VIEW ranked AS SELECT *, ROW_NUMBER() OVER (
-        PARTITION BY cwd, mode = 'subagent' ORDER BY recency DESC, id DESC) AS rank FROM sessions;"
+    # root: the session at the top of a Codex subagent tree (itself for any other
+    # session, a subagent whose parent is gone, or a cycle).
+    if [[ -n $CODEX_DB ]] && ((HAS_EDGES)); then
+        PRELUDE+="CREATE TEMP VIEW up AS WITH RECURSIVE up(id, root, depth) AS (
+            SELECT child_thread_id, parent_thread_id, 1 FROM cx.thread_spawn_edges
+            UNION SELECT up.id, e.parent_thread_id, up.depth + 1
+              FROM up JOIN cx.thread_spawn_edges AS e ON e.child_thread_id = up.root WHERE up.depth < 32)
+            SELECT id, root FROM up
+             WHERE root IN (SELECT id FROM cx.threads)
+               AND NOT EXISTS (SELECT 1 FROM cx.thread_spawn_edges AS e WHERE e.child_thread_id = up.root);"
+    else
+        PRELUDE+="CREATE TEMP VIEW up AS SELECT NULL AS id, NULL AS root WHERE 0;"
+    fi
+    PRELUDE+="CREATE TEMP VIEW rooted AS SELECT s.*,
+        COALESCE((SELECT up.root FROM up WHERE up.id = s.id LIMIT 1), s.id) AS root FROM sessions AS s;"
+    # rank: 1 for the most recent session of each project, both agents together.
+    # A subagent takes the rank of its root, whatever its own directory: it is
+    # kept with the session that started it.
+    PRELUDE+="CREATE TEMP VIEW toprank AS SELECT id, ROW_NUMBER() OVER (
+        PARTITION BY cwd ORDER BY recency DESC, id DESC) AS rank FROM rooted WHERE root = id;"
+    PRELUDE+="CREATE TEMP VIEW ranked AS SELECT rooted.*, toprank.rank AS rank
+        FROM rooted JOIN toprank ON toprank.id = rooted.root;"
     # Reads only: the agents' databases are never written through this connection.
     PRELUDE+="PRAGMA query_only = 1;"
 }
@@ -644,7 +741,7 @@ F_IDLE="" F_PROJECT=""
 F_EMPTY=0 F_MISSING=0 F_ORPHANS=0 F_KEEP="" F_ALL=0
 F_DIRS=() F_IDS=()
 FILTER_ARGS=() # filters as given (minus agent and status), replayed by the picker on reload
-O_YES=0 O_DRY=0 O_JSON=0 O_IDS=0 O_FORCE=0 O_SORT=recent O_BRANCHES=active
+O_YES=0 O_DRY=0 O_JSON=0 O_IDS=0 O_FORCE=0 O_SORT=recent O_BRANCHES=active O_SUBAGENTS=hidden
 
 reset_filters() {
     F_AGENT="" F_STATUS="" F_OLDER="" F_NEWER="" F_MODE="" F_PROVIDER="" F_GREP="" F_IDLE="" F_PROJECT=""
@@ -783,6 +880,7 @@ parse_args() {
             -n | --dry-run) allow dry && O_DRY=1 ;;
             --json) allow json && O_JSON=1 ;;
             --all-branches) allow branches && O_BRANCHES=all ;;
+            --subagents) allow subagents && O_SUBAGENTS=shown ;;
             --ids) allow json && O_IDS=1 ;;
             -h | --help)
                 usage
@@ -887,10 +985,11 @@ build_where() {
 # and the conversation is the path from the last message back to the root.
 #
 # CLAUDE_ENTRIES (per line): [uuid, parent, logical parent, is a message,
-# is a prompt, type, displayed text, linked] for every entry of the main chain.
-# Messages without a uuid (older formats) are not linked: always shown.
+# is a prompt, type, displayed text, linked, subagents started] for every entry
+# of the main chain ($side: of a subagent transcript, all sidechain). Messages
+# without a uuid (older formats) are not linked: always shown.
 readonly CLAUDE_ENTRIES='
-    select(type == "object" and .isSidechain != true
+    select(type == "object" and (.isSidechain != true or $side)
                        and (.uuid != null or .type == "user" or .type == "assistant"))
     | ((.type == "user" or .type == "assistant") and .isMeta != true and .isCompactSummary != true) as $msg
     | (.message.content? // null) as $c
@@ -902,7 +1001,11 @@ readonly CLAUDE_ENTRIES='
             $c | if type == "string" then [.] else [.[]? | select(.type == "text") | .text] end
                | map(select(injected | not)) | join("\n")
         else "" end),
-       .uuid != null]'
+       .uuid != null,
+       (if .type == "assistant" and ($c | type) == "array" then
+            [$c[] | select(type == "object" and .type == "tool_use" and (.name == "Agent" or .name == "Task"))
+             | .id | strings]
+        else [] end)]'
 
 # CLAUDE_BRANCHES (all entries, slurped): {rewinds, messages: [{role, text, abandoned}]}.
 # A branch off the active path is abandoned only if it contains a prompt (a
@@ -931,11 +1034,11 @@ readonly CLAUDE_BRANCHES='
              | if $e[4] then .prompt[$root] = true else . end
            end)) as $branch
     | {rewinds: ($branch.prompt | length),
-       messages: [$all[] | select(.[6] != "")
-                  | {role: .[5], text: .[6],
+       messages: [$all[] | select(.[6] != "" or (.[8] | length) > 0)
+                  | {role: .[5], text: .[6], subagents: .[8],
                      abandoned: (.[7] and ($on[.[0]] | not) and $branch.prompt[$branch.root[.[0]] // ""] == true)}]}'
 
-# messages AGENT FILE [all] — one JSON object {role, text, abandoned} per
+# messages AGENT FILE [all] [sidechain] — one JSON object {role, text, abandoned} per
 # user/assistant message. Claude Code sessions give the active branch only,
 # or with "all" every branch (abandoned ones flagged). Context injected by the
 # agents themselves (environment, instructions, tool output, command
@@ -944,8 +1047,9 @@ messages() {
     # Control characters (escape sequences) never reach the terminal.
     local controls='gsub("[\\x{0}-\\x{8}\\x{b}-\\x{1f}\\x{7f}-\\x{9f}]"; "")'
     if [[ $1 == claude ]]; then
-        { grep -E '"uuid"|"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } |
-            jq -cR "$JQ_INJECTED fromjson? | $CLAUDE_ENTRIES" | jq -sc "$CLAUDE_BRANCHES" |
+        { grep -aE '"uuid"|"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } |
+            jq -cR --argjson side "$([[ ${4:-} == sidechain ]] && echo true || echo false)" \
+                "$JQ_INJECTED fromjson? | $CLAUDE_ENTRIES" | jq -sc "$CLAUDE_BRANCHES" |
             jq -c --arg branches "${3:-active}" \
                 ".messages[] | select(\$branches == \"all\" or (.abandoned | not)) | .text |= $controls"
     else
@@ -954,70 +1058,97 @@ messages() {
         # Subagents of Codex's multi-agent mode exchange encrypted messages: what
         # can be shown is who talks to them, and the commands and edits they made.
         { transcript_cat "$2" |
-            grep -E '"type":"(message|transcript_segment|user_message|agent_message|function_call|item_completed)"' || true; } | jq -cRn "$JQ_INJECTED"'
+            grep -aE '"type":"(message|transcript_segment|user_message|agent_message|function_call|item_completed)"' || true; } | jq -cRn "$JQ_INJECTED"'
             def clean: select((injected or startswith("# AGENTS.md instructions")) | not);
+            # A message in clear: a response item, or a voice transcript segment.
+            def prim:
+                if .type == "response_item" and .payload.type == "message"
+                   and (.payload.role == "user" or .payload.role == "assistant") then
+                    {role: .payload.role, abandoned: false,
+                     text: ([.payload.content[]? | select(.type == "input_text" or .type == "output_text")
+                             | .text // empty | clean] | join("\n"))}
+                elif .type == "realtime_item" and .payload.type == "transcript_segment"
+                   and (.payload.role == "user" or .payload.role == "assistant") then
+                    {role: .payload.role, abandoned: false, text: (.payload.text // "")}
+                else empty end
+                | select(.text != "");
+            # What a subagent of the multi-agent mode does, when its messages are
+            # encrypted: who talks to it, its commands and edits.
+            def act:
+                if .type == "response_item" and .payload.type == "agent_message" then
+                    ([.payload.content[]? | select(.type == "input_text") | .text // ""] | join(" ")
+                     | ((capture("Message Type: (?<kind>[A-Z_]+)") // {}) | .kind // "MESSAGE")) as $kind
+                    | "← \(if $kind == "NEW_TASK" then "task" else "message" end) from \(.payload.author // "?")"
+                      + " (content encrypted by Codex)"
+                elif .type == "response_item" and .payload.type == "function_call"
+                     and .payload.name == "send_message" then
+                    "→ message to \(.payload.arguments | fromjson? | .target // "?") (content encrypted by Codex)"
+                elif .type == "event_msg" and .payload.type == "item_completed"
+                     and .payload.item.type == "CommandExecution" then
+                    "$ \(.payload.item.command | if type == "array" then last else tostring end)"
+                    + (if (.payload.item.exit_code // 0) != 0 then "   (exit \(.payload.item.exit_code))" else "" end)
+                elif .type == "event_msg" and .payload.type == "item_completed"
+                     and .payload.item.type == "FileChange" then
+                    (.payload.item.changes // {} | keys[] | "edited \(.)")
+                else empty end;
+            # One "activity" message per run of consecutive actions, between the
+            # messages in clear.
+            def weave(items):
+                reduce items as $x ([];
+                    if $x.msg != null then . + [$x.msg]
+                    elif ($x.line | startswith("←")) then
+                        . + [{role: "user", activity: true, abandoned: false, text: $x.line}]
+                    elif (length > 0 and .[-1].activity == true and .[-1].role == "assistant") then
+                        .[-1].text += "\n" + $x.line
+                    else . + [{role: "assistant", activity: true, abandoned: false, text: $x.line}] end);
             [inputs | fromjson? | select(type == "object" and (.payload | type) == "object")] as $all
-            | [$all[]
-               | if .type == "response_item" and .payload.type == "message"
-                    and (.payload.role == "user" or .payload.role == "assistant") then
-                     {role: .payload.role, abandoned: false,
-                      text: ([.payload.content[]? | select(.type == "input_text" or .type == "output_text")
-                              | .text // empty | clean] | join("\n"))}
-                 elif .type == "realtime_item" and .payload.type == "transcript_segment"
-                    and (.payload.role == "user" or .payload.role == "assistant") then
-                     {role: .payload.role, abandoned: false, text: (.payload.text // "")}
-                 else empty end
-               | select(.text != "")] as $primary
+            | [$all[] | prim] as $primary
             | [$all[]
                | select(.type == "event_msg"
                         and (.payload.type == "user_message" or .payload.type == "agent_message"))
                | {role: (if .payload.type == "user_message" then "user" else "assistant" end),
                   abandoned: false, text: (.payload.message // "" | tostring | clean)}
                | select(.text != "")] as $events
-            | if ($primary | length) > 0 then $primary[]
+            # A subagent of the multi-agent mode receives its tasks (the root
+            # session, /root, only receives reports): its actions go between its
+            # messages in clear.
+            | ($all | any(.type == "response_item" and .payload.type == "agent_message"
+                          and (.payload.recipient // "/root") != "/root")) as $team
+            | if ($primary | length) > 0 and ($team | not) then $primary[]
+              elif ($primary | length) > 0 then weave($all[] | (prim | {msg: .}), (act | {line: .})) | .[]
               elif ($events | length) > 0 then $events[]
-              else
-                  # One "activity" message per run of consecutive actions.
-                  reduce ($all[]
-                      | if .type == "response_item" and .payload.type == "agent_message" then
-                            ([.payload.content[]? | select(.type == "input_text") | .text // ""] | join(" ")
-                             | ((capture("Message Type: (?<kind>[A-Z_]+)") // {}) | .kind // "MESSAGE")) as $kind
-                            | "← \(if $kind == "NEW_TASK" then "task" else "message" end) from \(.payload.author // "?")"
-                              + " (content encrypted by Codex)"
-                        elif .type == "response_item" and .payload.type == "function_call"
-                             and .payload.name == "send_message" then
-                            "→ message to \(.payload.arguments | fromjson? | .target // "?") (content encrypted by Codex)"
-                        elif .type == "event_msg" and .payload.type == "item_completed"
-                             and .payload.item.type == "CommandExecution" then
-                            "$ \(.payload.item.command | if type == "array" then last else tostring end)"
-                            + (if (.payload.item.exit_code // 0) != 0 then "   (exit \(.payload.item.exit_code))" else "" end)
-                        elif .type == "event_msg" and .payload.type == "item_completed"
-                             and .payload.item.type == "FileChange" then
-                            (.payload.item.changes // {} | keys[] | "edited \(.)")
-                        else empty end) as $line ([];
-                      if ($line | startswith("←")) then . + [{role: "user", activity: true, abandoned: false, text: $line}]
-                      elif (length > 0 and .[-1].role == "assistant") then .[-1].text += "\n" + $line
-                      else . + [{role: "assistant", activity: true, abandoned: false, text: $line}] end)
-                  | .[]
+              else weave($all[] | act | {line: .}) | .[]
               end
             | .text |= '"$controls"
     fi
 }
 
 session_matches() {
+    local files=("$2") file
+    # A Claude Code session is also found by what its subagents wrote.
+    if [[ $1 == claude && -d ${2%.jsonl}/subagents && ! -L ${2%.jsonl}/subagents ]]; then
+        for file in "${2%.jsonl}"/subagents/agent-*.jsonl; do
+            [[ -f $file && ! -L $file ]] && files+=("$file")
+        done
+    fi
     # The transcript is JSON: a " or \ in the text is stored escaped.
     # grep -q stops reading at the first match: the reader may die of SIGPIPE.
-    { transcript_cat "$2" || true; } | grep -qiF -- "$F_GREP_RAW" || return 1
+    { for file in "${files[@]}"; do transcript_cat "$file" || true; done; } |
+        grep -aqiF -- "$F_GREP_RAW" || return 1
     # Every branch: a session is found by anything it still contains. Claude Code
     # needs no branch walk for that, so one jq reads the texts directly.
     if [[ $1 == claude ]]; then
-        { grep -E '"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } | jq -rR "$JQ_INJECTED"'
-            fromjson? | select((.type == "user" or .type == "assistant") and .isMeta != true and .isSidechain != true
+        # Sidechain lines are subagents': kept in their own files only.
+        {
+            { grep -aE '"type":"(user|assistant)"' -- "$2" 2>/dev/null || true; } | jq -cR 'fromjson? | select(.isSidechain != true)'
+            ((${#files[@]} == 1)) || { grep -haE '"type":"(user|assistant)"' -- "${files[@]:1}" 2>/dev/null || true; }
+        } | jq -rR "$JQ_INJECTED"'
+            fromjson? | select((.type == "user" or .type == "assistant") and .isMeta != true
                                and .isCompactSummary != true)
             | .message.content | if type == "string" then . else (.[]? | select(.type == "text") | .text) end
-            | select(injected | not)' 2>/dev/null | grep -iF -- "$F_GREP" >/dev/null
+            | select(injected | not)' 2>/dev/null | grep -aiF -- "$F_GREP" >/dev/null
     else
-        messages "$1" "$2" all | jq -r '.text' | grep -iF -- "$F_GREP" >/dev/null
+        messages "$1" "$2" all | jq -r '.text' | grep -aiF -- "$F_GREP" >/dev/null
     fi
 }
 
@@ -1025,14 +1156,20 @@ session_matches() {
 
 # One line per matching session, most recent first, fields separated by $US:
 #   agent id archived recency date mode provider empty size cwd title path state rewinds pinned
-# size is -1 when the transcript is missing; state is open, recent or "".
+#   parent kids kidsize created
+# size is -1 when the transcript is missing; state is open, recent or "". parent is
+# the Codex session that spawned a subagent (it may be gone); kids is how many
+# subagents a session spawned, and kidsize their size for Claude Code (whose own
+# size already includes them).
 fetch_rows() {
     local where agent id archived recency date mode provider empty cwd title path size state rewinds pinned line
+    local parent kids kidsize created
     local candidates=() pending=()
     where=$(build_where)
     load_sizes
     [[ -z $F_GREP ]] || F_GREP_RAW=$(jq -rn --arg text "$F_GREP" '$text | tojson | .[1:-1]')
-    while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds pinned; do
+    while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds pinned \
+        parent kids kidsize created; do
         if [[ $agent == codex ]]; then
             [[ $path == /* ]] || path=$CODEX_DIR/$path
             # The index can lag behind: a moved transcript is still this session's.
@@ -1065,12 +1202,13 @@ fetch_rows() {
         # running: open or active in the last 10 minutes (◉ ◔); idle: neither (●).
         [[ $F_STATUS != running || -n $state ]] || continue
         [[ $F_STATUS != idle || -z $state ]] || continue
-        line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}$US${pinned:-0}"
+        line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}$US${pinned:-0}$US$parent$US${kids:-0}$US${kidsize:-0}$US${created:-0}"
         if [[ -n $F_GREP ]]; then pending+=("$line"); else printf '%s\n' "$line"; fi
     done < <(query "
         SELECT agent, id, archived, recency,
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
-               mode, $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds, pinned
+               mode, $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds, pinned,
+               parent, kids, kidsize, created
           FROM ranked
          WHERE $where
          ORDER BY recency DESC, id DESC;")
@@ -1103,15 +1241,218 @@ fetch_sorted() {
     esac
 }
 
+# tree_rows — the rows of fetch_sorted (on stdin), with Codex subagents under the
+# session that spawned them, and Claude Code subagents under theirs when
+# O_SUBAGENTS is "shown" (otherwise trees are folded). Output: one line per row,
+#   kind US before US after US style US shown size US row
+# kind: row (a session), hidden (a session folded under its parent: counted,
+# not shown), context (the parent of a subagent the filters kept, shown dim, not
+# part of the selection) or sub (a Claude Code subagent: the row holds its
+# fields, and its id is sub:SESSION/AGENT). tree and style are for
+# format_row. Trees are ordered by their most recent member (by date), their
+# total size (by size), or the other way round (oldest first).
+tree_rows() {
+    local -a order=()
+    local -A t_line=() t_parent=() t_rec=() t_size=() t_created=() t_agent=() t_kids=() t_children=() t_cwd=()
+    local row id p f
+    while IFS= read -r row; do
+        IFS=$US read -ra f <<<"$row"
+        id=${f[1]}
+        order+=("$id")
+        t_line[$id]=$row t_agent[$id]=${f[0]} t_rec[$id]=${f[3]} t_size[$id]=${f[8]} t_cwd[$id]=${f[9]}
+        t_parent[$id]=${f[15]:-} t_kids[$id]=${f[16]:-0} t_created[$id]=${f[18]:-0}
+        ((t_size[$id] >= 0)) || t_size[$id]=0
+    done
+    ((${#order[@]})) || return 0
+
+    # Parents the filters left out: shown as context, if they still exist.
+    local -A context=() gone=()
+    local -a wanted=()
+    for id in "${order[@]}"; do
+        p=${t_parent[$id]}
+        [[ -n $p && -z ${t_line[$p]+x} && -z ${context[$p]+x} ]] || continue
+        context[$p]=""
+        wanted+=("$p")
+    done
+    if ((${#wanted[@]})); then
+        while IFS= read -r row; do
+            IFS=$US read -ra f <<<"$row"
+            id=${f[1]}
+            context[$id]=$row t_line[$id]=$row t_agent[$id]=${f[0]} t_rec[$id]=${f[3]} t_size[$id]=0
+            t_cwd[$id]=${f[9]} t_parent[$id]="" t_kids[$id]=${f[16]:-0} t_created[$id]=${f[18]:-0}
+        done < <(reset_filters && F_IDS=("${wanted[@]}") && fetch_rows)
+        # Parents that are gone are not context.
+        for p in "${wanted[@]}"; do [[ -n ${t_line[$p]+x} ]] || unset 'context[$p]'; done
+    fi
+    for id in "${order[@]}"; do
+        p=${t_parent[$id]}
+        [[ -n $p ]] || continue
+        if [[ -n ${t_line[$p]+x} ]]; then
+            t_children[$p]+="${t_created[$id]}"$'\t'"$id"$'\n'
+        else
+            gone[$id]=1
+        fi
+    done
+
+    # Claude Code subagents, from the index (only when shown).
+    local -A subs=()
+    local session agentid sz started kind desc model effort
+    if [[ $O_SUBAGENTS == shown && -n $CLAUDE_CACHE ]]; then
+        local ids=()
+        for id in "${order[@]}"; do
+            [[ ${t_agent[$id]} != claude ]] || ((${t_kids[$id]} == 0)) || ids+=("'$id'")
+        done
+        if ((${#ids[@]})); then
+            while IFS=$US read -r session agentid sz started kind desc model effort; do
+                subs[$session]+="$agentid$US$sz$US$started$US$kind$US$desc$US$model$US$effort"$'\n'
+            done < <(query "SELECT session, agent, size, started, $(flat type), $(flat description), $(flat model),
+                                   $(flat effort) FROM cl.claude_sub WHERE session IN ($(join_by , "${ids[@]}"))
+                             ORDER BY session, started, agent;")
+        fi
+    fi
+
+    # Roots, with the key of their whole tree.
+    local -A seen=() treerec=() treesize=()
+    local -a roots=()
+    tree_measure() {
+        local id=$1 c
+        seen[$id]=1
+        M_REC=$((t_rec[$id] > M_REC ? t_rec[$id] : M_REC)) M_SIZE=$((M_SIZE + t_size[$id]))
+        while IFS=$'\t' read -r _ c; do
+            if [[ -n $c && -z ${seen[$c]+x} ]]; then tree_measure "$c"; fi
+        done <<<"${t_children[$id]:-}"
+        return 0
+    }
+    local key
+    for id in "${!context[@]}" "${order[@]}"; do
+        [[ -z ${t_parent[$id]} || -n ${gone[$id]+x} ]] || continue
+        [[ -z ${seen[$id]+x} ]] || continue
+        M_REC=0 M_SIZE=0
+        tree_measure "$id"
+        roots+=("$id") treerec[$id]=$M_REC treesize[$id]=$M_SIZE
+    done
+    # What no root reaches (a cycle of edges) is listed at the top level.
+    for id in "${order[@]}"; do
+        [[ -z ${seen[$id]+x} ]] || continue
+        M_REC=0 M_SIZE=0
+        tree_measure "$id"
+        roots+=("$id") treerec[$id]=$M_REC treesize[$id]=$M_SIZE gone[$id]=cycle
+    done
+
+    local -A emitted=()
+    # The sessions folded under ID.
+    tree_hide() {
+        local c
+        emitted[$1]=1
+        while IFS=$'\t' read -r _ c; do
+            [[ -n $c && -z ${emitted[$c]+x} ]] || continue
+            printf '%s\n' "hidden$US$US$US$US$US${t_line[$c]}"
+            tree_hide "$c"
+        done <<<"${t_children[$1]:-}"
+        return 0
+    }
+    # tree_emit ID BEFORE CONTINUATION DEPTH
+    tree_emit() {
+        local id=$1 before=$2 cont=$3 depth=$4 kind=row style="" after="" c n=0 total shown i=0 last
+        local -a kidlist=()
+        local skind
+        emitted[$id]=1
+        # Each session once, even when edges make a cycle.
+        while IFS=$'\t' read -r _ c; do
+            if [[ -n $c && -z ${emitted[$c]+x} ]]; then kidlist+=("$c") && emitted[$c]=1; fi
+        done < <(printf '%s' "${t_children[$id]:-}" | sort -n)
+        for c in "${kidlist[@]}"; do unset 'emitted[$c]'; done
+        [[ -z ${context[$id]+x} ]] || kind=context style=context
+        if ((depth > 0)); then
+            style=${style:-child}
+        elif [[ -n ${gone[$id]+x} && ${gone[$id]} != cycle ]]; then
+            style=gone
+        fi
+        # Folded: only the root, and how many subagents it has.
+        local open=0 has=0
+        if [[ ${t_agent[$id]} == claude ]] && ((${t_kids[$id]})); then has=1; fi
+        if ((${#kidlist[@]})); then has=1; fi
+        [[ $O_SUBAGENTS == shown || $kind == context ]] && open=1
+        if ((has && depth == 0)); then
+            if ((open)); then before="▾ "; else before="▸ "; fi
+        fi
+        total=${t_kids[$id]}
+        shown=${#kidlist[@]}
+        [[ ${t_agent[$id]} != claude ]] || shown=$total
+        if ((has)) && ((total > shown)); then
+            after=" · $shown of $total subagents"
+        elif ((has && !open)); then
+            after=" · $total subagent$([[ $total == 1 ]] || echo s)"
+        fi
+        # Folded Codex tree: the size shown is the whole tree's (a Claude Code
+        # session's size already includes its subagents).
+        local shownsize=""
+        if ((!open && has && depth == 0)) && [[ ${t_agent[$id]} == codex && $kind == row ]] && ((t_size[$id] >= 0)); then
+            shownsize=${treesize[$id]}
+        fi
+        printf '%s\n' "$kind$US$before$US$after$US$style$US$shownsize$US${t_line[$id]}"
+        if ((!open)); then
+            tree_hide "$id"
+            return 0
+        fi
+        # Claude Code subagents.
+        if [[ -n ${subs[$id]:-} ]]; then
+            local -a sublines=()
+            mapfile -t sublines < <(printf '%s' "${subs[$id]}")
+            for c in "${sublines[@]}"; do
+                i=$((i + 1))
+                last=$([[ $i == "${#sublines[@]}" && ${#kidlist[@]} == 0 ]] && echo 1 || echo 0)
+                IFS=$US read -r agentid sz started skind desc model effort <<<"$c"
+                local branch="├─ " title
+                ((!last)) || branch="└─ "
+                title="${skind:-subagent}${model:+ · $model${effort:+/$effort}}${desc:+ « $desc »}"
+                # A row in the layout of fetch_rows, for format_row.
+                printf '%s\n' "sub$US$cont$branch$US${US}sub$US${US}claude${US}sub:$id/$agentid${US}0$US${t_rec[$id]}$US-${US}subagent$US${US}0$US$sz$US${t_cwd[$id]}$US$title$US$US${US}0${US}0"
+            done
+        fi
+        for c in "${kidlist[@]}"; do
+            n=$((n + 1))
+            last=$((n == ${#kidlist[@]}))
+            if ((depth >= 2)); then
+                tree_emit "$c" "${cont}… " "$cont" $((depth + 1))
+            elif ((last)); then
+                tree_emit "$c" "${cont}└─ " "$cont   " $((depth + 1))
+            else
+                tree_emit "$c" "${cont}├─ " "${cont}│  " $((depth + 1))
+            fi
+        done
+        return 0
+    }
+    for id in $(for rid in "${roots[@]}"; do
+        case $O_SORT in
+            size) printf '%s\t%s\n' "${treesize[$rid]}" "$rid" ;;
+            oldest) printf '%s\t%s\n' "$((-treerec[$rid]))" "$rid" ;;
+            *) printf '%s\t%s\n' "${treerec[$rid]}" "$rid" ;;
+        esac
+    done | sort -t $'\t' -k1,1nr -s | cut -f 2); do
+        tree_emit "$id" "" "" 0
+    done
+}
+
 # format_row AGENT ARCHIVED RECENCY DATE MODE SIZE CWD TITLE STATE [TITLE_WIDTH] [REWINDS] [PINNED]
+#            [TREE STYLE] — TREE: what goes before the title (the subagent tree), and
+# after it (" · 3 subagents"), separated by $US; STYLE: child (indented: no
+# "subagent ·" tag), gone (its parent is gone), context (shown only for a
+# subagent below it: dim), sub (a Claude Code subagent, not a session) or plan
+# (a row of a deletion plan: the title is never cut below 12 columns).
 # Sets REPLY to a display line. An empty DATE gives the compact picker layout,
 # where the mode is shown as a tag before the title instead of a column.
 format_row() {
     local agent=$1 archived=$2 recency=$3 date=$4 mode=$5 size=$6 cwd=$7 title=$8 state=$9
-    local title_width=${10:-44} rewinds=${11:-0} pinned=${12:-0} icon age hsize size_color="" agent_color title_color=""
+    local title_width=${10:-44} rewinds=${11:-0} pinned=${12:-0} tree=${13:-} style=${14:-}
+    local icon age hsize size_color="" agent_color title_color="" before after
+    before=${tree%%"$US"*} after=""
+    [[ $tree != *"$US"* ]] || after=${tree#*"$US"}
     clean title
     clean cwd
-    if [[ $state == open ]]; then
+    if [[ $style == sub ]]; then
+        icon="${C_DIM}↳${C_RESET}"
+    elif [[ $state == open ]]; then
         icon="${C_GREEN}◉${C_RESET}"
     elif [[ $state == trash ]]; then
         icon="${C_YELLOW}↺${C_RESET}"
@@ -1153,7 +1494,11 @@ format_row() {
     # title (subagent sessions included, so they stand out whatever their title).
     # ⑂N: N abandoned branches (edited or rewound prompts) are hidden.
     local tag="" project
-    [[ $mode == cli || $mode == unknown ]] || tag="$mode · "
+    if [[ $style == gone ]]; then
+        tag="parent gone · "
+    elif [[ $mode != cli && $mode != unknown && ! ($style == child && $mode == subagent) && $style != sub ]]; then
+        tag="$mode · "
+    fi
     ((${rewinds:-0} == 0)) || tag="⑂$rewinds $tag"
     ((${pinned:-0} == 0)) || tag="pinned · $tag"
     case $cwd in
@@ -1163,19 +1508,37 @@ format_row() {
         *) project=${cwd##*/} ;;
     esac
     fit project "$project" "$PROJECT_WIDTH"
+    # The tree and the tags are dim, before the title; the title takes what is left.
+    tag=$before$tag
+    title=$title$after
     if [[ -n $date ]]; then
-        # Command-line layout: fixed widths, with the date. Tags never leave the
-        # title less than 12 columns.
-        ((title_width - ${#tag} >= 12)) || title_width=$((${#tag} + 12))
-        fit title "$tag$title" "$title_width"
-        title=${title:${#tag}}
+        # Command-line layout: fixed widths, with the date. The terminal's width
+        # wins: tags and title are cut together, except in a deletion plan
+        # (style "plan"), where the title always keeps 12 columns.
+        [[ $style != plan ]] || ((title_width - ${#tag} >= 12)) || title_width=$((${#tag} + 12))
+        local both=$tag$title
+        fit both "$both" "$title_width"
+        if ((${#both} <= ${#tag})); then
+            tag=$both title=""
+        else
+            title=${both:${#tag}}
+        fi
         title=${title%"${title##*[! ]}"}
         date="$C_DIM$date$C_RESET  "
     fi
     [[ -z $tag ]] || tag="$C_DIM$tag$C_RESET"
+    if [[ $style == sub ]]; then
+        agent="" age="" agent_color=$C_DIM size_color=$C_DIM title_color=$C_DIM
+        [[ -z $date ]] || date="$(printf '%16s' '')  "
+    fi
     printf -v REPLY '%s %s%-6s%s %s%4s%s  %s%s%6s%s  %s%s%s  %s%s%s%s' \
         "$icon" "$agent_color" "$agent" "$C_RESET" "$age_color" "$age" "$C_RESET" "$date" \
         "$size_color" "$hsize" "$C_RESET" "$C_BLUE" "$project" "$C_RESET" "$tag" "$title_color" "$title" "$C_RESET"
+    # Context: a session shown only for a subagent below it, all dim.
+    if [[ $style == context ]]; then
+        REPLY=$(printf '%s' "$REPLY" | sed 's/\x1b\[[0-9;]*m//g')
+        REPLY="$C_DIM$REPLY$C_RESET"
+    fi
 }
 
 # row_header TITLE_WIDTH
@@ -1187,7 +1550,7 @@ row_header() {
 # ── Commands ─────────────────────────────────────────────────────────────────
 
 cmd_list() {
-    parse_args "ids json sort" "$@"
+    parse_args "ids json sort subagents" "$@"
     prepare
 
     if ((O_JSON)); then
@@ -1209,8 +1572,18 @@ cmd_list() {
                 open: (.[12] == "open"),
                 recent: (.[12] == "recent"),
                 abandoned_branches: (.[13] | tonumber? // 0),
-                pinned: (.[14] == "1")
-            }]'
+                pinned: (.[14] == "1"),
+                parent: (if .[15] == "" then null else .[15] end),
+                kids: (.[16] | tonumber? // 0),
+                kidsize: (.[17] | tonumber? // 0)
+            }]
+            # subagents: how many a session spawned, and their size (Codex: of
+            # those listed here).
+            | (map(select(.parent != null) | {key: .parent, value: (.size // 0)})
+               | group_by(.key) | map({key: .[0].key, value: (map(.value) | add)}) | from_entries) as $codexsize
+            | map(. + (if .kids > 0 then {subagents: {count: .kids,
+                         size: (if .agent == "claude" then .kidsize else ($codexsize[.id] // 0) end)}} else {} end)
+                  | del(.kids, .kidsize))'
         return
     fi
     if ((O_IDS)); then
@@ -1218,7 +1591,7 @@ cmd_list() {
         return
     fi
 
-    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned
+    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local count=0 bytes=0 missing=0 open=0 title_width=50 hbytes
     if [[ -t 1 ]]; then
         # The columns before the title take 59.
@@ -1227,13 +1600,18 @@ cmd_list() {
         ((title_width <= 80)) || title_width=80
     fi
     row_header "$title_width"
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned; do
-        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$title_width" "$rewinds" "$pinned"
-        printf '%s\n' "$REPLY"
+    local kind before after style shown
+    while IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
+        if [[ $kind != hidden ]]; then
+            format_row "$agent" "$archived" "$recency" "$date" "$mode" "${shown:-$size}" "$cwd" "$title" "$state" \
+                "$title_width" "$rewinds" "$pinned" "$before$US$after" "$style"
+            printf '%s\n' "$REPLY"
+        fi
+        [[ $kind == row || $kind == hidden ]] || continue
         count=$((count + 1))
         if ((size >= 0)); then bytes=$((bytes + size)); else missing=$((missing + 1)); fi
         [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
-    done < <(fetch_sorted)
+    done < <(fetch_sorted | tree_rows)
 
     human_size hbytes "$bytes"
     printf '\n%s%d session(s) · %s' "$C_DIM" "$count" "$hbytes"
@@ -1250,15 +1628,24 @@ cmd_stats() {
 
 # stats_report — disk usage of the sessions matched by the current filters.
 stats_report() {
-    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned
+    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local total=0 bytes=0 empties=0 missing=0 open=0 orphans=0 key bucket hsize i trash_bytes trash_count
+    local sub_n=0 sub_bytes=0 sub_in=0
     local buckets=("< 1 day" "< 1 week" "< 1 month" "< 3 months" "< 1 year" "older")
     local limits=(86400 604800 2592000 7776000 31536000)
     declare -A n_agent=() b_agent=() n_mode=() n_dir=() b_dir=() n_age=() b_age=()
 
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned; do
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
         ((size >= 0)) || { missing=$((missing + 1)) && size=0; }
         ((!empty)) || empties=$((empties + 1))
+        # Subagents: Claude Code ones live inside their session (and its size);
+        # Codex ones are sessions of their own.
+        if [[ $agent == claude ]] && ((${kids:-0})); then
+            sub_n=$((sub_n + kids)) sub_bytes=$((sub_bytes + kidsize)) sub_in=$((sub_in + 1))
+        elif [[ -n $parent ]]; then
+            sub_n=$((sub_n + 1)) sub_bytes=$((sub_bytes + size))
+        fi
+        [[ $agent != codex ]] || ((${kids:-0} == 0)) || sub_in=$((sub_in + 1))
         [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
         ! dir_gone "$cwd" || orphans=$((orphans + 1))
         total=$((total + 1))
@@ -1311,6 +1698,11 @@ stats_report() {
     done
     human_size hsize "$bytes"
     printf '  %s%-18s %5d  %7s%s\n' "$C_BOLD" "Total" "$total" "$hsize" "$C_RESET"
+    if ((sub_n)); then
+        human_size hsize "$sub_bytes"
+        # Already in the totals above: dim, without a bar.
+        printf '  %s%-18s %5d  %7s%s\n' "$C_DIM" "subagents (in $sub_in)" "$sub_n" "$hsize" "$C_RESET"
+    fi
 
     trash_count=0 trash_bytes=0
     if [[ -d $TRASH_DIR ]]; then
@@ -1395,7 +1787,7 @@ cmd_show() {
         preview=1
         shift
     fi
-    parse_args "ids branches" "$@"
+    parse_args "ids branches subagents" "$@"
     ((${#F_IDS[@]} == 1)) || usage_error "show takes exactly one session id"
     need jq
     prepare
@@ -1424,10 +1816,24 @@ cmd_show() {
     printf '%s%s%s  %s%s  %s%s%s\n' "$([[ $agent == claude ]] && echo "$C_CLAUDE" || echo "$C_CODEX")" "$agent" \
         "$C_RESET" "$status" "$C_RESET" "$C_DIM" "$mode${model:+ · $model}" "$C_RESET"
     printf '%s%s%s%s\n' "$C_BLUE" "$cwd" "$C_RESET" "$C_DIM${size:+ · $size}$( ((${tokens:-0} == 0)) ||
-        printf ' · %s tokens' "$tokens")$(subagent_summary "$agent" "$path")$C_RESET"
+        printf ' · %s tokens' "$tokens")$(subagent_summary "$agent" "$id" "$path")$C_RESET"
     local shown=$id
     ((!preview)) || short_id shown "$id"
     printf '%s%s → %s · %s%s\n' "$C_DIM" "$created" "$recency" "$shown" "$C_RESET"
+    # A Codex subagent: the session that spawned it.
+    local parent ptitle pshort
+    IFS=$US read -r parent ptitle < <(query "
+        SELECT s.parent, $(flat p.title) FROM sessions AS s LEFT JOIN sessions AS p ON p.id = s.parent
+         WHERE s.id = '$id';")
+    if [[ -n $parent ]]; then
+        clean ptitle
+        if [[ -n $(query "SELECT 1 FROM sessions WHERE id = '${parent//\'/}';") ]]; then
+            short_id pshort "$parent"
+            printf '%sspawned by %s%s%s\n' "$C_DIM" "$pshort" "${ptitle:+ · « $ptitle »}" "$C_RESET"
+        else
+            printf '%sspawned by %s, which is gone%s\n' "$C_DIM" "${parent:0:13}" "$C_RESET"
+        fi
+    fi
     if ((${rewinds:-0})); then
         if [[ $O_BRANCHES == all ]]; then
             printf '%s⑂ %d abandoned branch(es) shown, dimmed%s\n' "$C_MAGENTA" "$rewinds" "$C_RESET"
@@ -1438,22 +1844,100 @@ cmd_show() {
     fi
     rule
 
-    render_conversation "$agent" "$path" "$preview"
+    render_conversation "$agent" "$path" "$preview" "$id"
 }
 
-# " · N subagents (SIZE)" for a Claude Code session whose subagents have their
-# own transcripts inside the session directory; nothing otherwise.
+# subagent_list AGENT ID PATH — the subagents of a session, in launch order, one
+# line each: key US transcript US size US name US heading US tool_use_id.
+# Claude Code: the transcripts in <session>/subagents (key: agent id). Codex:
+# the sessions it spawned, recursively (key: session id).
+subagent_list() {
+    local agent=$1 id=$2 path=$3 key file size started kind description model effort tool name heading hsize
+    if [[ $agent == claude ]]; then
+        while IFS=$US read -r started key file size kind description model effort tool; do
+            human_size hsize "$size"
+            clean description
+            clean kind
+            name=${description:+« $description »}
+            name=${name:-${kind:-subagent}}
+            heading="${kind:-subagent}${model:+ · $model${effort:+/$effort}}${description:+ · « $description »} · $hsize"
+            printf '%s\n' "$key$US$file$US$size$US$name$US$heading$US$tool"
+        done < <(claude_subagent_fields "$id" "$path" |
+            awk -F "$US" -v OFS="$US" '{ print $4, $1, $2, $3, $5, $6, $7, $8, $9 }' | sort -t "$US" -k1,1 -k2,2)
+    elif [[ -n $CODEX_DB ]] && ((HAS_EDGES)); then
+        load_sizes
+        local nick role
+        while IFS=$US read -r key file nick role; do
+            file=$(codex_path codex "$key" "$file")
+            size=${SIZES[$file]:-0}
+            human_size hsize "$size"
+            clean nick
+            clean role
+            name=${nick:-${key:0:13}}
+            heading="subagent ${name}${role:+ ($role)} · $hsize"
+            printf '%s\n' "$key$US$file$US$size$US$name$US$heading$US"
+        done < <(query "
+            WITH RECURSIVE tree(id, depth) AS (
+                SELECT child_thread_id, 1 FROM cx.thread_spawn_edges WHERE parent_thread_id = '${id//\'/}'
+                UNION SELECT e.child_thread_id, tree.depth + 1
+                  FROM tree JOIN cx.thread_spawn_edges AS e ON e.parent_thread_id = tree.id WHERE tree.depth < 32)
+            SELECT t.id, t.rollout_path, $(flat "$(codex_col agent_nickname "''")"),
+                   $(flat "COALESCE(NULLIF($(codex_col agent_role "''"), ''), $(codex_col agent_path "''"))")
+              FROM (SELECT DISTINCT id FROM tree) AS d JOIN cx.threads AS t ON t.id = d.id
+             ORDER BY $(codex_col created_at 0), t.id;")
+    fi
+}
+
+# " · N subagents: name, name, name +N (SIZE)" for a session that has subagents.
 subagent_summary() {
-    [[ $1 == claude && -d ${2%.jsonl}/subagents ]] || return 0
-    local file count=0 bytes=0 hsize
-    for file in "${2%.jsonl}"/subagents/*.jsonl; do
-        [[ -f $file ]] || continue
+    local key file size name heading tool count=0 bytes=0 names=() hsize
+    while IFS=$US read -r key file size name heading tool; do
         count=$((count + 1))
-        bytes=$((bytes + $(wc -c <"$file")))
-    done
+        bytes=$((bytes + size))
+        if ((${#names[@]} < 3)); then
+            if ((${#name} > 32)); then
+                if [[ $name == "« "*" »" ]]; then name=${name:2:-2} && name="« ${name:0:27}… »"; else name="${name:0:31}…"; fi
+            fi
+            names+=("$name")
+        fi
+    done < <(subagent_list "$@")
     ((count)) || return 0
     human_size hsize "$bytes"
-    printf ' · %d subagent%s (%s)' "$count" "$([[ $count == 1 ]] || echo s)" "$hsize"
+    printf ' · %d subagent%s: %s%s (%s)' "$count" "$([[ $count == 1 ]] || echo s)" "$(join_by ', ' "${names[@]}")" \
+        "$( ((count <= 3)) || printf ' +%d' $((count - 3)))" "$hsize"
+}
+
+# conversation AGENT FILE ID SUBAGENTS — the messages of a session, then (when
+# SUBAGENTS is shown, or a search is active: hidden then) those of each of its
+# subagents, after a {role: "section"} line. Each subagent transcript is read on
+# its own: the choices made per transcript (branches, encrypted messages) stay
+# its own.
+conversation() {
+    local agent=$1 path=$2 id=$3 subs=$4 key file size name heading tool n=0 hidden
+    messages "$agent" "$path" "$O_BRANCHES" "$( ((${SIDECHAIN:-0})) && echo sidechain)" |
+        jq -c '. + {section: 0} | if $side and .role == "user" then .role = "task" else . end' \
+            --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)"
+    [[ $subs == shown || -n ${FOCUS:-} ]] || return 0
+    hidden=$([[ $subs == shown ]] && echo false || echo true)
+    while IFS=$US read -r key file size name heading tool; do
+        n=$((n + 1))
+        jq -cn --arg title "$heading" --argjson n "$n" --argjson hidden "$hidden" \
+            '{role: "section", section: $n, title: $title, hidden: $hidden}'
+        [[ -f $file ]] && transcript_readable "$file" || continue
+        messages "$agent" "$file" "$O_BRANCHES" "$([[ $agent == claude ]] && echo sidechain)" |
+            jq -c --argjson n "$n" --argjson hidden "$hidden" '. + {section: $n, hidden: $hidden}
+                | if .role == "user" and (.activity | not) then .role = "task" else . end'
+    done < <(subagent_list "$agent" "$id" "$path")
+}
+
+# The labels of the subagent launches of a session, by tool_use id (Claude Code).
+subagent_marks() {
+    local key file size name heading tool hsize
+    while IFS=$US read -r key file size name heading tool; do
+        [[ -n $tool ]] || continue
+        human_size hsize "$size"
+        printf '%s\t%s\n' "$tool" "$name ($hsize)"
+    done < <(subagent_list "$@") | jq -Rsc 'split("\n") | map(select(. != "") | split("\t") | {(.[0]): .[1]}) | add // {}'
 }
 
 # A dim horizontal line as wide as the preview (or 60 columns).
@@ -1463,10 +1947,11 @@ rule() {
     printf '%s%s%s\n\n' "$C_DIM" "${line// /─}" "$C_RESET"
 }
 
-# render_conversation AGENT FILE PREVIEW — print the messages of a transcript;
-# with PREVIEW=1, long conversations are shortened to their start and end.
+# render_conversation AGENT FILE PREVIEW [ID] — print the messages of a session
+# (and of its subagents when O_SUBAGENTS is "shown"); with PREVIEW=1, long
+# conversations are shortened to their start and end, section by section.
 render_conversation() {
-    local agent=$1 path=$2 preview=$3 conversation
+    local agent=$1 path=$2 preview=$3 id=${4:-} conversation name
     if [[ ! -f $path ]]; then
         printf '%s(transcript file is missing: %s)%s\n' "$C_RED" "$path" "$C_RESET"
         return
@@ -1477,16 +1962,21 @@ render_conversation() {
     fi
     local width=${FZF_PREVIEW_COLUMNS:-${COLUMNS:-0}}
     if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
-    conversation=$(messages "$agent" "$path" "$O_BRANCHES" | jq -rs \
+    if [[ $agent == claude ]]; then name=Claude; else name=Codex; fi
+    conversation=$(conversation "$agent" "$path" "$id" "$O_SUBAGENTS" | jq -rs \
         --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
         --arg abandoned_you "${C_DIM}○ You (abandoned)$C_RESET" \
-        --arg abandoned_agent "${C_DIM}○ $([[ $agent == claude ]] && echo Claude || echo Codex) (abandoned)$C_RESET" \
+        --arg abandoned_agent "${C_DIM}○ $name (abandoned)$C_RESET" \
         --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
+        --arg subagent "$([[ $agent == claude ]] && echo "$C_CLAUDE" || echo "$C_CODEX")${C_BOLD}● $name$C_RESET$C_DIM (subagent)$C_RESET" \
+        --arg task "$C_DIM${C_BOLD}● $name → subagent$C_RESET" \
         --arg other "$C_DIM${C_BOLD}● Other agents$C_RESET" \
         --arg activity "$C_CODEX${C_BOLD}● Codex$C_RESET$C_DIM (subagent: commands and edits)$C_RESET" \
         --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
         --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" \
-        --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD" '
+        --argjson marks "$([[ $agent == claude ]] && subagent_marks "$agent" "$id" "$path" || echo '{}')" \
+        --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD" \
+        --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)" '
         def vlen: gsub("\u001b\\[[0-9;]*m|[\u0001\u0002]"; "") | length;
         # Wrap on spaces to the preview width (fzf would cut words in two).
         def wrap: if $width == 0 or vlen <= $width then . else
@@ -1507,63 +1997,84 @@ render_conversation() {
                 elif $reset != "" then .out += [$line | inline | wrap]
                 else .out += [$line | wrap] end)
             | .out | join("\n");
-        # Long messages in the preview stop at a line break (or a space), so
-        # that no **bold** or `code` marker is left open.
         # The searched text (Ctrl-G), as a case-insensitive literal regex.
         def focus_re: $focus | gsub("(?<c>[.*+?^${}()|\\[\\]\\\\/])"; "\\\(.c)");
         # Matches are marked before styling (with \u0001 \u0002), so that no color
         # code is ever matched, then given their color.
         def premark: if $focus == "" then . else gsub("(?<m>\(focus_re))"; "\u0001" + .m + "\u0002"; "i") end;
         def postmark: gsub("\u0001"; $mark) | gsub("\u0002"; $reset);
+        # Long messages in the preview stop at a line break (or a space), so
+        # that no **bold** or `code` marker is left open.
         def cut: if $preview == 1 and length > 1200 then
                 .[:1200] as $head
                 | ($head | rindex("\n") // 0) as $nl
                 | (if $nl > 600 then $head[:$nl] else $head[:($head | rindex(" ") // 1200)] end) + " …"
             else . end;
+        # Where a subagent was started: a line under the message, not a message.
+        def launches: [(.subagents // [])[] | $dim + "↳ subagent " + ($marks[.] // "") + $reset] | join("\n");
         def render:
-            if .abandoned then
+            (if .abandoned then
                 (if .role == "user" then $abandoned_you else $abandoned_agent end) + "\n"
                 + (.text | cut | split("\n") | map(wrap) | join("\n") | split("\n")
-                   | map($dim + . + $reset) | join("\n")) + "\n"
+                   | map($dim + . + $reset) | join("\n"))
+            elif .text == "" then ""
             else
                 (if .activity then (if .role == "user" then $other else $activity end)
-                 elif .role == "user" then $you else $agent end)
-                + "\n" + (.text | cut | premark | styled | postmark) + "\n"
-            end;
-        # Ctrl-G: the preview shows the messages that contain the searched text.
-        (if $focus != "" and $preview == 1 then
-            length as $all
-            | map(select(.text | test(focus_re; "i"))) as $hits
-            | if ($hits | length) == 0 then
-                  [{role: "note", text: "", abandoned: false}]
-              else $hits end
-            | .[0].header = "\($hits | length) of \($all) messages mention “\($focus)”"
-         else . end) as $shown
-        | ($shown[0].header // null) as $header
-        | if $header != null then
-            $dim + $header + $reset + "\n\n"
-            + ($shown | map(select(.role != "note") | render) | join("\n"))
-          else $shown |
-        # Long previews keep the start and the end, and every abandoned message
-        # with the one before it, so that Alt-B always shows something.
-        if $preview == 1 and length > 24 then
-            . as $all
-            | [range(0; length) | select(. < 4 or . >= ($all | length) - 20
-                                         or $all[.].abandoned or ($all[. + 1].abandoned // false))] as $keep
-            | reduce range(0; $keep | length) as $k ([];
-                . + (if $k > 0 and $keep[$k] > $keep[$k - 1] + 1
-                     then [$dim + "  … \($keep[$k] - $keep[$k - 1] - 1) more messages …" + $reset + "\n"]
-                     else [] end)
-                  + [$all[$keep[$k]] | render])
-            | join("\n")
-        else map(render) | join("\n") end
+                 elif .role == "task" then $task
+                 elif .role == "user" then $you
+                 elif .section > 0 or $side then $subagent
+                 else $agent end)
+                + "\n" + (.text | cut | premark | styled | postmark)
+            end) as $body
+            | ([$body, launches] | map(select(. != "")) | join("\n")) + "\n";
+        def title($t): $dim + "── " + $t + " ──" + $reset + "\n";
+        # A message that only starts subagents joins the message before it.
+        reduce .[] as $m ([];
+            if $m.role != "section" and $m.text == "" and length > 0 and .[-1].role != "section"
+            then .[-1].subagents += ($m.subagents) else . + [$m] end)
+        | . as $items
+        | (reduce ($items[] | select(.role == "section")) as $s ({}; .[$s.section | tostring] = $s.title)) as $titles
+        | [$items[] | select(.role != "section")] as $messages
+        # Ctrl-G: the preview shows the messages that contain the searched text,
+        # subagents included (hidden ones are counted, and said so).
+        | if $focus != "" and $preview == 1 then
+            [$messages[] | select(.text | test(focus_re; "i"))] as $hits
+            | ([$hits[] | select(.section > 0)] | length) as $insub
+            | ([$hits[] | select(.hidden != true)]) as $shown
+            | $dim + "\($hits | length) of \($messages | length) messages mention “\($focus)”"
+              + (if $insub > 0 then " · \($insub) in subagents"
+                    + (if ($shown | length) < ($hits | length) then ", Alt-S shows them" else "" end) else "" end)
+              + $reset + "\n\n"
+              + (reduce $shown[] as $m ({out: [], at: 0};
+                    (if $m.section != .at then .out += [title($titles[$m.section | tostring])] else . end)
+                    | .at = $m.section | .out += [$m | render]) | .out | join("\n"))
+          else
+            # Section by section: long previews keep the start and the end, and
+            # every abandoned message with the one before it (Alt-B).
+            [$items[] | select(.hidden != true)] as $visible
+            | [$visible[] | .section] | unique as $sections
+            | [$sections[] as $n
+               | [$visible[] | select(.section == $n and .role != "section")] as $all
+               | (if $n > 0 then [title($titles[$n | tostring])] else [] end)
+                 + if $preview == 1 and ($all | length) > 24 then
+                       [range(0; $all | length) | select(. < 4 or . >= ($all | length) - 20
+                                                  or $all[.].abandoned or ($all[. + 1].abandoned // false))] as $keep
+                       | reduce range(0; $keep | length) as $k ([];
+                           . + (if $k > 0 and $keep[$k] > $keep[$k - 1] + 1
+                                then [$dim + "  … \($keep[$k] - $keep[$k - 1] - 1) more messages …" + $reset + "\n"]
+                                else [] end)
+                             + [$all[$keep[$k]] | render])
+                   else [$all[] | render] end
+               | join("\n")]
+            | map(select(. != "")) | join("\n")
           end')
     printf '%s\n' "${conversation:-${C_DIM}(no messages)${C_RESET}}"
 }
 
-# cmd_export ID — the conversation as Markdown, on stdout.
+# cmd_export ID — the conversation as Markdown, on stdout (with --subagents,
+# then the conversation of each subagent).
 cmd_export() {
-    parse_args "ids branches" "$@"
+    parse_args "ids branches subagents" "$@"
     ((${#F_IDS[@]} == 1)) || usage_error "export takes exactly one session id"
     need jq
     prepare
@@ -1579,10 +2090,41 @@ cmd_export() {
     printf '# %s\n\n' "${title:-Untitled session}"
     printf -- '- Agent: %s (%s%s)\n- Project: `%s`\n- Session: `%s`\n- %s → %s\n\n' \
         "$name" "$mode" "${model:+, $model}" "$cwd" "$id" "$created" "$recency"
-    messages "$agent" "$path" "$O_BRANCHES" | jq -r --arg name "$name" \
-        '"---\n\n## " + (if .activity then (if .role == "user" then "Other agents" else "\($name) (subagent: commands and edits)" end)
-                          elif .role == "user" then "You" else $name end)
-         + (if .abandoned then " (abandoned)" else "" end) + "\n\n" + .text + "\n"'
+    export_markdown "$agent" "$path" "$id" "$O_SUBAGENTS"
+}
+
+# export_sub FILE — a Claude Code subagent transcript as Markdown (picker, Ctrl-E).
+export_sub() {
+    local key file size name heading tool path
+    path=$(query "SELECT path FROM cl.claude WHERE id = '$SUB_SESSION';")
+    while IFS=$US read -r key file size name heading tool; do
+        [[ $key == "$SUB_AGENT" ]] || continue
+        printf '# %s\n\n- Agent: Claude (subagent: %s)\n- Session: `%s`\n\n' "$name" "$heading" "$SUB_SESSION"
+    done < <(subagent_list claude "$SUB_SESSION" "$path")
+    SIDECHAIN=1 export_markdown claude "$1" "" hidden
+}
+
+# export_markdown AGENT FILE ID SUBAGENTS — the messages as Markdown sections.
+export_markdown() {
+    local agent=$1 name
+    if [[ $agent == claude ]]; then name="Claude"; else name="Codex"; fi
+    FOCUS="" conversation "$@" | jq -rs --arg name "$name" --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)" \
+        --argjson marks "$([[ $agent == claude ]] && subagent_marks "$agent" "$3" "$2" || echo '{}')" '
+        reduce .[] as $m ([];
+            if $m.role != "section" and $m.text == "" and length > 0 and .[-1].role != "section"
+            then .[-1].subagents += ($m.subagents) else . + [$m] end)
+        | .[] | select(.hidden != true)
+        | if .role == "section" then "---\n\n# Subagent: \(.title)\n"
+          else "---\n\n## "
+               + (if .activity then (if .role == "user" then "Other agents" else "\($name) (subagent: commands and edits)" end)
+                  elif .role == "task" then "Task (from \($name))"
+                  elif .role == "user" then "You"
+                  elif .section > 0 or $side then "\($name) (subagent)"
+                  else $name end)
+               + (if .abandoned then " (abandoned)" else "" end) + "\n\n"
+               + ([.text, ((.subagents // [])[] | "_↳ subagent \($marks[.] // "")_")] | map(select(. != "")) | join("\n\n"))
+               + "\n"
+          end'
 }
 
 # codex_path AGENT ID PATH — PATH, or where a Codex transcript is now if the
@@ -1696,12 +2238,15 @@ claude_trash() {
 history_take() {
     local id=$1 entry=$2 file=$CLAUDE_DIR/history.jsonl key tmp before
     key="\"sessionId\":\"$id\""
-    [[ -f $file ]] && grep -qF -- "$key" "$file" 2>/dev/null || return 0
+    [[ -f $file ]] && grep -aqF -- "$key" "$file" 2>/dev/null || return 0
     before=$(file_stats "$file" -maxdepth 0)
     tmp=$(mktemp "$CLAUDE_DIR/.lethe-history.XXXXXX") || return 0
-    grep -F -- "$key" "$file" >"$entry/history.jsonl" || true
-    grep -vF -- "$key" "$file" >"$tmp" || true
-    if [[ $(file_stats "$file" -maxdepth 0) == "$before" ]] && mv -f -- "$tmp" "$file"; then
+    grep -aF -- "$key" "$file" >"$entry/history.jsonl" || true
+    grep -avF -- "$key" "$file" >"$tmp" || true
+    # Every line is either taken out or kept: anything else, and the history is
+    # left as it was.
+    if (($(wc -l <"$tmp") + $(wc -l <"$entry/history.jsonl") == $(wc -l <"$file"))) &&
+        [[ $(file_stats "$file" -maxdepth 0) == "$before" ]] && mv -f -- "$tmp" "$file"; then
         return 0
     fi
     rm -f -- "$tmp" "$entry/history.jsonl"
@@ -1945,7 +2490,7 @@ op_done() {
 # the current filters.
 run_action() {
     local action=$1
-    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned op hsize
+    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created op hsize
     local codex_active=() codex_archived=() claude_ids=() selection=0 unsupported=0 explicit=${#F_IDS[@]}
     declare -A selected=()
 
@@ -2003,7 +2548,7 @@ run_action() {
     reset_filters
     F_IDS=("${!PLAN_OP[@]}")
     declare -A rows=() recency_of=()
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned; do
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
         rows[$id]="$agent$US$archived$US$recency$US$date$US$mode$US$size$US$cwd$US$title$US$state$US$rewinds$US$pinned"
         recency_of[$id]=$recency
         # Pinned in Codex: kept by any cleanup, changed only when named.
@@ -2038,7 +2583,8 @@ run_action() {
         sort -t $'\t' -k1,1nr | cut -f 2)
     for id in "${order[@]}"; do
         IFS=$US read -r agent archived recency date mode size cwd title state rewinds pinned <<<"${rows[$id]}"
-        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$plan_width" "$rewinds" "$pinned"
+        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$plan_width" "$rewinds" \
+            "$pinned" "" plan
         line=$REPLY
         if protected "$id" "$recency"; then
             skipped+=("  $line" "      ${C_DIM}↳ $REPLY$C_RESET")
@@ -2189,7 +2735,7 @@ cmd_action() {
 # ── Interactive picker ───────────────────────────────────────────────────────
 
 cmd_pick() {
-    parse_args "sort" "$@"
+    parse_args "sort subagents" "$@"
     need fzf jq
     prepare
 
@@ -2206,6 +2752,7 @@ cmd_pick() {
     # The full key list takes 5 lines: on short terminals start with one line.
     if (($(tput lines 2>/dev/null || echo 50) >= 45)); then echo full; else echo short; fi >"$state/keys"
     printf 'active\n' >"$state/branches"
+    printf '%s\n' "$O_SUBAGENTS" >"$state/subagents"
     # --grep becomes the picker's search: Ctrl-G shows it and can clear it.
     printf '%s' "$F_GREP" >"$state/grep"
     : >"$state/dir"
@@ -2276,6 +2823,7 @@ cmd_pick() {
         --bind="ctrl-g:execute-silent($me __state grep {q})+clear-query$refresh" \
         --bind="ctrl-o:execute-silent($me __state sort)$refresh" \
         --bind="alt-b:execute-silent($me __state branches)${refresh%+reload*}+refresh-preview" \
+        --bind="alt-s:execute-silent($me __state subagents)$refresh+refresh-preview" \
         --bind="ctrl-b:execute-silent($me __state panel)+show-preview+refresh-preview${refresh%+reload*}" \
         --bind='ctrl-a:toggle-all' \
         --bind='ctrl-p:toggle-preview' \
@@ -2295,6 +2843,7 @@ picker_setup() {
     F_AGENT=$(<"$LETHE_STATE/agent")
     F_STATUS=$(<"$LETHE_STATE/status")
     O_SORT=$(<"$LETHE_STATE/sort")
+    [[ ! -f $LETHE_STATE/subagents ]] || O_SUBAGENTS=$(<"$LETHE_STATE/subagents")
     [[ $F_AGENT != all ]] || F_AGENT=""
     [[ $F_STATUS != all ]] || F_STATUS=""
     if [[ $skip != nofilter ]]; then
@@ -2318,11 +2867,11 @@ picker_setup() {
 # under the current agent and status. With dir, the current choice (the
 # project of session ID) is the first line after "All projects".
 choose_lines() {
-    local kind=$1 current=${2:-} agent id archived recency date mode provider empty size cwd title path state rewinds pinned
+    local kind=$1 current=${2:-} agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local -A n=() b=() pn=() pb=()
     if [[ $kind == filter ]]; then picker_setup nofilter; else picker_setup nodir; fi
     setup_colors always
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned; do
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
         ((size >= 0)) || size=0
         [[ $id != "$current" ]] || current=$cwd
         add() { n[$1]=$((${n[$1]:-0} + 1)) && b[$1]=$((${b[$1]:-0} + size)); }
@@ -2389,6 +2938,9 @@ internal_choose() {
     # The trash has no projects to choose from.
     [[ $kind != dir || $(<"$LETHE_STATE/filter") != trash ]] || return 0
     [[ $current != trash:* ]] || current=""
+    if [[ -n $current ]]; then
+        if picker_id "$current" || (($? == 2)); then current=$REPLY; else current=""; fi
+    fi
     ! fzf --help 2>/dev/null | grep -q -- '--gutter' || gutter=(--gutter=' ')
     # The cursor starts on what is selected now: the current filter, or the
     # current session's project.
@@ -2430,17 +2982,23 @@ internal_rows() {
         return
     fi
     picker_setup
-    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned
+    local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local count=0 bytes=0 open=0 hbytes
     : >"$LETHE_STATE/sizes"
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned; do
+    local kind before after style shown
+    while IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
+        if [[ $kind != hidden ]]; then
+            format_row "$agent" "$archived" "$recency" "" "$mode" "${shown:-$size}" "$cwd" "$title" "$state" "" "$rewinds" \
+                "$pinned" "$before$US$after" "$style"
+            # A context row is not part of the list: its id says so.
+            if [[ $kind == context ]]; then printf 'ctx:%s\t%s\n' "$id" "$REPLY"; else printf '%s\t%s\n' "$id" "$REPLY"; fi
+        fi
+        [[ $kind == row || $kind == hidden ]] || continue
         printf '%s\t%s\n' "$id" "$size" >>"$LETHE_STATE/sizes"
-        format_row "$agent" "$archived" "$recency" "" "$mode" "$size" "$cwd" "$title" "$state" "" "$rewinds" "$pinned"
-        printf '%s\t%s\n' "$id" "$REPLY"
         count=$((count + 1))
         ((size < 0)) || bytes=$((bytes + size))
         [[ -z $state ]] || open=$((open + 1)) # running: ◉ or ◔
-    done < <(fetch_sorted)
+    done < <(fetch_sorted | tree_rows)
     : >"$LETHE_STATE/open"
     ((${#OPEN[@]} == 0)) || printf '%s\n' "${!OPEN[@]}" >"$LETHE_STATE/open"
     human_size hbytes "$bytes"
@@ -2472,7 +3030,7 @@ trash_rows() {
 internal_state() {
     local dir=$LETHE_STATE value
     case $1 in
-        agent | status | sort | branches | panel)
+        agent | status | sort | branches | panel | subagents)
             value=$(<"$dir/$1")
             case $1:$value in
                 agent:all) value=claude ;;
@@ -2485,6 +3043,8 @@ internal_state() {
                 sort:oldest) value=recent ;;
                 branches:active) value=all ;;
                 branches:all) value=active ;;
+                subagents:hidden) value=shown ;;
+                subagents:shown) value=hidden ;;
                 panel:conversation) value=stats ;;
                 panel:stats) value=conversation ;;
                 *) value=all ;;
@@ -2567,6 +3127,7 @@ internal_state() {
                 oldest) parts+=("oldest first") ;;
             esac
             [[ $(cat "$dir/branches" 2>/dev/null) != all ]] || parts+=("⑂ all branches")
+            [[ $(cat "$dir/subagents" 2>/dev/null) != shown ]] || parts+=("subagents")
             printf '%s ❯ ' "$(join_by ' · ' "${parts[@]}")"
             ;;
         keys)
@@ -2582,7 +3143,8 @@ internal_state() {
                 keys=("Tab:mark Enter:read Ctrl-D:delete Ctrl-R:resume Esc:quit F1:all_keys")
             elif [[ $(<"$dir/filter") == trash ]]; then
                 keys=("Tab:mark Ctrl-A:all Ctrl-R:restore Ctrl-D:delete_forever Enter:read"
-                    "Ctrl-F:leave_the_trash Ctrl-P:preview Ctrl-B:trash_size Esc:quit F1:fewer_keys")
+                    "Ctrl-F:leave_the_trash Ctrl-P:preview Ctrl-B:trash_size Esc:quit F1:fewer_keys"
+                    "Alt-S:subagents[$(cat "$dir/subagents" 2>/dev/null || echo hidden)]")
             else
                 # The keys that switch a view show where they stand: [value].
                 local agent status filter project text sort branches
@@ -2604,7 +3166,8 @@ internal_state() {
                     "Ctrl-T:agent[$agent] Ctrl-S:status[$status] Ctrl-F:filter[$filter]"
                     "Ctrl-W:project[${project:-all}] Ctrl-G:find[${text:-off}] Ctrl-O:sort[$sort]"
                     "Alt-B:abandoned_branches[$branches] Ctrl-B:stats[$(
-                        [[ $(cat "$dir/panel" 2>/dev/null) == stats ]] && echo on || echo off)] Ctrl-Y:copy F1:fewer_keys")
+                        [[ $(cat "$dir/panel" 2>/dev/null) == stats ]] && echo on || echo off)] Ctrl-Y:copy F1:fewer_keys"
+                    "Alt-S:subagents[$(cat "$dir/subagents" 2>/dev/null || echo hidden)]")
             fi
             local words
             for line in "${keys[@]}"; do
@@ -2631,16 +3194,86 @@ internal_state() {
             else
                 printf '%s\n' "Tab mark · Ctrl-A all · Ctrl-D delete · Ctrl-X archive · Enter read" \
                     "Ctrl-R resume · Ctrl-K fork · Ctrl-E export · Ctrl-B stats" \
-                    "Ctrl-T agent · Ctrl-S status · Ctrl-F filter · Ctrl-W project" \
+                    "Ctrl-T agent · Ctrl-S status · Ctrl-F filter · Ctrl-W project · Alt-S subagents" \
                     "Ctrl-G find · Ctrl-O sort · Ctrl-P preview · Ctrl-Y copy · Alt-B branches · Esc quit"
             fi
             ;;
     esac
 }
 
+# picker_id ID — what a picker row stands for. A session: REPLY is its id (a
+# context row, ctx:ID, stands for its session too) and the status is 0. A Claude
+# Code subagent (sub:SESSION/AGENT): SUB_SESSION and SUB_AGENT are set, REPLY is
+# the session, and the status is 2. Anything else (malformed): status 1.
+picker_id() {
+    local id=${1#ctx:}
+    SUB_SESSION="" SUB_AGENT=""
+    if [[ $id == sub:* ]]; then
+        id=${id#sub:}
+        [[ ${id%%/*} =~ ^$UUID_RE$ && ${id#*/} =~ ^[A-Za-z0-9_-]+$ && $id == */* ]] || return 1
+        SUB_SESSION=${id%%/*} SUB_AGENT=${id#*/} REPLY=${id%%/*}
+        return 2
+    fi
+    REPLY=$id
+}
+
+# The transcript of the Claude Code subagent SUB_SESSION/SUB_AGENT, or nothing.
+picker_sub_file() {
+    local path
+    path=$(query "SELECT path FROM cl.claude WHERE id = '$SUB_SESSION';")
+    [[ -n $path ]] || return 1
+    REPLY=${path%.jsonl}/subagents/agent-$SUB_AGENT.jsonl
+    [[ -f $REPLY && ! -L $REPLY ]]
+}
+
+# show_sub PREVIEW — the conversation of the subagent SUB_SESSION/SUB_AGENT.
+show_sub() {
+    local preview=$1 key file size name heading tool path agent=claude
+    REINDEX=0
+    init
+    picker_sub_file || { printf '%sThis subagent is gone.%s\n' "$C_DIM" "$C_RESET"; return 0; }
+    path=$(query "SELECT path FROM cl.claude WHERE id = '$SUB_SESSION';")
+    while IFS=$US read -r key file size name heading tool; do
+        [[ $key == "$SUB_AGENT" ]] || continue
+        printf '%s%s%s\n' "$C_BOLD" "$name" "$C_RESET"
+        printf '%sclaude%s  %ssubagent of %s · %s%s\n' "$C_CLAUDE" "$C_RESET" "$C_DIM" "${SUB_SESSION:0:8}" "$heading" "$C_RESET"
+        printf '%sit lives inside its session: open, delete and export it with the session%s\n' "$C_DIM" "$C_RESET"
+        rule
+        FOCUS=${FOCUS:-} render_conversation_sub "$file" "$preview"
+        return 0
+    done < <(subagent_list "$agent" "$SUB_SESSION" "$path")
+}
+
+# render_conversation_sub FILE PREVIEW — a subagent transcript alone.
+render_conversation_sub() {
+    local saved=$O_SUBAGENTS
+    O_SUBAGENTS=hidden
+    SIDECHAIN=1 render_conversation claude "$1" "$2" ""
+    O_SUBAGENTS=$saved
+}
+
 internal_action() {
-    local action=$1
+    local action=$1 arg ignored=0 ids=()
     shift
+    # Context rows and Claude Code subagents are not sessions to change.
+    for arg; do
+        if [[ $arg == trash:* ]]; then
+            ids+=("$arg")
+        elif picker_id "$arg" && [[ $arg != ctx:* ]]; then
+            ids+=("$REPLY")
+        else
+            ignored=$((ignored + 1))
+        fi
+    done
+    set -- "${ids[@]}"
+    if ((ignored && $# == 0)); then
+        printf '\e[H\e[2J'
+        printf 'Nothing to do: a Claude Code subagent lives inside its session, and a dim row is\n'
+        printf 'only shown for the subagent below it. Act on the session itself.\n'
+        printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
+        read -r </dev/tty || true
+        return 0
+    fi
     (($#)) || return 0 # never fall back to "every session"
     if [[ $1 == trash:* ]]; then
         printf '\e[H\e[2J'
@@ -2653,6 +3286,8 @@ internal_action() {
     detect_open
     F_IDS=("$@")
     printf '\e[H\e[2J'
+    ((ignored == 0)) || printf '%s%d row(s) left out: subagents of Claude Code sessions, or dim context rows.%s\n\n' \
+        "$C_DIM" "$ignored" "$C_RESET"
     run_action "$action" || true
     printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
     read -r </dev/tty || true
@@ -2693,6 +3328,18 @@ trash_action() {
 }
 
 internal_resume() {
+    local rc=0
+    picker_id "$1" || rc=$?
+    if ((rc == 2)); then
+        printf '\e[H\e[2J'
+        printf 'A Claude Code subagent cannot be resumed or forked: it lives inside its session.\n'
+        printf 'Resume or fork the session %s instead.\n' "$SUB_SESSION"
+        printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
+        read -r </dev/tty || true
+        return 0
+    fi
+    ((rc == 0)) || return 0
+    [[ $1 == trash:* ]] || set -- "$REPLY" "${@:2}"
     if [[ ${2:-} == fork ]]; then
         [[ $1 != trash:* ]] || return 0
         "$SELF" fork "$1" || {
@@ -2716,12 +3363,31 @@ internal_resume() {
 
 # Save a conversation as Markdown in the directory the picker was started from.
 internal_export() {
-    local file short branches=()
+    local file short branches=() rc=0
     picker_branches
     init
+    [[ $1 == trash:* ]] || picker_id "$1" || rc=$?
+    if ((rc == 2)); then
+        printf '\e[H\e[2J'
+        short_id short "$SUB_SESSION"
+        file="lethe-$short-$SUB_AGENT.md"
+        if [[ -e $file ]]; then
+            printf '%s already exists; nothing written.\n' "$PWD/$file"
+        elif picker_sub_file && export_sub "$REPLY" >"$file"; then
+            printf '%s✓ saved %s%s\n' "$C_GREEN" "$PWD/$file" "$C_RESET"
+        else
+            rm -f -- "$file"
+        fi
+        printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
+        read -r </dev/tty || true
+        return 0
+    fi
+    ((rc == 0)) || return 0
+    [[ $1 == trash:* ]] || set -- "$REPLY"
     short_id short "$1"
     file="lethe-$short.md"
     [[ $O_BRANCHES != all ]] || branches=(--all-branches)
+    [[ $O_SUBAGENTS != shown ]] || branches+=(--subagents)
     printf '\e[H\e[2J'
     if [[ $1 == trash:* ]]; then
         printf 'Restore the session first (Ctrl-R) to export it.\n'
@@ -2745,19 +3411,27 @@ internal_marked() {
         return
     fi
     declare -A marked=()
-    for id; do marked[$id]=1; done
+    local count=0
+    for id; do [[ -z $id ]] || marked[$id]=1; done
+    # Only sessions: context rows and Claude Code subagents are not in sizes.
     while IFS=$'\t' read -r id size; do
-        [[ -z ${marked[$id]+x} ]] || ((size < 0)) || total=$((total + size))
+        [[ -n ${marked[$id]+x} ]] || continue
+        count=$((count + 1))
+        ((size < 0)) || total=$((total + size))
     done <"$LETHE_STATE/sizes"
     human_size hsize "$total"
-    printf ' %d marked · %s ·%s' "$FZF_SELECT_COUNT" "$hsize" "$base"
+    printf ' %d marked · %s ·%s' "$count" "$hsize" "$base"
 }
 
 # Copy the command that resumes a session to the clipboard, with OSC 52 (kitty,
 # WezTerm, iTerm2, tmux with set-clipboard, ...) and any local clipboard tool.
 internal_copy() {
     [[ $1 != trash:* ]] || return 0
-    local agent cwd command
+    local agent cwd command rc=0
+    # A subagent: the command that resumes its session.
+    picker_id "$1" || rc=$?
+    ((rc != 1)) || return 0
+    set -- "$REPLY"
     REINDEX=0
     init
     IFS=$US read -r agent _ _ _ cwd _ < <(session_info "$1")
@@ -2791,16 +3465,21 @@ internal_page() {
         pager=(less -i -p "$(printf '%s' "$focus" | sed 's/[][\\.*^$+?(){}|/]/\\&/g')")
     fi
     setup_colors always
+    local rc=0
+    [[ $1 == trash:* ]] || picker_id "$1" || rc=$?
     if [[ $1 == trash:* ]]; then
         show_trash "$TRASH_DIR/${1#trash:}" | "${pager[@]}"
-    else
-        cmd_show "$1" | "${pager[@]}"
+    elif ((rc == 2)); then
+        show_sub 0 | "${pager[@]}"
+    elif ((rc == 0)); then
+        cmd_show "$REPLY" | "${pager[@]}"
     fi
 }
 
 # Branches shown in the picker's preview, pager and export (Alt-B).
 picker_branches() {
     [[ -z ${LETHE_STATE:-} || ! -f $LETHE_STATE/branches ]] || O_BRANCHES=$(<"$LETHE_STATE/branches")
+    [[ -z ${LETHE_STATE:-} || ! -f $LETHE_STATE/subagents ]] || O_SUBAGENTS=$(<"$LETHE_STATE/subagents")
 }
 
 internal_preview() {
@@ -2819,10 +3498,14 @@ internal_preview() {
     fi
     # Ctrl-G: show where the searched text is.
     [[ ! -s ${LETHE_STATE:-}/grep ]] || FOCUS=$(<"$LETHE_STATE/grep")
+    local rc=0
+    [[ $1 == trash:* ]] || picker_id "$1" || rc=$?
     if [[ $1 == trash:* ]]; then
         show_trash "$TRASH_DIR/${1#trash:}" 1
-    else
-        cmd_show --preview "$1"
+    elif ((rc == 2)); then
+        show_sub 1
+    elif ((rc == 0)); then
+        cmd_show --preview "$REPLY"
     fi
 }
 
@@ -2860,10 +3543,11 @@ _lethe() {
         COMPREPLY=($(compgen -W "bash zsh" -- "$cur"))
     elif [[ $cur == -* ]]; then
         case $cmd in
-            show | export) COMPREPLY=($(compgen -W "--all-branches" -- "$cur")) ;;
+            show | export) COMPREPLY=($(compgen -W "--all-branches --subagents" -- "$cur")) ;;
             resume | fork) ;;
-            list | ls) COMPREPLY=($(compgen -W "$filters --json --ids" -- "$cur")) ;;
-            stats | pick) COMPREPLY=($(compgen -W "$filters" -- "$cur")) ;;
+            list | ls) COMPREPLY=($(compgen -W "$filters --json --ids --subagents" -- "$cur")) ;;
+            pick) COMPREPLY=($(compgen -W "$filters --subagents" -- "$cur")) ;;
+            stats) COMPREPLY=($(compgen -W "$filters" -- "$cur")) ;;
             *) COMPREPLY=($(compgen -W "$filters --dry-run --yes --force --all" -- "$cur")) ;;
         esac
     elif [[ -n $cur ]]; then
@@ -2885,10 +3569,10 @@ $PROG $VERSION — browse, resume and forget your Claude Code and Codex sessions
 
 Usage:
   $PROG [pick] [FILTERS] [--sort ORDER]  interactive browser (needs fzf)
-  $PROG list   [FILTERS] [--sort ORDER] [--json | --ids]
+  $PROG list   [FILTERS] [--sort ORDER] [--subagents] [--json | --ids]
   $PROG stats  [FILTERS]                 disk usage and cleanup hints
-  $PROG show   ID [--all-branches]       print a conversation
-  $PROG export ID [--all-branches]       the conversation as Markdown, on stdout
+  $PROG show   ID [--all-branches] [--subagents]   print a conversation
+  $PROG export ID [--all-branches] [--subagents]   as Markdown, on stdout
   $PROG resume ID                        reopen it in its agent and directory
   $PROG fork   ID                        continue in a copy, original untouched
   $PROG delete    (FILTERS | ID...) [-n] [-y] [--force]
@@ -2924,6 +3608,8 @@ Options:
       --json, --ids       list output formats
       --all-branches      show/export: include abandoned branches of Claude
                           Code sessions (edited or rewound prompts), marked
+      --subagents         list: subagents unfolded under their session;
+                          show/export: their conversations too
   -h, --help, -V, --version
 
 Safety:
@@ -2948,6 +3634,7 @@ Picker keys (the footer shows them, with the state of each switch):
   Ctrl-O sort: date, size, oldest     Ctrl-P show or hide the preview
   Ctrl-B disk usage of the listed sessions, in the preview
   Alt-B  show or hide abandoned branches (⑂)
+  Alt-S  subagents: unfold them under their session, and read them
   F1     fewer or all keys in the footer     Esc quit
 
 Environment:

@@ -238,7 +238,7 @@ expect_ids "--grep searches both agents, case-insensitive" "$A $G" --grep PARSER
 expect_ids "--grep ignores injected context" "" --grep secretword
 expect_ids "--grep ignores hidden reasoning" "" --grep hidden
 expect_ids "filters combine with AND" "$A $C" --codex --dir "$PROJ" --older-than 30d
-expect_ids "--keep spares the latest sessions of each project, both agents together" "$A $D $F $H $I" --keep 1
+expect_ids "--keep spares the latest sessions of each project, both agents together; subagents follow their root" "$A $C $D $F $H $I" --keep 1
 mv "$WORK/other" "$WORK/other.moved"
 expect_ids "--orphans" "$D $E $F $H $I" --orphans
 mv "$WORK/other.moved" "$WORK/other"
@@ -254,7 +254,10 @@ check "list --json" '"$LETHE" list --json | jq -e "length == 9 and (map(select(.
 out=$("$LETHE" list --claude)
 check "Claude titles come from ai-title" '[[ $out == *"Design the cache"* ]]' "$out"
 out=$("$LETHE" list --codex)
-check "subagent sessions are tagged, and named after their nickname" '[[ $out == *"subagent · Kepler"* ]]' "$out"
+check "subagents are folded under their session" '[[ $out == *"▸ Refactor parser · 1 subagent"* && $out != *Kepler* ]]' "$out"
+out=$("$LETHE" list --codex --subagents)
+check "... unfolded with --subagents, named after their nickname, without the tag" \
+    '[[ $out == *"▾ Refactor parser"* && $out == *"└─ Kepler"* && $out != *"subagent · Kepler"* ]]' "$out"
 out=$("$LETHE" stats)
 check "stats" '[[ $out == *Total*9* && $out == *"2 running session(s), protected"*"list --running"* ]]' "$out"
 out=$("$LETHE" show "$E" 2>&1; "$LETHE" show "$A" 2>&1)
@@ -263,7 +266,7 @@ check "show: the status reads running or idle" \
 out=$("$LETHE" show "$A")
 check "show (codex)" '[[ $out == *"please refactor the Parser"* && $out != *secretword* ]]' "$out"
 out=$("$LETHE" show "$G")
-check "show (claude) counts subagent transcripts" '[[ $out == *"1 subagent ("* ]]' "$out"
+check "show (claude) counts subagent transcripts" '[[ $out == *"1 subagent: subagent ("* ]]' "$out"
 check "show (claude) skips reasoning and wrappers" \
     '[[ $out == *"how should we cache"* && $out == *"Sure, done."* && $out != *hidden* && $out != *command-name* ]]' "$out"
 perl -pi -e 's/Design the cache/Cache design v2/' "$CPROJ/$G.jsonl" && set_mtime "$(($(date +%s) - 86400))" "$CPROJ/$G.jsonl"
@@ -346,7 +349,7 @@ check "picker: Ctrl-F lists filters with their counts" \
     '[[ $(grep "^empty" <<<"$out") =~ [[:space:]]2[[:space:]] && $(grep "^missing" <<<"$out") =~ [[:space:]]1[[:space:]] ]]' "$out"
 out=$(REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines dir "$2"' _ "$LETHE" "$B" | perl -pe 's/\e\[[0-9;]*m//g')
 printf '=%s' "$PROJ" >"$LETHE_STATE/dir"
-check "picker: a project chosen with Ctrl-W excludes the projects below it" '[[ $(picker_ids) == "$A $C " ]]' "$(picker_ids)"
+check "picker: a project chosen with Ctrl-W excludes the projects below it" '[[ $(picker_ids) == "$A " ]]' "$(picker_ids)"
 : >"$LETHE_STATE/dir"
 check "picker: Ctrl-W lists projects, the current one first" \
     '[[ $(sed -n 3p <<<"$out") == "$PROJ/sub"$'"'"'\t'"'"'* ]]' "$out"
@@ -397,7 +400,7 @@ check "picker: Ctrl-W keeps the current project" '[[ $(picker_ids) == "$B " ]]' 
 check "picker: Ctrl-G searches the conversations" '[[ $(picker_ids) == "$A " ]]' "$(picker_ids)"
 out=$(NO_COLOR="" "$LETHE" __preview "$A" | perl -pe 's/\e\[[0-9;]*m//g')
 check "picker: with Ctrl-G the preview shows the messages that mention the text" \
-    '[[ $out == *"1 of 1 messages mention “parser”"* && $out == *"refactor the Parser"* ]]' "$out"
+    '[[ $out == *"1 of 2 messages mention “parser”"* && $out == *"refactor the Parser"* ]]' "$out"
 out=$("$LETHE" __preview "$A")
 check "picker: an empty open-session list does not break the preview" '[[ $out == *Parser* ]]' "$out"
 unset LETHE_STATE LETHE_FILTERS
@@ -748,7 +751,7 @@ mkdir -p "$WORK/claude2/projects/-p"
 cp "$CPROJ/$G.jsonl" "$WORK/claude2/projects/-p/"
 CLAUDE_CONFIG_DIR=$WORK/claude2 "$LETHE" list >/dev/null
 "$LETHE" list >/dev/null
-check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v4-*.sqlite | wc -l) -eq 2 ]]'
+check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v5-*.sqlite | wc -l) -eq 2 ]]'
 
 printf '{"display":"secret prompt","sessionId":"%s"}\n{"display":"other","sessionId":"%s"}\n' "$G" "$H" \
     >"$CLAUDE_CONFIG_DIR/history.jsonl"
@@ -797,6 +800,132 @@ set_mtime "$(($(date +%s) - 3 * 86400))" "$(codex_file "$SA" 0)"
 out=$("$LETHE" export "$SA")
 check "a Codex subagent with encrypted messages shows its commands and edits" \
     '[[ $out == *"## Other agents"*"← task from /root"*"## Codex (subagent: commands and edits)"*"$ cat src/app.py"*"edited /p/src/app.py"*"→ message to /root"* && $out != *"## You"* ]]' "$out"
+
+echo "subagents"
+reset_fixture
+# A Claude session S that started two subagents (one with a meta file, one without).
+S=88888888-0000-4000-8000-0000000000ee
+claude_chat "$S" 3 "$PROJ" 'user:audit the cache layer' 'assistant:I will ask a subagent.'
+jq -cn --arg s "$S" '{type: "assistant", uuid: "\($s)-3", parentUuid: "\($s)-2", cwd: "/x", timestamp: "2026-01-01T10:00:03.000Z",
+    message: {role: "assistant", model: "claude-test-1", content: [{type: "tool_use", name: "Agent", id: "toolu_aaa"}]}}' >>"$CPROJ/$S.jsonl"
+jq -cn --arg s "$S" '{type: "user", uuid: "\($s)-4", parentUuid: "\($s)-3", cwd: "/x", timestamp: "2026-01-01T10:00:04.000Z",
+    toolUseResult: {agentId: "bbb"}, message: {role: "user", content: [{type: "tool_result", tool_use_id: "toolu_bbb"}]}}' >>"$CPROJ/$S.jsonl"
+jq -cn --arg s "$S" '{type: "assistant", uuid: "\($s)-5", parentUuid: "\($s)-4", cwd: "/x", timestamp: "2026-01-01T10:00:05.000Z",
+    message: {role: "assistant", model: "claude-test-1", content: [{type: "text", text: "Both reports are in."}]}}' >>"$CPROJ/$S.jsonl"
+mkdir -p "$CPROJ/$S/subagents"
+sub_chat() { # sub_chat FILE TEXT... : a sidechain transcript
+    local file=$1 parent=null n=0 arg
+    shift
+    for arg; do
+        n=$((n + 1))
+        jq -cn --arg role "${arg%%:*}" --arg text "${arg#*:}" --arg uuid "${file##*/}-$n" --argjson parent "$parent" \
+            '{type: $role, uuid: $uuid, parentUuid: $parent, isSidechain: true, cwd: "/x", timestamp: "2026-01-01T10:00:0\($uuid[-1:]).000Z",
+              message: (if $role == "user" then {role: "user", content: $text}
+                        else {role: "assistant", model: "claude-test-1", content: [{type: "text", text: $text}]} end)}'
+        parent="\"${file##*/}-$n\""
+    done >"$file"
+}
+sub_chat "$CPROJ/$S/subagents/agent-aaa.jsonl" 'user:check the eviction policy' 'assistant:The eviction uses zanzibar timestamps.'
+printf '{"agentType":"general-purpose","description":"Audit eviction","model":"opus","effort":"high","toolUseId":"toolu_aaa"}' \
+    >"$CPROJ/$S/subagents/agent-aaa.meta.json"
+sub_chat "$CPROJ/$S/subagents/agent-bbb.jsonl" 'user:check the keys' 'assistant:Keys are fine.'
+set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$S.jsonl"
+out=$("$LETHE" show "$S")
+check "show: a session's subagents in its header, not their text" \
+    '[[ $out == *"2 subagents: « Audit eviction », subagent ("* && $out != *zanzibar* ]]' "$out"
+check "show: where a subagent was started" '[[ $out == *"Both reports"* && $out == *"↳ subagent « Audit eviction »"* ]]' "$out"
+out=$("$LETHE" show "$S" --subagents)
+check "show --subagents: their conversations, labelled" \
+    '[[ $out == *"── general-purpose · opus/high · « Audit eviction »"* && $out == *"Claude → subagent"* && $out == *zanzibar* && $out == *"Keys are fine"* ]]' "$out"
+out=$("$LETHE" export "$S" --subagents)
+check "export --subagents" '[[ $out == *"# Subagent: general-purpose"* && $out == *"## Task (from Claude)"* && $out == *"## Claude (subagent)"* && $out == *"_↳ subagent « Audit eviction »"* ]]' "$out"
+expect_ids "--grep finds a session by what its subagents wrote" "$S" --grep zanzibar
+mkdir -p "$WORK/st"
+for f in agent status filter; do printf 'all\n' >"$WORK/st/$f"; done
+printf 'recent\n' >"$WORK/st/sort"; : >"$WORK/st/grep"; : >"$WORK/st/dir"; printf 'full\n' >"$WORK/st/keys"
+printf 'active\n' >"$WORK/st/branches"; printf 'conversation\n' >"$WORK/st/panel"; printf 'hidden\n' >"$WORK/st/subagents"
+printf 'zanzibar' >"$WORK/st/grep"
+out=$(NO_COLOR=1 LETHE_STATE=$WORK/st "$LETHE" __preview "$S")
+check "Ctrl-G: the preview counts the subagents' matches, even folded" '[[ $out == *"1 of "*" · 1 in subagents, Alt-S shows them"* ]]' "$out"
+: >"$WORK/st/grep"
+printf 'shown\n' >"$WORK/st/subagents"
+rows=$(LETHE_STATE=$WORK/st "$LETHE" __rows | cut -f 1)
+check "picker: Alt-S unfolds the subagents under their session" '[[ $rows == *"$S"$'"'"'\n'"'"'"sub:$S/aaa"$'"'"'\n'"'"'"sub:$S/bbb"* ]]' "$rows"
+out=$(NO_COLOR=1 LETHE_STATE=$WORK/st FZF_PREVIEW_COLUMNS=80 "$LETHE" __preview "sub:$S/aaa")
+check "picker: a Claude subagent's own preview" '[[ $out == *"Audit eviction"* && $out == *zanzibar* && $out != *"Keys are fine"* ]]' "$out"
+out=$(LETHE_STATE=$WORK/st "$LETHE" __preview "sub:$S/../../etc" 2>&1)
+check "picker: a malformed subagent id reads nothing" '[[ -z $out ]]' "$out"
+(cd "$WORK" && LETHE_STATE=$WORK/st "$LETHE" __export "sub:$S/aaa" </dev/null >/dev/null 2>&1)
+check "picker: Ctrl-E on a subagent exports it alone" 'grep -q zanzibar "$WORK"/lethe-88888888-aaa.md && ! grep -q "Keys are fine" "$WORK"/lethe-88888888-aaa.md'
+out=$(LETHE_STATE=$WORK/st "$LETHE" __action delete "sub:$S/aaa" </dev/null 2>&1)
+check "picker: Ctrl-D on a subagent explains and changes nothing" '[[ $out == *"lives inside its session"* && -f $CPROJ/$S.jsonl ]]' "$out"
+out=$(LETHE_STATE=$WORK/st "$LETHE" __resume "sub:$S/aaa" </dev/null 2>&1)
+check "picker: Ctrl-R on a subagent names its session" '[[ $out == *"cannot be resumed"* && $out == *"$S"* && ! -s $WORK/claude.log ]]' "$out"
+out=$(FZF_SELECT_COUNT=2 LETHE_STATE=$WORK/st "$LETHE" __marked "sub:$S/aaa" "$S")
+check "picker: marked subagents are not counted" '[[ $out == " 1 marked ·"* ]]' "$out"
+# The cache sees a new subagent without its session changing.
+sub_chat "$CPROJ/$S/subagents/agent-ccc.jsonl" 'user:late task' 'assistant:late answer'
+check "a subagent added later is seen" '[[ $("$LETHE" show "$S") == *"3 subagents"* ]]'
+# Unsafe files are not read.
+ln -s "$CPROJ/$G.jsonl" "$CPROJ/$S/subagents/agent-ddd.jsonl"
+printf 'not json' >"$CPROJ/$S/subagents/agent-ccc.meta.json"
+out=$("$LETHE" show "$S" --subagents)
+check "subagents: a symbolic link is not read, a bad meta file is not fatal" \
+    '[[ $out == *"3 subagents"* && $out != *"how should we cache"* && $out == *"late answer"* ]]' "$out"
+
+# Codex: A spawned C; add D2 (a grandchild, encrypted) and C2 (a second child).
+C2=cccccccc-0000-4000-8000-0000000000c2 D2=dddddddd-0000-4000-8000-0000000000d2
+codex_session "$C2" 100 0 '{"subagent":{}}' openai "$WORK/other" "" "second child"
+codex_session "$D2" 100 0 '{"subagent":{}}' openai "$PROJ" "" ""
+printf '%s\n' '{"type":"response_item","payload":{"type":"agent_message","author":"/root/x","recipient":"/root/x/y","content":[{"type":"input_text","text":"Message Type: NEW_TASK\nPayload:\n"}]}}' \
+    '{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["sh","-c","make check"],"exit_code":0}}}' \
+    >>"$(codex_file "$D2" 0)"
+sqlite3 "$DB" "UPDATE threads SET agent_nickname = 'Noether', preview = '' WHERE id = '$C2';
+               UPDATE threads SET agent_nickname = 'Hume', preview = '' WHERE id = '$D2';
+               INSERT INTO thread_spawn_edges VALUES ('$A', '$C2', 'open'), ('$C', '$D2', 'open');"
+out=$("$LETHE" list --codex --subagents)
+check "list --subagents: the tree, children in launch order" \
+    '[[ $out == *"▾ Refactor parser"*"├─ Kepler"*"│  └─ Hume"*"└─ Noether"* ]]' "$out"
+check "... each child keeps its own project" '[[ $(grep Noether <<<"$out") == *" other "* ]]'
+out=$("$LETHE" list --codex)
+check "list: folded trees, with the size of the whole tree" '[[ $out == *"▸ Refactor parser · 2 subagents"* && $out != *Hume* ]]' "$out"
+check "list --ids and --json stay flat" '[[ $("$LETHE" list --codex --ids | wc -l) -eq 8 && $("$LETHE" list --codex --json | jq length) -eq 8 ]]'
+out=$("$LETHE" show "$A" --subagents)
+check "show --subagents (Codex): the whole tree, each transcript read on its own" \
+    '[[ $out == *"subagent Kepler"* && $out == *"subagent Hume"* && $out == *"$ make check"* && $out == *"please refactor the Parser"* ]]' "$out"
+out=$("$LETHE" show "$C")
+check "show: the session that spawned a subagent" '[[ $out == *"spawned by aaaaaaaa"*"Refactor parser"* ]]' "$out"
+check "list --json: parent and subagents" \
+    '"$LETHE" list --json | jq -e --arg a "$A" --arg c "$C" "(map(select(.id == \$c))[0].parent == \$a) and (map(select(.id == \$a))[0].subagents.count == 2)" >/dev/null'
+out=$("$LETHE" stats)
+check "stats: the subagents line" '[[ $out == *"subagents (in "* ]]' "$out"
+# A filter that keeps a child but not its parent: the parent in context.
+out=$("$LETHE" list --codex --grep "second child")
+check "a subagent found alone comes with its parent, dim" '[[ $out == *"▾ Refactor parser · 1 of 2 subagents"*"└─ Noether"* && $out == *"1 session(s)"* ]]' "$out"
+printf 'second child' >"$WORK/st/grep"; printf 'hidden\n' >"$WORK/st/subagents"
+rows=$(LETHE_STATE=$WORK/st "$LETHE" __rows | cut -f 1 | tr '\n' ' ')
+check "picker: the parent of a subagent found alone is a ctx: row" '[[ $rows == "ctx:$A $C2 " ]]' "$rows"
+: >"$WORK/st/grep"
+out=$(LETHE_STATE=$WORK/st "$LETHE" __action delete "ctx:$A" </dev/null 2>&1)
+check "picker: Ctrl-D on a context row changes nothing" '[[ $out == *"Nothing to do"* ]] && codex_exists "$A"' "$out"
+# Subagent alone: deletable, not resumable.
+out=$("$LETHE" delete -n "$C2")
+check "a Codex subagent can be deleted alone" '[[ $(sed -n "/^Delete/,/^$/p" <<<"$out") == *Noether* && $(sed -n "/^Delete/,/^$/p" <<<"$out") != *"Refactor parser"* ]]' "$out"
+expect_status "a Codex subagent cannot be resumed" 1 resume "$C2"
+# Parent gone, and a cycle of edges.
+sqlite3 "$DB" "DELETE FROM threads WHERE id = '$A';"
+out=$("$LETHE" list --codex)
+check "parent gone: the subagent at the top level, tagged" '[[ $out == *"parent gone · "* ]]' "$out"
+sqlite3 "$DB" "UPDATE thread_spawn_edges SET parent_thread_id = '$D2' WHERE child_thread_id = '$C';"
+out=$("$LETHE" list --codex --subagents --ids | sort | tr '\n' ' ')
+check "a cycle of edges loses no session" '[[ $("$LETHE" list --codex --subagents | grep -c -e Kepler -e Hume) -eq 2 ]]' "$("$LETHE" list --codex --subagents)"
+out=$("$LETHE" list --codex)
+check "... folded too" '[[ $(grep -c -e Kepler -e Hume <<<"$out") -ge 1 && $out == *"7 session(s)"* ]]' "$out"
+# Width: the rows of a deep tree fit 80 columns.
+out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); NO_COLOR=1; setup_colors
+    for t in "│  │  └─ " "" ; do format_row codex 0 0 "2026-01-01 00:00" subagent 1000 /x "A very long subagent title that goes on" "" 20 0 0 "$t$US" child; echo "$REPLY"; done
+    format_row codex 0 0 "2026-01-01 00:00" subagent 1000 /x "A very long title" "" 20 0 0 "" gone; echo "$REPLY"' _ "$LETHE" | perl -CSD -ne 'print if length > 81')
+check "tree rows fit 80 columns" '[[ -z $out ]]' "$out"
 
 # Codex 0.163 compresses old transcripts: rollout-*.jsonl.zst, index unchanged.
 if command -v zstd >/dev/null 2>&1; then

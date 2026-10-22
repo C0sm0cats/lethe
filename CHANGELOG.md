@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.0 — 2026-10-22
+
+Subagents:
+- The subagents a session started are shown under it, as a tree: Codex subagent sessions with their
+  nickname (`├─ Socrates`), Claude Code subagents as read-only rows (`↳ general-purpose · opus/high
+  « Audit eviction »`). **Trees are folded by default**: `list` and the picker no longer show Codex
+  subagent sessions flat; `▸ … · 3 subagents` tells there are some. `Alt-S` (and `--subagents` for
+  `list`, `show`, `export`, `pick`) unfolds them and adds their conversations to the preview, Enter
+  and Ctrl-E. A folded Codex tree shows its total size.
+- Claude Code subagents can be read: their task (`● Claude → subagent`) and their answers, in a
+  section of their own; where each was started is marked in the conversation
+  (`↳ subagent « … »`). A subagent row has its own preview and Ctrl-E export.
+- Search (`--grep`, Ctrl-G) finds a session by what its subagents wrote; the preview says how many
+  matches are in subagents, folded or not.
+- Codex subagents whose tasks are encrypted show the actions (commands, edits, messages to other
+  agents) between their answers in clear.
+- Trees sort by their most recent member (by date) or their total size (by size). A subagent the
+  filters keep without its parent comes with the parent shown dim (`ctx:` row, not selectable).
+  A subagent whose parent is gone is tagged `parent gone ·`; cycles of edges lose no session.
+- Headers: `· 3 subagents: Arendt, Kepler, Raman (2.4M)` on a session, `spawned by …` on a Codex
+  subagent. `list --json` (still flat): `parent`, `subagents: {count, size}`. `stats`: a subagents line.
+- `--keep N`: a subagent takes the rank of the session at the top of its tree, whatever its own
+  directory (it could be deleted while its session was kept).
+- Actions apply to what is selected, never to what is folded: Ctrl-D/Ctrl-X/Ctrl-R on a Claude
+  subagent row or a dim context row explain and change nothing.
+
+Fixes:
+- Transcripts that `grep` takes for binary (a NUL byte in a pasted log) were read only in part.
+
 ## 0.6.3 — 2026-10-22
 
 - Codex 0.163 compresses old transcripts (`rollout-*.jsonl.zst`) without updating its index:

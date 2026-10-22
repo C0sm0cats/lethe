@@ -47,7 +47,7 @@ SESSIONS = [
     ("claude", 4 * MIN, "cli", "code/api-server", "Fix the token refresh race in auth", 2_100_000, 0, TOKEN_RACE, True),
     ("codex", 3 * HOUR, "cli", "code/web-dashboard", "Add dark mode to the settings page", 640_000, 0, [], False),
     ("claude", 9 * HOUR, "cli", "code/api-server", "Write integration tests for /orders", 3_200_000, 0, [], False),
-    ("codex", 1 * DAY, "subagent", "code/api-server", "Kepler", 910_000, 0, [], False),
+    ("codex", 1 * DAY, "subagent", "code/web-dashboard", "Kepler", 910_000, 0, [], False),
     ("codex", 3 * DAY, "exec", "code/scripts", "Summarize the changelog for 2.4", 95_000, 0, [], False),
     ("claude", 6 * DAY, "cli", "code/game-engine", "Profile the renderer and cut draw calls", 48_300_000, 0, [], False),
     ("claude", 9 * DAY, "cli", "", "", 4_000, 0, [], False),
@@ -85,9 +85,12 @@ def build_demo(root):
     db = sqlite3.connect(os.path.join(codex, "state_5.sqlite"))
     db.execute("""CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT, created_at INTEGER,
         updated_at INTEGER, recency_at INTEGER, source TEXT, model_provider TEXT, cwd TEXT, title TEXT,
-        preview TEXT, archived INTEGER, model TEXT, tokens_used INTEGER)""")
+        preview TEXT, archived INTEGER, model TEXT, tokens_used INTEGER, agent_nickname TEXT)""")
+    db.execute("CREATE TABLE thread_spawn_edges (parent_thread_id TEXT, child_thread_id TEXT PRIMARY KEY, status TEXT)")
+    ids = {}
     for i, (agent, age, mode, project, title, size, archived, conversation, is_open) in enumerate(SESSIONS):
         session_id = f"019a{i:04x}-5c2e-7d41-9b6a-{0x3f8e21c4d7a0 + i * 0x1111:012x}"
+        ids[i] = session_id
         cwd = os.path.join(FAKE_HOME, project) if project else FAKE_HOME
         stamp = now - age
         conversation = conversation or ([("user", title)] if title else [])
@@ -99,9 +102,10 @@ def build_demo(root):
                 for role, text in conversation], size)
             os.utime(path, (stamp, stamp))
             source = '{"subagent":{}}' if mode == "subagent" else mode
-            db.execute("INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?, 'openai', ?, ?, ?, ?, 'gpt-5.5', ?)",
-                       (session_id, path, stamp - 1800, stamp, stamp, source, cwd, title, title, archived,
-                        18_400 * (i + 3)))
+            db.execute("INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?, 'openai', ?, ?, ?, ?, 'gpt-5.5', ?, ?)",
+                       (session_id, path, stamp - 1800, stamp, stamp, source, cwd,
+                        "" if mode == "subagent" else title, "" if mode == "subagent" else title, archived,
+                        18_400 * (i + 3), title if mode == "subagent" else None))
         else:
             project_dir = os.path.join(claude, "projects", cwd.replace("/", "-"))
             os.makedirs(project_dir, exist_ok=True)
@@ -120,6 +124,41 @@ def build_demo(root):
             if is_open:
                 with open(os.path.join(claude, "sessions", f"{os.getpid()}.json"), "w") as file:
                     json.dump({"pid": os.getpid(), "sessionId": session_id, "procStart": proc_start()}, file)
+    # Subagents: Kepler and two more under the dark mode session (Codex), and one
+    # under the session about the token race (Claude Code).
+    parent = ids[1]
+    db.execute("INSERT INTO thread_spawn_edges VALUES (?, ?, 'open')", (parent, ids[3]))
+    for n, (nick, size) in enumerate([("Noether", 520_000), ("Hopper", 380_000)]):
+        child = f"019b{n:04x}-5c2e-7d41-9b6a-3f8e21c4d7a0"
+        path = os.path.join(codex, "sessions", "2026", "01", "01", f"rollout-2026-01-01T00-00-00-{child}.jsonl")
+        write_padded(path, [{"type": "response_item", "payload": {"type": "message", "role": "assistant",
+                     "content": [{"type": "output_text", "text": "Done."}]}}], size)
+        stamp = now - 3 * HOUR - 600 * (n + 1)
+        os.utime(path, (stamp, stamp))
+        db.execute("INSERT INTO threads VALUES (?, ?, ?, ?, ?, '{\"subagent\":{}}', 'openai', ?, '', '', 0, 'gpt-5.5', 1000, ?)",
+                   (child, path, stamp - 600, stamp, stamp, os.path.join(FAKE_HOME, "code/web-dashboard"), nick))
+        db.execute("INSERT INTO thread_spawn_edges VALUES (?, ?, 'open')", (parent, child))
+    session = ids[0]
+    project_dir = os.path.join(claude, "projects", os.path.join(FAKE_HOME, "code/api-server").replace("/", "-"))
+    transcript = os.path.join(project_dir, f"{session}.jsonl")
+    stamp = os.stat(transcript).st_mtime
+    with open(transcript, "a") as file:
+        file.write(json.dumps({"type": "assistant", "uuid": "launch", "cwd": FAKE_HOME, "timestamp": "2026-01-01T00:00:00.000Z",
+                               "message": {"role": "assistant", "model": "claude-opus-5-5", "content": [
+                                   {"type": "tool_use", "name": "Agent", "id": "toolu_demo"}]}}) + "\n")
+    os.utime(transcript, (stamp, stamp))
+    sub_dir = os.path.join(project_dir, session, "subagents")
+    os.makedirs(sub_dir)
+    with open(os.path.join(sub_dir, "agent-a1b2c3.jsonl"), "w") as file:
+        for role, text in [("user", "Find every call site of refreshToken() and check which ones can race."),
+                           ("assistant", "Three call sites: the axios interceptor, the websocket reconnect and the "
+                                         "visibility handler. Only the interceptor runs concurrently.")]:
+            file.write(json.dumps({"type": role, "isSidechain": True, "timestamp": "2026-01-01T00:00:00.000Z",
+                                   "message": {"role": role, "model": "claude-sonnet-5-5",
+                                               "content": text if role == "user" else [{"type": "text", "text": text}]}}) + "\n")
+    with open(os.path.join(sub_dir, "agent-a1b2c3.meta.json"), "w") as file:
+        json.dump({"agentType": "Explore", "description": "Find refreshToken call sites", "model": "sonnet",
+                   "effort": "low", "toolUseId": "toolu_demo"}, file)
     db.commit()
     return codex, claude
 
@@ -152,7 +191,8 @@ def screen():
 # (caption, keys to press before the capture)
 STORY = [
     ("Every Claude Code and Codex session, in one list", ["F1"]),
-    ("Ctrl-T: one agent at a time", ["C-t"]),
+    ("Alt-S: subagents, under the session that started them", ["M-s"]),
+    ("Ctrl-T: one agent at a time", ["M-s", "C-t"]),
     ("Ctrl-O: biggest sessions first", ["C-o", *["Up"] * 8]),
     ("Tab marks, Ctrl-D deletes, and open sessions are always skipped",
      ["Down", "Tab", "Down", "Down", "Tab", "C-d"]),

@@ -27,6 +27,7 @@ On Linux and macOS. The installer puts lethe in `~/.local/bin`, adds it to your 
 - **Running sessions are untouchable.** Sessions open in a running agent, or active in the last 10 minutes, are detected and skipped. Always, even with `--yes`.
 - **Undo.** Deleted Claude Code sessions go to a trash and can be restored. Codex sessions can be archived instead of deleted.
 - **The conversation as it is now.** When you edit or rewind an earlier prompt in Claude Code, the old branch stays in the transcript. lethe shows the active branch only, marks sessions that have abandoned branches with `⑂N`, and shows those branches on demand (`Alt-B`, `--all-branches`).
+- **Subagents included.** The subagents a session started are folded under it; `Alt-S` unfolds them and shows what each one did, Claude Code and Codex alike. Search finds a session by what its subagents wrote too.
 - **Find what to clean.** `Ctrl-F` and `Ctrl-W` open menus that show how many sessions and how much space each cleanup filter and each project holds: empty sessions, projects you deleted, idle ones, the biggest ones. Or search the text of every conversation.
 - **Scriptable.** `list --json`, `stats`, `--dry-run`, `--yes` for cron, and tab completion.
 
@@ -48,7 +49,7 @@ Two options, set in front of `sh`, if you need them:
 
 ```sh
 # install a given release instead of the latest version
-curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.6.3 sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.0 sh
 
 # install in another directory than ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
@@ -97,6 +98,8 @@ lethe resume 01a11ee1          # unique id prefixes work everywhere
 lethe fork 01a11ee1            # a copy to continue in another direction
 lethe export 01a11ee1 > notes.md
 lethe export 01a11ee1 --all-branches   # with abandoned branches, labelled (abandoned)
+lethe show 01a11ee1 --subagents        # with what each of its subagents did
+lethe list --subagents                 # subagents unfolded under their session
 ```
 
 ### Picker keys
@@ -123,6 +126,7 @@ Everything the command line can do, the picker can do too.
 | `Ctrl‑P` | show / hide the preview |
 | `Ctrl‑B` | disk usage of the listed sessions, in the preview |
 | `Alt‑B` | show / hide abandoned branches (`⑂`) |
+| `Alt‑S` | unfold / fold subagents, and read them |
 | `F1` | all keys, or only the essential ones |
 | `Esc` | quit |
 
@@ -139,12 +143,15 @@ The footer lists the keys and shows where each switch stands (`Ctrl‑T agent: c
 | `✗` | indexed by Codex, but the transcript file is gone |
 | `↺` | in the trash, restorable |
 | `⑂N` | N abandoned branches (edited or rewound prompts), hidden |
+| `▸` / `▾` | a session with subagents, folded / unfolded (`Alt‑S`) |
+| `├─` `└─` | a subagent, under the session that started it |
+| `↳` | a Claude Code subagent: part of its session, read-only |
 
 Sizes over 10 MB are yellow, over 50 MB red.
 
 ### Searching conversations
 
-Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversation contains it, the preview shows only the messages that mention it, highlighted ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence. Press `Ctrl‑G` again with an empty search to clear it.
+Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversation contains it, the preview shows only the messages that mention it, highlighted ("8 of 22 messages mention …"), and `Enter` opens the conversation on the first occurrence. Press `Ctrl‑G` again with an empty search to clear it. Subagents are searched too: the count says how many matches are in them ("· 2 in subagents"), and `Alt‑S` shows them.
 
 ### Cleaning up from the command line
 
@@ -182,16 +189,19 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | `--dir PATH` | sessions started in `PATH` or below it (repeatable; symlinks are followed) |
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
 | `--provider NAME` | `anthropic`, `openai`, … |
-| `--grep TEXT` | the conversation contains `TEXT` (any case, any branch) |
+| `--grep TEXT` | the conversation contains `TEXT` (any case, any branch, subagents included) |
 | `--empty` | sessions with no message and no reply |
 | `--orphans` | sessions whose project directory no longer exists (an unmounted disk or an unreadable parent does not count) |
 | `--missing` | Codex index entries whose transcript is gone |
-| `--keep N` | spares the `N` most recent sessions of each project, both agents together |
+| `--keep N` | spares the `N` most recent sessions of each project, both agents together; subagents follow the session that started them |
 | `ID…` | session ids or unique prefixes |
 
 ```sh
 lethe list --json | jq -r '.[] | select(.size > 50000000) | "\(.agent) \(.id) \(.title)"'
+lethe list --json | jq -r '.[] | select(.subagents) | "\(.id) \(.subagents.count) subagents"'
 ```
+
+`list --ids` and `list --json` stay flat: subagents are rows of their own there, with `parent` (Codex) and `subagents: {count, size}`.
 
 ## How it stays safe
 
@@ -203,7 +213,7 @@ lethe list --json | jq -r '.[] | select(.size > 50000000) | "\(.agent) \(.id) \(
 
   Protection is checked when the plan is shown, and again right before each change: a session that was opened, written to or moved in the meantime is left alone. `--force` lifts only the 10-minute rule. If a running agent's open files cannot be listed, lethe changes nothing. Homes reached through symlinks (`~/.codex` in a dotfiles repo, say) are resolved.
 - **Pinned Codex sessions** are skipped by filters (`--older-than`, `--empty`…): only naming them, by id or in the picker, changes them.
-- **Subagents.** Deleting a Codex session also deletes the subagent sessions it spawned, children first. A subagent whose parent is running is protected, and so is the whole tree of any protected session. Claude Code subagent transcripts live inside their session and go with it.
+- **Subagents.** Deleting a Codex session also deletes the subagent sessions it spawned, children first. A subagent whose parent is running is protected, and so is the whole tree of any protected session. A Codex subagent can be deleted or archived alone, never resumed or forked (it would leave its team). Claude Code subagents live inside their session: they are read-only rows in the picker and go with their session. Actions apply to what is selected, never to what is folded or unfolded.
 - **Codex** is changed only through its own CLI (`codex delete`, `codex archive`, `codex unarchive`). Every change is checked in its database afterwards.
 - **Claude Code** has no delete command. lethe moves the transcript and everything Claude Code keeps for that session (subagent transcripts, tool results, file history, session environment, its prompts in the prompt history) to the trash, with a manifest to restore it. A session is moved entirely or not at all, and a restore only writes inside the Claude Code directory.
 - **Resume** refuses a session that is already open in a running agent (two agents writing one transcript would interleave it); fork it instead.
