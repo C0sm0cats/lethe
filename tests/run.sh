@@ -1198,7 +1198,8 @@ cp -a "$(echo "$TRASH"/*)" "$TRASH/claude-$G.copy"
 expect_status "several trashed copies of a session are ambiguous" 1 trash restore "$G"
 rm -rf "$TRASH/claude-$G.copy"
 manifest=$(echo "$TRASH"/*/manifest.json)
-jq '.root = "relative"' "$manifest" >"$manifest.new" && mv "$manifest.new" "$manifest"
+jq '.root = "relative" | .items = ["relative/x"]' "$manifest" >"$manifest.new" && mv "$manifest.new" "$manifest"
+mkdir -p "$(echo "$TRASH"/*)/files" && echo x >"$(echo "$TRASH"/*)/files/x"
 expect_status "a relative manifest root is refused" 1 trash restore "$G"
 check "... and writes nothing" '[[ ! -e relative && ! -e $CPROJ/$G.jsonl ]]'
 reset_fixture

@@ -1294,7 +1294,11 @@ fetch_rows() {
     # One grep over every plain transcript first: most sessions stop here, without
     # the processes each of them would start. Compressed ones are read below.
     local -A raw_hit=()
-    local file hit
+    local file hit grep_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}} xargs_opts=()
+    # Plain ASCII needs no multibyte case folding, which is much slower.
+    [[ $F_GREP_RAW == *[![:ascii:]]* ]] || grep_locale=C
+    # Several greps at once, where xargs can (busybox may not).
+    if xargs -P 1 true </dev/null >/dev/null 2>&1; then xargs_opts=(-n 32 -P "$jobs"); fi
     while IFS= read -r hit; do
         [[ $hit != */subagents/agent-*.jsonl ]] || hit=${hit%/subagents/agent-*.jsonl}.jsonl
         raw_hit[$hit]=1
@@ -1307,7 +1311,7 @@ fetch_rows() {
                 if [[ -f $file && ! -L $file ]]; then printf '%s\0' "$file"; fi
             done
         fi
-    done | xargs -0 grep -laiF -- "$F_GREP_RAW" 2>/dev/null || true)
+    done | LC_ALL=$grep_locale xargs -0 "${xargs_opts[@]}" grep -laiF -- "$F_GREP_RAW" 2>/dev/null || true)
     for i in "${!candidates[@]}"; do
         path=${candidates[i]#*"$US"}
         [[ $path == *.zst || -n ${raw_hit[$path]+x} ]] || continue
@@ -1973,6 +1977,18 @@ cmd_show() {
     render_conversation "$agent" "$path" "$preview" "$id"
 }
 
+# claude_subagent_rows ID PATH — claude_subagent_fields from the index, which already
+# has them: a session can have hundreds. The files are read when it does not
+# (a trashed session).
+claude_subagent_rows() {
+    local rows=""
+    if [[ -n $1 && -n $CLAUDE_CACHE ]]; then
+        rows=$(query "SELECT agent, $(flat path), size, started, $(flat type), $(flat description), $(flat model),
+                             $(flat effort), tooluse FROM cl.claude_sub WHERE session = '${1//\'/}';")
+    fi
+    if [[ -n $rows ]]; then printf '%s\n' "$rows"; else claude_subagent_fields "$@"; fi
+}
+
 # subagent_list AGENT ID PATH — the subagents of a session, in launch order, one
 # line each: key US transcript US size US name US heading US tool_use_id.
 # Claude Code: the transcripts in <session>/subagents (key: agent id). Codex:
@@ -1988,7 +2004,7 @@ subagent_list() {
             name=${name:-${kind:-subagent}}
             heading="${kind:-subagent}${model:+ · $model${effort:+/$effort}}${description:+ · « $description »} · $hsize"
             printf '%s\n' "$key$US$file$US$size$US$name$US$heading$US$tool"
-        done < <(claude_subagent_fields "$id" "$path" |
+        done < <(claude_subagent_rows "$id" "$path" |
             awk -F "$US" -v OFS="$US" '{ print $4, $1, $2, $3, $5, $6, $7, $8, $9 }' | sort -t "$US" -k1,1 -k2,2)
     elif [[ -n $CODEX_DB ]] && ((HAS_EDGES)); then
         load_sizes

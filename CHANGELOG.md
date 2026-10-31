@@ -52,6 +52,7 @@ Speed:
 - `--grep` and Ctrl-G: one grep over the plain transcripts first, so that only sessions holding the
   text cost anything more.
 - The preview of a transcript over 32 MB reads its start and end, and says so.
+- The headers and previews read subagents from the index, not one process per subagent.
 - `delete -n` no longer computes what only a real deletion uses.
 - `show` no longer copies the whole text at each message.
 
