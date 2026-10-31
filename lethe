@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.7.3"
+readonly VERSION="0.7.4"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -1356,9 +1356,11 @@ fetch_rows() {
     local file hit verdict grep_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}} xargs_opts=()
     # Plain ASCII needs no multibyte case folding, which is much slower.
     [[ $F_GREP_RAW == *[![:ascii:]]* ]] || grep_locale=C
-    # Several at once, where xargs can (busybox may not).
+    # Several at once, where xargs can (busybox may not). They share one pipe: jq
+    # must write line by line, or their blocks would cut lines in two.
     if xargs -P 1 true </dev/null >/dev/null 2>&1; then xargs_opts=(-n 64 -P "$jobs"); fi
     while read -r verdict hit; do
+        [[ $verdict == [HM] && -n $hit ]] || continue
         [[ $hit != */subagents/agent-*.jsonl ]] || hit=${hit%/subagents/agent-*.jsonl}.jsonl
         if [[ $verdict == H ]]; then raw_hit[$hit]=1; else raw_maybe[$hit]=1; fi
     done < <(for i in "${!candidates[@]}"; do
@@ -1373,7 +1375,7 @@ fetch_rows() {
     done | LETHE_RAW=$F_GREP_RAW LETHE_TEXT=$F_GREP LETHE_LOCALE=$grep_locale LETHE_JQ="$JQ_INJECTED $JQ_SEARCH" \
         LETHE_PROJECTS=$CLAUDE_DIR/projects/ xargs -0 "${xargs_opts[@]}" sh -c '
             LC_ALL=$LETHE_LOCALE grep -aHiF -- "$LETHE_RAW" "$@" 2>/dev/null |
-                jq -nrR --arg q "$LETHE_TEXT" --arg projects "$LETHE_PROJECTS" "$LETHE_JQ"' _ || true)
+                jq -nrR --unbuffered --arg q "$LETHE_TEXT" --arg projects "$LETHE_PROJECTS" "$LETHE_JQ"' _ || true)
     for i in "${!candidates[@]}"; do
         path=${candidates[i]#*"$US"}
         if [[ -n ${raw_hit[$path]+x} ]]; then
@@ -2278,7 +2280,7 @@ render_conversation() {
         foreach ((inputs | select(.hidden != true)), {eof: true}) as $m ({prev: null, any: false};
             .out = []
             | if $m.eof then
-                  (if .prev != null then .out = [.prev | render] else . end)
+                  (if .prev != null then .out = [.prev | render | sub("\n+$"; "") + "\n"] else . end)
               elif $m.role == "section" then
                   .out = (if .prev != null then [.prev | render] else [] end) + [title($m.title)] | .prev = null
               elif $m.text == "" and .prev != null then

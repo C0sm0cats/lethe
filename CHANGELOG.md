@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.4 — 2026-10-31
+
+- **`--grep` and Ctrl-G could fail and find nothing in 0.7.3** when many sessions matched: parallel
+  searches cut each other's output lines. Results now match 0.7.0's on every word compared, on 189
+  real sessions. Update if you are on 0.7.3. Nothing was deleted by this: an empty search selects
+  nothing.
+- `show` no longer ends with an extra blank line when the last message ends with a line break.
+
 ## 0.7.3 — 2026-10-31
 
 Finishes what 0.7.1 only started:
@@ -7,7 +15,7 @@ Finishes what 0.7.1 only started:
 - `list` and picker reloads start no process per session, and text with accents no longer costs a
   loop over every character: 2.9 s → 1.1 s for 189 real sessions.
 - `--grep` and Ctrl-G: one pass over the transcripts instead of several processes per session found.
-  A word found almost everywhere: 34 s → 7 s on 1.8 GB.
+  A word found almost everywhere: 19.9 s (0.7.0) → 8.9 s on 1.8 GB (measured on 0.7.4; see below).
 - Ctrl-G's preview of a huge transcript reads only the lines holding the text (and says "N messages",
   as it does not count the others). Huge compressed transcripts are sampled like the others.
 - `delete` and `archive` compute what they compare in one pass, not per session.

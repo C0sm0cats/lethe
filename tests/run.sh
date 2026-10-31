@@ -1362,6 +1362,19 @@ printf 'recent\n' >"$WORK/pm/sort"; : >"$WORK/pm/grep"; : >"$WORK/pm/dir"
 out=$(LETHE_STATE=$WORK/pm REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines dir' _ "$LETHE" | perl -pe 's/\e\[[0-9;]*m//g')
 check "a shortened project keeps its whole path, searchable" '[[ $(grep "^$LP1" <<<"$out") == *"  $LP1" ]]' "$out"
 
+echo "search at scale"
+reset_fixture
+# Many sessions and long paths: parallel greps share one pipe, lines must stay whole.
+SCALE=$CLAUDE_CONFIG_DIR/projects/-a-rather-long-project-directory-name-so-that-output-lines-are-long-enough-to-fill-pipe-buffers
+mkdir -p "$SCALE"
+for n in $(seq 1 700); do
+    id=$(printf 'c%07x-0000-4000-8000-000000000001' "$n")
+    printf '{"type":"user","uuid":"u","cwd":"/x","timestamp":"2026-01-01T10:00:00.000Z","message":{"role":"user","content":"scaleword %d"}}\n' "$n" >"$SCALE/$id.jsonl"
+done
+find "$SCALE" -name '*.jsonl' -exec perl -e 'utime 1700000000, 1700000000, @ARGV' {} +
+out=$("$LETHE" list --ids --grep scaleword --claude 2>&1 | wc -l)
+check "--grep finds every session among hundreds" '[[ ${out//[[:space:]]/} == 700 ]]' "$out"
+
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))
