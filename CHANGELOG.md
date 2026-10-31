@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.7.1 — 2026-10-31
+
+Security:
+- A Codex session title holding the internal field separator (`\x1f`) could shift the fields of its
+  row, and on SQLite older than 3.50 reach shell arithmetic: `list` or `stats` could fail, or run a
+  command. Titles are flattened, and numeric fields are checked before any arithmetic.
+- A subagent transcript whose first `timestamp` was forged could inject SQL into the Claude Code
+  index script, and write a file through the `sqlite3` shell. Timestamps and agent ids are validated,
+  and index scripts run with `sqlite3 -safe` where it exists.
+- Restoring a session printed its title with its terminal control sequences. Outside a UTF-8 locale,
+  C1 control characters reached the terminal too.
+
+Wrong selection and data loss:
+- `--grep` with `--running`, `--recent` or `--idle` could select **another session** than the one
+  containing the text, including for `delete`.
+- `trash restore` reported success and erased the entry when the transcript was missing from it, and
+  lost the session's prompts when `history.jsonl` could not be written. Both now fail and keep the
+  session in the trash.
+- A failed move to the trash could erase files when putting them back failed too. They now stay in
+  the trash entry, and lethe says where.
+- On Alpine (busybox grep), a NUL byte in `history.jsonl` silently kept the prompts of deleted
+  sessions. A symlinked `history.jsonl` was replaced by a file, with the prompts left in its target.
+  Both are handled, and lethe now says when prompts could not be taken out.
+- One unreadable trash manifest blocked `trash list` and `trash empty`.
+- A whole HTML or XML prompt (`<div>…</div>`) was hidden, and could make its session `--empty`: only
+  machine-style tags now count as injected context. `[Request interrupted by user]` no longer counts
+  as a message you typed.
+- A Claude Code session whose subagent wrote in the last 10 minutes now counts as recent, and is
+  protected.
+- Selecting more than about 3,300 Codex sessions answered "Nothing to delete".
+- A prompt holding `\x1f` shifted the fields of its row in the Claude Code index.
+
+List and picker:
+- `lethe list` has an **ID column**, as long as ids need to be unique. Under 100 columns, `list` and
+  the deletion plan drop the date instead of wrapping.
+- Durations accept `mo` (`--older-than 6mo`), as the AGE column writes months; `m` still means months.
+- `stats` suggestions keep your filters: `lethe delete --empty --dir ~/work`.
+- The picker stays usable on small terminals: the preview no longer takes every row, `F1` and
+  `Ctrl-P` take turns under 32 lines, and at 50 columns the title, menu counts, marked size, `Esc` and
+  `F1` stay visible.
+- The list label counts apart: `11 session(s) + 3 subagent(s)`.
+- The project menu keeps both ends of long paths: they stay distinct, and can be found by what starts them.
+- `lethe trash` is aligned. `trash --help`, `trash list --help` and `completion --help` show the help.
+- `delete --claude` explains why an agent alone is refused. The stats panel says typed text is not
+  applied. Completion offers `--sort` only where it works.
+- The agent colors are readable on light terminals too.
+
+Speed:
+- `list` and picker reloads: no process per session (8.0 s → about 4 s for 1,000 sessions).
+- `--grep` and Ctrl-G: one grep over the plain transcripts first, so that only sessions holding the
+  text cost anything more.
+- The preview of a transcript over 32 MB reads its start and end, and says so.
+- `delete -n` no longer computes what only a real deletion uses.
+- `show` no longer copies the whole text at each message.
+
+Tests: 78 new checks, on the fixes above and on behavior nothing covered (resume directory, trash
+confirmation and dry run, background jobs, recycled PIDs, read-only access to the Codex database…).
+
 ## 0.7.0 — 2026-10-22
 
 Subagents:

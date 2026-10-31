@@ -23,7 +23,7 @@ On Linux and macOS. The installer puts lethe in `~/.local/bin`, adds it to your 
 
 - **Every session, one list.** Claude Code and Codex side by side, with age, size, project and title, and a live preview of the conversation.
 - **Resume anything.** `Ctrl-R` reopens a session in its agent, in the directory it was started from. `Ctrl-K` forks it into a new session, and `Ctrl-E` exports it as Markdown.
-- **Clean up in seconds.** Mark with `Tab`, delete with `Ctrl-D`. Or `lethe delete --older-than 1m --keep 3`.
+- **Clean up in seconds.** Mark with `Tab`, delete with `Ctrl-D`. Or `lethe delete --older-than 1mo --keep 3`.
 - **Running sessions are untouchable.** Sessions open in a running agent, or active in the last 10 minutes, are detected and skipped. Always, even with `--yes`.
 - **Undo.** Deleted Claude Code sessions go to a trash and can be restored. Codex sessions can be archived instead of deleted.
 - **The conversation as it is now.** When you edit or rewind an earlier prompt in Claude Code, the old branch stays in the transcript. lethe shows the active branch only, marks sessions that have abandoned branches with `⑂N`, and shows those branches on demand (`Alt-B`, `--all-branches`).
@@ -49,7 +49,7 @@ Two options, set in front of `sh`, if you need them:
 
 ```sh
 # install a given release instead of the latest version
-curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.0 sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.1 sh
 
 # install in another directory than ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
@@ -94,7 +94,7 @@ lethe                          # the picker
 lethe stats                    # what takes space, with cleanup suggestions
 lethe list --claude --sort size
 lethe list --running           # what is open right now
-lethe resume 01a11ee1          # unique id prefixes work everywhere
+lethe resume 01a11ee1          # the ID column of list; unique prefixes work everywhere
 lethe fork 01a11ee1            # a copy to continue in another direction
 lethe export 01a11ee1 > notes.md
 lethe export 01a11ee1 --all-branches   # with abandoned branches, labelled (abandoned)
@@ -124,7 +124,7 @@ Everything the command line can do, the picker can do too.
 | `Ctrl‑G` | find the typed text in the conversations ([details](#searching-conversations)) |
 | `Ctrl‑O` | sort: by date, by size or oldest first |
 | `Ctrl‑P` | show / hide the preview |
-| `Ctrl‑B` | disk usage of the listed sessions, in the preview |
+| `Ctrl‑B` | disk usage of the listed sessions, in the preview (text typed in the list is not applied) |
 | `Alt‑B` | show / hide abandoned branches (`⑂`) |
 | `Alt‑S` | unfold / fold subagents, and read them |
 | `F1` | all keys, or only the essential ones |
@@ -158,11 +158,11 @@ Type a word, then press `Ctrl‑G`: the list keeps the sessions whose conversati
 ```sh
 lethe delete --empty                       # sessions without a single message
 lethe delete --orphans                     # projects you have deleted or moved
-lethe delete --older-than 1m --keep 3      # idle for a month, but keep the last 3 of each project
+lethe delete --older-than 1mo --keep 3     # idle for a month, but keep the last 3 of each project
 lethe delete --codex --mode exec --older-than 1w
 lethe delete --grep "api key" --dry-run    # preview what would be deleted
 lethe archive --dir ~/old-project          # hide a finished project from codex resume
-lethe delete --older-than 6m --yes         # no prompt, e.g. from cron
+lethe delete --older-than 6mo --yes        # no prompt, e.g. from cron
 ```
 
 Destructive commands show the sessions they will change and ask for confirmation. Without a terminal they require `--yes`. With no filter at all they require `--all`.
@@ -175,7 +175,7 @@ lethe trash restore 7f3a       # put a session back, exactly where it was
 lethe trash empty --older-than 30d         # what was trashed more than 30 days ago
 ```
 
-The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites existing files, and is all or nothing: if a file cannot be put back, the session stays whole in the trash.
+The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites existing files, and is all or nothing: if a file or the prompt history cannot be put back, or the transcript is missing, the session stays in the trash.
 
 ### Filters
 
@@ -184,7 +184,7 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | `--claude`, `--codex` | one agent (also `--agent NAME`) |
 | `--running`, `--recent`, `--idle`, `--archived` | session status: open in an agent (`◉`), closed in the last 10 minutes (`◔`), neither (`●`), archived (`◌`) |
 | `--unarchived` | all but archived sessions (formerly `--active`) |
-| `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6m`, `1y` |
+| `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6mo` (or `6m`), `1y` |
 | `--newer-than D` | last activity within `D` |
 | `--dir PATH` | sessions started in `PATH` or below it (repeatable; symlinks are followed) |
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
@@ -209,7 +209,7 @@ lethe list --json | jq -r '.[] | select(.subagents) | "\(.id) \(.subagents.count
   - a running process holds its transcript open (this is how Codex works);
   - Claude Code lists it in `~/.claude/sessions/` with a live process, checked against the process start time so that a recycled PID doesn't count;
   - it is an unfinished Claude Code background job;
-  - it was active in the last 10 minutes.
+  - it was active in the last 10 minutes, subagents included.
 
   Protection is checked when the plan is shown, and again right before each change: a session that was opened, written to or moved in the meantime is left alone. `--force` lifts only the 10-minute rule. If a running agent's open files cannot be listed, lethe changes nothing. Homes reached through symlinks (`~/.codex` in a dotfiles repo, say) are resolved.
 - **Pinned Codex sessions** are skipped by filters (`--older-than`, `--empty`…): only naming them, by id or in the picker, changes them.

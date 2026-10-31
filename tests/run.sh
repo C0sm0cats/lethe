@@ -938,7 +938,7 @@ reset_fixture
   printf '{"display":"bye","sessionId":"%s"}\n' "$H"; } >"$CLAUDE_CONFIG_DIR/history.jsonl"
 "$LETHE" delete -y "$H" >/dev/null 2>&1
 check "a NUL byte in the prompt history does not empty it" \
-    '[[ $(grep -ac "" "$CLAUDE_CONFIG_DIR/history.jsonl") -eq 2 ]] && grep -aq "keep me" "$CLAUDE_CONFIG_DIR/history.jsonl"'
+    '[[ $(wc -l <"$CLAUDE_CONFIG_DIR/history.jsonl") -eq 2 ]] && grep -aq "keep me" "$CLAUDE_CONFIG_DIR/history.jsonl" && ! grep -aq "\"bye\"" "$CLAUDE_CONFIG_DIR/history.jsonl"'
 N=99999999-0000-4000-8000-0000000000ab
 claude_chat "$N" 3 "$PROJ" 'user:first prompt' 'assistant:first answer' 'user:second prompt' 'assistant:last answer'
 perl -pi -e 's/first answer/first \\u0000 answer/; s/"first answer"/"first answer"/' "$CPROJ/$N.jsonl"
@@ -1232,9 +1232,12 @@ for size in "200 50" "80 24" "50 18"; do
     COLUMNS=${size% *} LINES=${size#* } "$LETHE" pick </dev/null >/dev/null 2>&1 || true
     check "lethe pick starts fzf with the rows, panel layout, at $size" 'grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.in" 2>/dev/null)"
 done
-COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
-check "on a short terminal the preview and the full key list take turns" \
-    'grep -q "f1:.*hide-preview" "$WORK/fzf.args" && grep -q "ctrl-p:toggle-preview+execute-silent(.*__state keys short)" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+# (tput reads these two variables, where it exists)
+if [[ $(LINES=24 tput lines 2>/dev/null) == 24 ]]; then
+    COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
+    check "on a short terminal the preview and the full key list take turns" \
+        'grep -q "f1:.*hide-preview" "$WORK/fzf.args" && grep -q "ctrl-p:toggle-preview+execute-silent(.*__state keys short)" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+fi
 rm -f "$WORK/bin/fzf"
 printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"assistant says hello"}]}}' \
     '{"type":"realtime_item","payload":{"type":"transcript_segment","role":"user","text":"spoken words"}}' >>"$(codex_file "$B" 0)"
