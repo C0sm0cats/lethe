@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.7.1"
+readonly VERSION="0.7.2"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -3007,7 +3007,7 @@ cmd_pick() {
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
             --bind="multi:transform-list-label($me __marked {+1})"
-            --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$f1_extra"
+            --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$f1_extra+clear-screen"
             --header-lines=1 --header-lines-border=inline --color='header:8'
         )
         refresh="+transform-prompt($me __state prompt)+transform-footer($me __state footer)+reload($me __rows)"
@@ -3023,7 +3023,7 @@ cmd_pick() {
     local toggle=toggle-preview show_first=""
     if ((tight)); then
         show_first="+execute-silent($me __state keys short)"
-        toggle+="$show_first+transform-footer($me __state footer)"
+        toggle+="$show_first+transform-footer($me __state footer)+clear-screen"
     fi
     if [[ -n ${NO_COLOR:-} ]]; then
         layout+=(--color=bw)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2 — 2026-10-31
+
+- Picker: `F1` left pieces of the old borders on the screen when the footer changed height, next to
+  the preview. It now redraws. The README demo showed them too, and is re-recorded.
+
 ## 0.7.1 — 2026-10-31
 
 Security:

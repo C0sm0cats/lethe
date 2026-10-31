@@ -1233,6 +1233,7 @@ for size in "200 50" "80 24" "50 18"; do
     COLUMNS=${size% *} LINES=${size#* } "$LETHE" pick </dev/null >/dev/null 2>&1 || true
     check "lethe pick starts fzf with the rows, panel layout, at $size" 'grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.in" 2>/dev/null)"
 done
+check "F1 redraws: fzf leaves old borders when the footer changes height" 'grep -q "^--bind=f1:.*+clear-screen$" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
 # (tput reads these two variables, where it exists)
 if [[ $(LINES=24 tput lines 2>/dev/null) == 24 ]]; then
     COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
