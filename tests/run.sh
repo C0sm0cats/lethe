@@ -1143,7 +1143,7 @@ check "at 50 columns the menus keep their counts" '[[ -z $out ]]' "$out"
 out=$(FZF_COLUMNS=50 FZF_SELECT_COUNT=1 LETHE_STATE=$WORK/nt "$LETHE" __marked "$A")
 check "at 50 columns the marked size stays" '[[ $out == " 1 marked · "* && $out != *"session(s)"* ]]' "$out"
 out=$(FZF_COLUMNS=50 LETHE_STATE=$WORK/nt "$LETHE" __rows | sed -n 2p | cut -f 2 | perl -pe 's/\e\[[0-9;]*m//g')
-check "at 50 columns the project gives way to the title" '[[ ${#out} -gt 30 && $out =~ [0-9BKM]\ \ .{10}\ \  ]]' "$out"
+check "at 50 columns the project and the size give way to the title" '[[ $out =~ ^.\ [a-z]+\ +[0-9]+[a-z]+\ \ .{10}\ \ [^\ ] && ${#out} -lt 60 ]]' "$out"
 LETHE_STATE=$WORK/nt "$LETHE" __state keys
 LETHE_STATE=$WORK/nt "$LETHE" __state keys short
 check "the footer can be forced short for the preview" '[[ $(<"$WORK/nt/keys") == short ]]'
@@ -1268,6 +1268,99 @@ if command -v zstd >/dev/null 2>&1; then
     out=$("$LETHE" export "$A")
     check "a plain transcript wins over its compressed copy" '[[ $out == *"please refactor the Parser"* && $out != *"compressed copy"* ]]' "$out"
 fi
+
+echo "search, one pass"
+reset_fixture
+L1=b1000000-0000-4000-8000-000000000001 L2=b2000000-0000-4000-8000-000000000002 L3=b3000000-0000-4000-8000-000000000003
+claude_chat "$L1" 3 "$PROJ" 'user:literal a.b (c)+ here' 'assistant:ok'
+claude_chat "$L2" 3 "$PROJ" 'user:literal axb cc here' 'assistant:ok'
+expect_ids "--grep is literal: a dot is a dot" "$L1" --grep 'a.b (c)+'
+jq -cn '{type: "user", uuid: "side", isSidechain: true, cwd: "/x", timestamp: "2026-01-01T10:00:00.000Z", message: {role: "user", content: "sidechainword"}}' >>"$CPROJ/$L2.jsonl"
+jq -cn '{type: "assistant", uuid: "th", cwd: "/x", timestamp: "2026-01-01T10:00:00.000Z", message: {role: "assistant", content: [{type: "thinking", thinking: "thinkingword"}]}}' >>"$CPROJ/$L2.jsonl"
+jq -cn '{type: "user", uuid: "me", isMeta: true, cwd: "/x", timestamp: "2026-01-01T10:00:00.000Z", message: {role: "user", content: "metaword"}}' >>"$CPROJ/$L2.jsonl"
+set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$L2.jsonl"
+expect_ids "... a sidechain line of the main transcript is not searched" "" --grep sidechainword
+expect_ids "... nor reasoning" "" --grep thinkingword
+expect_ids "... nor meta messages" "" --grep metaword
+if [[ $(locale charmap 2>/dev/null) == UTF-8 ]]; then
+    claude_chat "$L3" 3 "$PROJ" 'user:Un ÉTÉ chaud' 'assistant:ok'
+    expect_ids "... accents match in any case" "$L3" --grep 'été chaud'
+fi
+claude_session "$L3" 3 "$PROJ" "" "zzqxplain word"
+expect_ids "... several matches in several sessions" "$A $G" --grep PARSER
+sqlite3 "$DB" "UPDATE threads SET title = 'x' WHERE id = '$D';"
+printf '%s\n' '{"type":"event_msg","payload":{"type":"user_message","message":"only in an event"}}' >"$(codex_file "$D" 1)"
+set_mtime "$(($(date +%s) - 40 * 86400))" "$(codex_file "$D" 1)"
+expect_ids "... a Codex transcript with only events is searched" "$D" --grep "only in an event"
+printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"clear text"}]}}' \
+    '{"type":"event_msg","payload":{"type":"agent_message","message":"zzqx echo event"}}' >"$(codex_file "$D" 1)"
+set_mtime "$(($(date +%s) - 40 * 86400))" "$(codex_file "$D" 1)"
+expect_ids "... events do not count next to messages in clear, as in the conversation" "" --grep "zzqx echo event"
+
+echo "the conversation, as it comes"
+reset_fixture
+L4=b4000000-0000-4000-8000-000000000004
+claude_chat "$L4" 3 "$PROJ" 'user:<command-name>/x</command-name>'
+out=$("$LETHE" show "$L4" | tail -n 1)
+check "show says when there is no message" '[[ $out == "(no messages)" ]]' "$out"
+out=$("$LETHE" show "$A" | tail -c 60)
+check "show ends with one newline" '[[ $("$LETHE" show "$A" | tail -n 1) == *Parser* ]]' "$out"
+out=$("$LETHE" show "$A" | awk 'prev == "" && $0 == "" { bad = 1 } { prev = $0 } END { exit bad }' && echo fine)
+check "show has no doubled blank lines" '[[ $out == fine ]]' "$out"
+
+echo "huge transcripts and Ctrl-G"
+reset_fixture
+L5=b5000000-0000-4000-8000-000000000005
+claude_chat "$L5" 3 "$PROJ" 'user:start of it' 'assistant:ok'
+head -c 18000000 /dev/zero | tr '\0' x >>"$CPROJ/$L5.jsonl"
+printf '\n' >>"$CPROJ/$L5.jsonl"
+jq -cn '{type: "user", uuid: "mid", parentUuid: "gone", cwd: "/x", timestamp: "2026-01-01T10:00:00.000Z", message: {role: "user", content: "needle in the middle"}}' >>"$CPROJ/$L5.jsonl"
+head -c 18000000 /dev/zero | tr '\0' y >>"$CPROJ/$L5.jsonl"
+printf '\n' >>"$CPROJ/$L5.jsonl"
+set_mtime "$(($(date +%s) - 3 * 86400))" "$CPROJ/$L5.jsonl"
+mkdir -p "$WORK/huge"
+for f in agent status filter; do printf 'all\n' >"$WORK/huge/$f"; done
+printf 'recent\n' >"$WORK/huge/sort"; : >"$WORK/huge/dir"; printf 'short\n' >"$WORK/huge/keys"
+printf 'active\n' >"$WORK/huge/branches"; printf 'conversation\n' >"$WORK/huge/panel"; printf 'hidden\n' >"$WORK/huge/subagents"
+"$LETHE" list >/dev/null
+printf 'NEEDLE IN' >"$WORK/huge/grep"
+out=$(LETHE_STATE=$WORK/huge FZF_PREVIEW_COLUMNS=80 "$LETHE" __preview "$L5")
+check "Ctrl-G on a huge transcript finds the text anywhere, without reading the rest" \
+    '[[ $out == *"1 messages mention “NEEDLE IN”"* && $out == *"needle in the middle"* && $(sed 1d <<<"$out") != *"start of it"* ]]' "${out:0:400}"
+if command -v zstd >/dev/null 2>&1; then
+    { printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"start of the archive"}]}}'
+      head -c 8000000 /dev/urandom | od -An -tx1 | tr -d ' \n'; printf '\n'
+      printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"end of the archive"}]}}'; } >"$WORK/huge/in"
+    plain=$(codex_file "$A" 0)
+    rm -f "$plain"
+    zstd -q -f "$WORK/huge/in" -o "$plain.zst"
+    out=$(FZF_PREVIEW_COLUMNS=80 "$LETHE" show --preview "$A")
+    check "a huge compressed transcript is sampled too" '[[ $out == *"Very long transcript"* && $out == *"start of the archive"* ]]' "${out:0:400}"
+fi
+
+echo "stamps in one pass"
+reset_fixture
+out=$("$LETHE" delete -y "$G" "$B" 2>&1)
+check "planned sessions are not seen as changed" '[[ $out != *"changed since"* && ! -e $CPROJ/$G.jsonl ]] && ! codex_exists "$B"' "$out"
+reset_fixture
+printf '%s' "$CPROJ/$G/subagents/agent-x.jsonl" >"$WORK/on-delete"
+out=$("$LETHE" delete -y "$A" "$G" 2>&1) || true
+check "a Claude session whose subagent wrote after the plan is left alone" '[[ $out == *"$G changed since the plan"* && -f $CPROJ/$G.jsonl ]]' "$out"
+
+echo "project menu"
+reset_fixture
+LP1=$WORK/clients/acme/workspace/monorepo/packages/some-long-name/shared-component
+LP2=$WORK/clients/beta/workspace/monorepo/packages/some-long-name/shared-component
+mkdir -p "$LP1" "$LP2"
+L6=b6000000-0000-4000-8000-000000000006 L7=b7000000-0000-4000-8000-000000000007
+claude_chat "$L6" 3 "$LP1" 'user:one' 'assistant:ok'
+claude_chat "$L7" 3 "$LP2" 'user:two' 'assistant:ok'
+mkdir -p "$WORK/pm"
+for f in agent status filter; do printf 'all\n' >"$WORK/pm/$f"; done
+printf 'recent\n' >"$WORK/pm/sort"; : >"$WORK/pm/grep"; : >"$WORK/pm/dir"
+"$LETHE" list >/dev/null
+out=$(LETHE_STATE=$WORK/pm REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines dir' _ "$LETHE" | perl -pe 's/\e\[[0-9;]*m//g')
+check "a shortened project keeps its whole path, searchable" '[[ $(grep "^$LP1" <<<"$out") == *"  $LP1" ]]' "$out"
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

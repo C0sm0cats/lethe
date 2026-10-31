@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.3 — 2026-10-31
+
+Finishes what 0.7.1 only started:
+
+- `list` and picker reloads start no process per session, and text with accents no longer costs a
+  loop over every character: 2.9 s → 1.1 s for 189 real sessions.
+- `--grep` and Ctrl-G: one pass over the transcripts instead of several processes per session found.
+  A word found almost everywhere: 34 s → 7 s on 1.8 GB.
+- Ctrl-G's preview of a huge transcript reads only the lines holding the text (and says "N messages",
+  as it does not count the others). Huge compressed transcripts are sampled like the others.
+- `delete` and `archive` compute what they compare in one pass, not per session.
+- `show` and Enter render messages as they come, without holding the whole text. The first message
+  still waits for the transcript to be read once: which branch is active is known only at its end.
+- The project menu searches the whole path of a shortened project, and shows it when there is room.
+- At under 60 columns, the picker gives the size column to the title too (the marked size stays).
+
 ## 0.7.2 — 2026-10-31
 
 - Picker: `F1` left pieces of the old borders on the screen when the footer changed height, next to

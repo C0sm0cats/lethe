@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.7.2"
+readonly VERSION="0.7.3"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -61,7 +61,11 @@ printf -v NOW '%(%s)T' -1
 PROJECT_WIDTH=16
 ((${FZF_COLUMNS:-${COLUMNS:-0}} < 180)) || PROJECT_WIDTH=26
 # Narrow: the title matters more than the project.
-((${FZF_COLUMNS:-${COLUMNS:-0}} == 0 || ${FZF_COLUMNS:-${COLUMNS:-0}} >= 60)) || PROJECT_WIDTH=10
+ROW_NOSIZE=0
+if ((${FZF_COLUMNS:-${COLUMNS:-0}} > 0 && ${FZF_COLUMNS:-${COLUMNS:-0}} < 60)); then
+    # The marked size stays in the list label.
+    PROJECT_WIDTH=10 ROW_NOSIZE=1
+fi
 # Command-line rows: the date goes first when the terminal is short of room, and
 # ROW_ID_WIDTH > 0 adds the id column.
 ROW_NODATE=0 ROW_ID_WIDTH=0
@@ -130,7 +134,7 @@ char_width() {
 # shellcheck disable=SC2034 # nameref output
 fit() {
     local -n fit_out=$1
-    local text=$2 width=$3 from=${4:-head} n=${#2} i cp total=0 used=0 widths=()
+    local text=$2 width=$3 from=${4:-head} n=${#2} i cp total=0 used=0
     if [[ $text != *[![:ascii:]]* ]]; then
         if ((n > width)); then
             if [[ $from == tail ]]; then text="…${text:n-width+1}"; else text="${text:0:width-1}…"; fi
@@ -138,21 +142,22 @@ fit() {
         printf -v fit_out '%s%*s' "$text" $((width - ${#text})) ''
         return
     fi
-    for ((i = 0; i < n; i++)); do
-        printf -v cp '%d' "'${text:i:1}"
-        char_width "$cp"
-        widths[i]=$CW
+    # From the end that is kept, and only as far as the width: this runs for every
+    # row whose text is not plain ASCII (a single accent is enough).
+    local step=1 at=0 keep=0
+    if [[ $from == tail ]]; then step=-1 at=$((n - 1)); fi
+    for ((i = 0; i < n; i++, at += step)); do
+        printf -v cp '%d' "'${text:at:1}"
+        if ((cp < 0x300)); then CW=1; else char_width "$cp"; fi
         total=$((total + CW))
+        # Where the text stops if it needs an ellipsis: width - 1 columns.
+        if ((total <= width - 1)); then
+            keep=$((i + 1)) used=$total
+        fi
+        ((total <= width)) || break
     done
     if ((total > width)); then
-        # Keep width - 1 columns, and the ellipsis.
-        if [[ $from == tail ]]; then
-            for ((i = n - 1; i >= 0 && used + widths[i] <= width - 1; i--)); do used=$((used + widths[i])); done
-            text="…${text:i+1}"
-        else
-            for ((i = 0; i < n && used + widths[i] <= width - 1; i++)); do used=$((used + widths[i])); done
-            text="${text:0:i}…"
-        fi
+        if [[ $from == tail ]]; then text="…${text:n-keep}"; else text="${text:0:keep}…"; fi
         total=$((used + 1))
     fi
     printf -v fit_out '%s%*s' "$text" $((width - total)) ''
@@ -288,17 +293,31 @@ transcript_cat() {
 # The preview of a huge transcript reads its start and end only.
 readonly SAMPLE_OVER=33554432 SAMPLE_HEAD=8388608 SAMPLE_TAIL=25165824
 
-# transcript_read FILE — transcript_cat, or with MSG_SAMPLE=1 the start and end of a
-# huge plain transcript (the lines cut in two are dropped by the JSON parsers).
+# transcript_huge FILE — too big for a preview to read it all? Compressed files
+# are judged by their compressed size.
+transcript_huge() {
+    local size limit=$SAMPLE_OVER
+    [[ $1 != *.zst ]] || limit=$((SAMPLE_OVER / 8))
+    size=$(wc -c <"$1" 2>/dev/null) || return 1
+    ((size > limit))
+}
+
+# transcript_read FILE — transcript_cat, except for previews of huge transcripts:
+# MSG_SAMPLE=1, the start and end (lines cut in two are dropped by the JSON
+# parsers); MSG_SAMPLE=2, the lines holding MSG_RAW (Ctrl-G).
 transcript_read() {
-    local size=0
-    if ((${MSG_SAMPLE:-0})) && [[ $1 != *.zst ]]; then
-        size=$(wc -c <"$1" 2>/dev/null) || size=0
-        if ((size > SAMPLE_OVER)); then
-            { head -c "$SAMPLE_HEAD" -- "$1"; printf '\n'; tail -c "$SAMPLE_TAIL" -- "$1"; } 2>/dev/null
+    case ${MSG_SAMPLE:-0} in
+        1)
+            if transcript_huge "$1"; then
+                transcript_cat "$1" | { head -c "$SAMPLE_HEAD"; printf '\n'; tail -c "$SAMPLE_TAIL"; } 2>/dev/null
+                return 0
+            fi
+            ;;
+        2)
+            transcript_cat "$1" | grep -aiF -- "$MSG_RAW" 2>/dev/null || true
             return 0
-        fi
-    fi
+            ;;
+    esac
     transcript_cat "$1"
 }
 
@@ -1216,6 +1235,45 @@ session_matches() {
     fi
 }
 
+# JQ_SEARCH — fed "FILE:LINE" lines (grep -H) holding the raw text, says for each
+# file whether a message has the text: "H FILE", or "M FILE" for a Codex line that
+# only counts if the transcript has no message in clear. Once a file is known, its
+# other lines are not even parsed.
+readonly JQ_SEARCH='
+    ($q | gsub("(?<c>[.*+?^${}()|\\[\\]\\\\/])"; "\\\(.c)")) as $re
+    | def verdict($file):
+        if ($file | startswith($projects)) then
+            if (.type == "user" or .type == "assistant") and .isMeta != true and .isCompactSummary != true
+               and (.isSidechain != true or ($file | contains("/subagents/")))
+               and any(.message.content | if type == "string" then . else (.[]? | objects | select(.type == "text") | .text) end
+                       | strings | select(injected | not); test($re; "i"))
+            then "H" else "" end
+        elif .type == "response_item" and .payload.type == "message" then
+            if (.payload.role == "user" or .payload.role == "assistant")
+               and any(.payload.content[]? | objects | select(.type == "input_text" or .type == "output_text") | .text | strings
+                       | select((injected or startswith("# AGENTS.md instructions")) | not); test($re; "i"))
+            then "H" else "" end
+        elif .type == "realtime_item" and .payload.type == "transcript_segment" then
+            if (.payload.text // "" | test($re; "i")) then "H" else "" end
+        elif (.type == "event_msg" and (.payload.type == "user_message" or .payload.type == "agent_message"
+                                        or .payload.type == "item_completed"))
+             or (.type == "response_item" and (.payload.type == "agent_message" or .payload.type == "function_call"))
+        then "M" else "" end;
+      foreach inputs as $line ({seen: {}};
+          .out = null
+          | ($line | index(".jsonl:")) as $at
+          | if $at == null then . else
+              $line[:$at + 6] as $file
+              | if .seen[$file] then . else
+                  ($line[$at + 7:] | fromjson? // null) as $entry
+                  | (if ($entry | type) == "object" then (try ($entry | verdict($file)) catch "") else "" end) as $v
+                  | if $v == "H" then .seen[$file] = true | .out = "H \($file)"
+                    elif $v == "M" then .out = "M \($file)"
+                    else . end
+                end
+            end;
+          .out // empty)'
+
 # ── Rows ─────────────────────────────────────────────────────────────────────
 
 # One line per matching session, most recent first, fields separated by $US:
@@ -1291,17 +1349,18 @@ fetch_rows() {
     local found jobs running=0 i
     found=$(mktemp -d "${TMPDIR:-/tmp}/lethe-grep.XXXXXX")
     jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
-    # One grep over every plain transcript first: most sessions stop here, without
-    # the processes each of them would start. Compressed ones are read below.
-    local -A raw_hit=()
-    local file hit grep_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}} xargs_opts=()
+    # Plain transcripts, all at once: one grep hands the lines holding the text to one
+    # jq, which says "H FILE" (a message of FILE has it) or "M FILE" (only
+    # session_matches can tell). A session costs a process only if it needs that.
+    local -A raw_hit=() raw_maybe=()
+    local file hit verdict grep_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}} xargs_opts=()
     # Plain ASCII needs no multibyte case folding, which is much slower.
     [[ $F_GREP_RAW == *[![:ascii:]]* ]] || grep_locale=C
-    # Several greps at once, where xargs can (busybox may not).
-    if xargs -P 1 true </dev/null >/dev/null 2>&1; then xargs_opts=(-n 32 -P "$jobs"); fi
-    while IFS= read -r hit; do
+    # Several at once, where xargs can (busybox may not).
+    if xargs -P 1 true </dev/null >/dev/null 2>&1; then xargs_opts=(-n 64 -P "$jobs"); fi
+    while read -r verdict hit; do
         [[ $hit != */subagents/agent-*.jsonl ]] || hit=${hit%/subagents/agent-*.jsonl}.jsonl
-        raw_hit[$hit]=1
+        if [[ $verdict == H ]]; then raw_hit[$hit]=1; else raw_maybe[$hit]=1; fi
     done < <(for i in "${!candidates[@]}"; do
         path=${candidates[i]#*"$US"}
         [[ $path != *.zst ]] || continue
@@ -1311,10 +1370,17 @@ fetch_rows() {
                 if [[ -f $file && ! -L $file ]]; then printf '%s\0' "$file"; fi
             done
         fi
-    done | LC_ALL=$grep_locale xargs -0 "${xargs_opts[@]}" grep -laiF -- "$F_GREP_RAW" 2>/dev/null || true)
+    done | LETHE_RAW=$F_GREP_RAW LETHE_TEXT=$F_GREP LETHE_LOCALE=$grep_locale LETHE_JQ="$JQ_INJECTED $JQ_SEARCH" \
+        LETHE_PROJECTS=$CLAUDE_DIR/projects/ xargs -0 "${xargs_opts[@]}" sh -c '
+            LC_ALL=$LETHE_LOCALE grep -aHiF -- "$LETHE_RAW" "$@" 2>/dev/null |
+                jq -nrR --arg q "$LETHE_TEXT" --arg projects "$LETHE_PROJECTS" "$LETHE_JQ"' _ || true)
     for i in "${!candidates[@]}"; do
         path=${candidates[i]#*"$US"}
-        [[ $path == *.zst || -n ${raw_hit[$path]+x} ]] || continue
+        if [[ -n ${raw_hit[$path]+x} ]]; then
+            : >"$found/$i"
+            continue
+        fi
+        [[ $path == *.zst || -n ${raw_maybe[$path]+x} ]] || continue
         { session_matches "${candidates[i]%%"$US"*}" "${candidates[i]#*"$US"}" && : >"$found/$i"; } &
         running=$((running + 1))
         if ((running >= jobs)); then
@@ -1352,14 +1418,21 @@ tree_rows() {
     local -a order=()
     local -A t_line=() t_parent=() t_rec=() t_size=() t_created=() t_agent=() t_kids=() t_children=() t_cwd=()
     local row id p f
+    # No process and no temporary input per row: this runs for every session.
+    local saved_ifs=$IFS
+    set -f
     while IFS= read -r row; do
-        IFS=$US read -ra f <<<"$row"
+        IFS=$US
+        # shellcheck disable=SC2206 # split on $US, with globbing off
+        f=($row)
+        IFS=$saved_ifs
         id=${f[1]}
         order+=("$id")
         t_line[$id]=$row t_agent[$id]=${f[0]} t_rec[$id]=${f[3]} t_size[$id]=${f[8]} t_cwd[$id]=${f[9]}
         t_parent[$id]=${f[15]:-} t_kids[$id]=${f[16]:-0} t_created[$id]=${f[18]:-0}
         ((t_size[$id] >= 0)) || t_size[$id]=0
     done
+    set +f
     ((${#order[@]})) || return 0
 
     # Parents the filters left out: shown as context, if they still exist.
@@ -1415,6 +1488,7 @@ tree_rows() {
         local id=$1 c
         seen[$id]=1
         M_REC=$((t_rec[$id] > M_REC ? t_rec[$id] : M_REC)) M_SIZE=$((M_SIZE + t_size[$id]))
+        [[ -n ${t_children[$id]:-} ]] || return 0
         while IFS=$'\t' read -r _ c; do
             if [[ -n $c && -z ${seen[$c]+x} ]]; then tree_measure "$c"; fi
         done <<<"${t_children[$id]:-}"
@@ -1441,6 +1515,7 @@ tree_rows() {
     tree_hide() {
         local c
         emitted[$1]=1
+        [[ -n ${t_children[$1]:-} ]] || return 0
         while IFS=$'\t' read -r _ c; do
             [[ -n $c && -z ${emitted[$c]+x} ]] || continue
             printf '%s\n' "hidden$US$US$US$US$US${t_line[$c]}"
@@ -1455,9 +1530,11 @@ tree_rows() {
         local skind
         emitted[$id]=1
         # Each session once, even when edges make a cycle.
-        while IFS=$'\t' read -r _ c; do
-            if [[ -n $c && -z ${emitted[$c]+x} ]]; then kidlist+=("$c") && emitted[$c]=1; fi
-        done < <([[ -z ${t_children[$id]:-} ]] || printf '%s' "${t_children[$id]}" | sort -n)
+        if [[ -n ${t_children[$id]:-} ]]; then
+            while IFS=$'\t' read -r _ c; do
+                if [[ -n $c && -z ${emitted[$c]+x} ]]; then kidlist+=("$c") && emitted[$c]=1; fi
+            done < <(printf '%s' "${t_children[$id]}" | sort -n)
+        fi
         for c in "${kidlist[@]}"; do unset 'emitted[$c]'; done
         [[ -z ${context[$id]+x} ]] || kind=context style=context
         if ((depth > 0)); then
@@ -1479,7 +1556,8 @@ tree_rows() {
         if ((has)) && ((total > shown)); then
             after=" · $shown of $total subagents"
         elif ((has && !open)); then
-            after=" · $total subagent$([[ $total == 1 ]] || echo s)"
+            after=" · $total subagent"
+            ((total == 1)) || after+=s
         fi
         # Folded Codex tree: the size shown is the whole tree's (a Claude Code
         # session's size already includes its subagents).
@@ -1630,9 +1708,15 @@ format_row() {
         agent="" age="" agent_color=$C_DIM size_color=$C_DIM title_color=$C_DIM
         [[ -z $date ]] || date="$(printf '%16s' '')  "
     fi
-    printf -v REPLY '%s %s%-6s%s %s%4s%s  %s%s%s%6s%s  %s%s%s  %s%s%s%s' \
+    local sizecol=""
+    if ((ROW_NOSIZE)) && [[ -z ${4:-} ]]; then
+        :
+    else
+        printf -v sizecol '%s%6s%s  ' "$size_color" "$hsize" "$C_RESET"
+    fi
+    printf -v REPLY '%s %s%-6s%s %s%4s%s  %s%s%s%s%s%s  %s%s%s%s' \
         "$icon" "$agent_color" "$agent" "$C_RESET" "$age_color" "$age" "$C_RESET" "$idcol" "$date" \
-        "$size_color" "$hsize" "$C_RESET" "$C_BLUE" "$project" "$C_RESET" "$tag" "$title_color" "$title" "$C_RESET"
+        "$sizecol" "$C_BLUE" "$project" "$C_RESET" "$tag" "$title_color" "$title" "$C_RESET"
     # Context: a session shown only for a subagent below it, all dim.
     if [[ $style == context ]]; then
         REPLY=$(printf '%s' "$REPLY" | sed 's/\x1b\[[0-9;]*m//g')
@@ -2066,6 +2150,8 @@ conversation() {
         jq -cn --arg title "$heading" --argjson n "$n" --argjson hidden "$hidden" \
             '{role: "section", section: $n, title: $title, hidden: $hidden}'
         [[ -f $file ]] && transcript_readable "$file" || continue
+        # Ctrl-G on a huge transcript: most subagents do not have the text.
+        if ((${MSG_SAMPLE:-0} == 2)) && ! transcript_cat "$file" | grep -aqiF -- "$MSG_RAW"; then continue; fi
         messages "$agent" "$file" "$O_BRANCHES" "$([[ $agent == claude ]] && echo sidechain)" |
             jq -c --argjson n "$n" --argjson hidden "$hidden" '. + {section: $n, hidden: $hidden}
                 | if .role == "user" and (.activity | not) then .role = "task" else . end'
@@ -2105,29 +2191,35 @@ render_conversation() {
     local width=${FZF_PREVIEW_COLUMNS:-${COLUMNS:-0}}
     if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
     if [[ $agent == claude ]]; then name=Claude; else name=Codex; fi
-    local MSG_SAMPLE=0 size
-    if ((preview == 1)) && [[ -z ${FOCUS:-} && $path != *.zst ]]; then
-        size=$(wc -c <"$path" 2>/dev/null) || size=0
-        if ((size > SAMPLE_OVER)); then
+    local MSG_SAMPLE=0 MSG_RAW="" partial=false
+    if ((preview == 1)) && transcript_huge "$path"; then
+        if [[ -n ${FOCUS:-} ]]; then
+            MSG_SAMPLE=2 partial=true
+            MSG_RAW=$(jq -rn --arg text "$FOCUS" '$text | tojson | .[1:-1]')
+        else
             MSG_SAMPLE=1
             printf '%sVery long transcript: this preview reads its start and end. Enter reads it all.%s\n\n' "$C_DIM" "$C_RESET"
         fi
     fi
-    conversation=$(conversation "$agent" "$path" "$id" "$O_SUBAGENTS" | jq -rs \
-        --arg you "$C_CYAN${C_BOLD}● You$C_RESET" \
-        --arg abandoned_you "${C_DIM}○ You (abandoned)$C_RESET" \
-        --arg abandoned_agent "${C_DIM}○ $name (abandoned)$C_RESET" \
-        --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET" \
-        --arg subagent "$([[ $agent == claude ]] && echo "$C_CLAUDE" || echo "$C_CODEX")${C_BOLD}● $name$C_RESET$C_DIM (subagent)$C_RESET" \
-        --arg task "$C_DIM${C_BOLD}● $name → subagent$C_RESET" \
-        --arg other "$C_DIM${C_BOLD}● Other agents$C_RESET" \
-        --arg activity "$C_CODEX${C_BOLD}● Codex$C_RESET$C_DIM (subagent: commands and edits)$C_RESET" \
-        --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN" \
-        --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))" \
-        --argjson marks "$([[ $agent == claude ]] && subagent_marks "$agent" "$id" "$path" || echo '{}')" \
-        --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD" \
-        --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)" '
-        def vlen: gsub("\u001b\\[[0-9;]*m|[\u0001\u0002]"; "") | length;
+    local render_args=(
+        --arg you "$C_CYAN${C_BOLD}● You$C_RESET"
+        --arg abandoned_you "${C_DIM}○ You (abandoned)$C_RESET"
+        --arg abandoned_agent "${C_DIM}○ $name (abandoned)$C_RESET"
+        --arg agent "$([[ $agent == claude ]] && echo "$C_CLAUDE${C_BOLD}● Claude" || echo "$C_CODEX${C_BOLD}● Codex")$C_RESET"
+        --arg subagent "$([[ $agent == claude ]] && echo "$C_CLAUDE" || echo "$C_CODEX")${C_BOLD}● $name$C_RESET$C_DIM (subagent)$C_RESET"
+        --arg task "$C_DIM${C_BOLD}● $name → subagent$C_RESET"
+        --arg other "$C_DIM${C_BOLD}● Other agents$C_RESET"
+        --arg activity "$C_CODEX${C_BOLD}● Codex$C_RESET$C_DIM (subagent: commands and edits)$C_RESET"
+        --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN"
+        --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))"
+        --argjson marks "$([[ $agent == claude ]] && subagent_marks "$agent" "$id" "$path" || echo '{}')"
+        --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD"
+        --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)"
+        --argjson partial "$partial"
+        --arg none "${C_DIM}(no messages)${C_RESET}"
+    )
+    # shellcheck disable=SC2016 # a jq program
+    local defs='        def vlen: gsub("\u001b\\[[0-9;]*m|[\u0001\u0002]"; "") | length;
         # Wrap on spaces to the preview width (fzf would cut words in two).
         def wrap: if $width == 0 or vlen <= $width then . else
             reduce (split(" ") | .[]) as $word ({lines: [], cur: null};
@@ -2177,7 +2269,32 @@ render_conversation() {
                 + "\n" + (.text | cut | premark | styled | postmark)
             end) as $body
             | ([$body, launches] | map(select(. != "")) | join("\n")) + "\n";
-        def title($t): $dim + "── " + $t + " ──" + $reset + "\n";
+        def title($t): $dim + "── " + $t + " ──" + $reset + "\n";'
+    # The whole conversation, as messages come: nothing is held but the message
+    # before (a message that only starts subagents joins it).
+    if ((preview == 0)) && [[ -z ${FOCUS:-} ]]; then
+        # shellcheck disable=SC2016 # a jq program
+        conversation "$agent" "$path" "$id" "$O_SUBAGENTS" | jq -jn --unbuffered "${render_args[@]}" "$defs"'
+        foreach ((inputs | select(.hidden != true)), {eof: true}) as $m ({prev: null, any: false};
+            .out = []
+            | if $m.eof then
+                  (if .prev != null then .out = [.prev | render] else . end)
+              elif $m.role == "section" then
+                  .out = (if .prev != null then [.prev | render] else [] end) + [title($m.title)] | .prev = null
+              elif $m.text == "" and .prev != null then
+                  .prev.subagents += ($m.subagents)
+              else
+                  .out = (if .prev != null then [.prev | render] else [] end) | .prev = $m
+              end
+            | .any as $before
+            | .emit = ((.out | to_entries | map((if .key > 0 or $before then "\n" else "" end) + .value) | join(""))
+                       + (if $m.eof and ($before or (.out | length) > 0 | not) then $none + "\n" else "" end))
+            | .any = ($before or (.out | length) > 0);
+            .emit)'
+        return
+    fi
+    # shellcheck disable=SC2016 # a jq program
+    conversation=$(conversation "$agent" "$path" "$id" "$O_SUBAGENTS" | jq -rs "${render_args[@]}" "$defs"'
         # A message that only starts subagents joins the message before it.
         reduce .[] as $m ([];
             if $m.role != "section" and $m.text == "" and length > 0 and .[-1].role != "section"
@@ -2191,7 +2308,8 @@ render_conversation() {
             [$messages[] | select(.text | test(focus_re; "i"))] as $hits
             | ([$hits[] | select(.section > 0)] | length) as $insub
             | ([$hits[] | select(.hidden != true)]) as $shown
-            | $dim + "\($hits | length) of \($messages | length) messages mention “\($focus)”"
+            | $dim + (if $partial then "\($hits | length) messages" else "\($hits | length) of \($messages | length) messages" end)
+              + " mention “\($focus)”"
               + (if $insub > 0 then " · \($insub) in subagents"
                     + (if ($shown | length) < ($hits | length) then ", Alt-S shows them" else "" end) else "" end)
               + $reset + "\n\n"
@@ -2618,6 +2736,35 @@ session_stamp() {
         END { printf "%d %d", newest, size }'
 }
 
+# plan_stamps — PLAN_STAMP (see session_stamp) for every planned session, in one
+# pass instead of two processes per session.
+plan_stamps() {
+    local id path stamp i paths=()
+    local -A stamps=()
+    for id in "${!PLAN_PATH[@]}"; do
+        paths+=("${PLAN_PATH[$id]}")
+        [[ ${PLAN_AGENT[$id]} != claude || ! -d ${PLAN_PATH[$id]%.jsonl} ]] || paths+=("${PLAN_PATH[$id]%.jsonl}")
+    done
+    while IFS=$'\t' read -r path stamp; do
+        stamps[$path]=$stamp
+    done < <(for ((i = 0; i < ${#paths[@]}; i += 500)); do
+        file_stats "${paths[@]:i:500}" -type f || true
+    done | awk -F '\t' -v projects="$CLAUDE_DIR/projects/" '
+        {
+            key = $3
+            # A file of a Claude Code session: its key is the transcript.
+            if (index(key, projects) == 1) {
+                split(substr(key, length(projects) + 1), part, "/")
+                sub(/\.jsonl$/, "", part[2])
+                key = projects part[1] "/" part[2] ".jsonl"
+            }
+            size[key] += $2
+            if ($1 + 0 > newest[key]) newest[key] = $1 + 0
+        }
+        END { for (key in size) printf "%s\t%d %d\n", key, newest[key], size[key] }')
+    for id in "${!PLAN_PATH[@]}"; do PLAN_STAMP[$id]=${stamps[${PLAN_PATH[$id]}]:-0 0}; done
+}
+
 # plan_codex OP CONDITION IDS... — schedule OP for Codex IDS and, through spawn
 # edges, for the subagent sessions they started (children are processed first).
 plan_codex() {
@@ -2762,9 +2909,9 @@ run_action() {
         PLAN_AGENT[$id]=$agent
         PLAN_PATH[$id]=$path
         PLAN_SIZE[$id]=$((size < 0 ? 0 : size))
-        # Only compared before a real change: a dry run never needs it.
-        ((O_DRY)) || PLAN_STAMP[$id]=$(session_stamp "$agent" "$path")
     done < <(fetch_rows)
+    # Only compared before a real change: a dry run never needs them.
+    ((O_DRY)) || plan_stamps
     local open_ids=()
     for id in "${!OPEN[@]}"; do open_ids+=("$id"); done
     while IFS= read -r id; do
@@ -3118,6 +3265,13 @@ choose_lines() {
         human_size hsize "${2:-0}"
         printf '%s%8d  %7s%s' "$C_DIM" "${1:-0}" "$hsize" "$C_RESET"
     }
+    # A shortened project keeps its whole path after the counts: fzf searches it, and
+    # shows it when the terminal has room.
+    local full="" note=""
+    full_path_note() {
+        note=""
+        if [[ $dir != "$full"* ]]; then note="  $C_DIM$full$C_RESET"; fi
+    }
     # Column titles: the first line (--header-lines=1), so they sit above the columns.
     printf '\t%-*s %8s  %7s\n' "$menu_w" "" "sessions" "size"
     if [[ $kind == filter ]]; then
@@ -3145,8 +3299,10 @@ EOF
         [[ -z $current || -z ${pn[$current]+x} ]] || {
             short_path dir "$current"
             clean dir
+            full=$dir
             fit_mid dir "${dir:--}" "$menu_w"
-            printf '%s\t%s %s\n' "$current" "$dir" "$(count "${pn[$current]}" "${pb[$current]}")"
+            full_path_note
+            printf '%s\t%s %s%s\n' "$current" "$dir" "$(count "${pn[$current]}" "${pb[$current]}")" "$note"
             # The cursor starts on it (see internal_choose).
             : >"$LETHE_STATE/choose-current"
         }
@@ -3155,8 +3311,10 @@ EOF
                 [[ $cwd != "$current" ]] || continue
                 short_path dir "$cwd"
                 clean dir
+                full=$dir
                 fit_mid dir "${dir:--}" "$menu_w"
-                printf '%s\t%s %s\n' "$cwd" "$dir" "$(count "${pn[$cwd]}" "$size")"
+                full_path_note
+                printf '%s\t%s %s%s\n' "$cwd" "$dir" "$(count "${pn[$cwd]}" "$size")" "$note"
             done
     fi
 }
@@ -3184,7 +3342,7 @@ internal_choose() {
     fi
     choice=$(printf '%s\n' "$lines" | fzf --ansi --layout=reverse --height=100% \
         --border=rounded --border-label=" $([[ $kind == filter ]] && echo "cleanup filter" || echo "project · by size") " \
-        --delimiter=$'\t' --with-nth=2 --no-sort --pointer='▶' --prompt='❯ ' --info=inline-right \
+        --delimiter=$'\t' --with-nth=2 --no-sort --no-hscroll --pointer='▶' --prompt='❯ ' --info=inline-right \
         --color="${LETHE_FZF_COLORS:-border:8,label:6:bold,pointer:5,prompt:6,info:8,header:8}" \
         "${gutter[@]}" \
         --header-lines=1 --bind="load:pos($pos)") || return 0
@@ -3200,7 +3358,11 @@ internal_choose() {
 # Column titles, first line of the picker's input (--header-lines=1).
 column_titles() {
     [[ ${LETHE_COLUMNS:-} == 1 ]] || return 0
-    printf '\t  %-6s %4s  %6s  %-*s  %s\n' AGENT AGE SIZE "$PROJECT_WIDTH" PROJECT TITLE
+    if ((ROW_NOSIZE)); then
+        printf '\t  %-6s %4s  %-*s  %s\n' AGENT AGE "$PROJECT_WIDTH" PROJECT TITLE
+    else
+        printf '\t  %-6s %4s  %6s  %-*s  %s\n' AGENT AGE SIZE "$PROJECT_WIDTH" PROJECT TITLE
+    fi
 }
 
 internal_rows() {
