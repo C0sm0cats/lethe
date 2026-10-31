@@ -143,7 +143,7 @@ def build_demo(root):
     transcript = os.path.join(project_dir, f"{session}.jsonl")
     stamp = os.stat(transcript).st_mtime
     with open(transcript, "a") as file:
-        file.write(json.dumps({"type": "assistant", "uuid": "launch", "cwd": FAKE_HOME, "timestamp": "2026-01-01T00:00:00.000Z",
+        file.write(json.dumps({"type": "assistant", "uuid": "launch", "cwd": os.path.join(FAKE_HOME, "code/api-server"), "timestamp": "2026-01-01T00:00:00.000Z",
                                "message": {"role": "assistant", "model": "claude-opus-5-5", "content": [
                                    {"type": "tool_use", "name": "Agent", "id": "toolu_demo"}]}}) + "\n")
     os.utime(transcript, (stamp, stamp))
@@ -159,6 +159,8 @@ def build_demo(root):
     with open(os.path.join(sub_dir, "agent-a1b2c3.meta.json"), "w") as file:
         json.dump({"agentType": "Explore", "description": "Find refreshToken call sites", "model": "sonnet",
                    "effort": "low", "toolUseId": "toolu_demo"}, file)
+    # A subagent's activity is its session's: same age as the session.
+    os.utime(os.path.join(sub_dir, "agent-a1b2c3.jsonl"), (stamp, stamp))
     db.commit()
     return codex, claude
 

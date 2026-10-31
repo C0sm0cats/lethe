@@ -1695,15 +1695,12 @@ cmd_list() {
     mapfile -t lines < <(fetch_sorted | tree_rows)
     # The id column: 8 characters, more when ids share them (Codex ids start with
     # a timestamp), as commands take any unique prefix.
-    local width seen_ids
-    ROW_ID_WIDTH=8
+    local width shared
     for width in 8 13 18 23 36; do
         ROW_ID_WIDTH=$width
-        seen_ids=$(for line in "${lines[@]}"; do
-            IFS=$US read -r _ _ _ _ _ _ id _ <<<"$line"
-            [[ $id == sub:* ]] || printf '%s\n' "${id:0:width}"
-        done | sort | uniq -d | head -n 1)
-        [[ -n $seen_ids ]] || break
+        ((${#lines[@]})) || break
+        shared=$(printf '%s\n' "${lines[@]}" | cut -d "$US" -f 7 | grep -v '^sub:' | cut -c "1-$width" | sort | uniq -d | wc -l)
+        ((shared)) || break
     done
     if [[ -t 1 ]]; then
         cols=$(tput cols 2>/dev/null || echo 130)
@@ -1714,8 +1711,8 @@ cmd_list() {
         ((title_width <= 80)) || title_width=80
     fi
     row_header "$title_width"
-    for line in "${lines[@]}"; do
-        IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created <<<"$line"
+    while IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
+        [[ -n $kind ]] || continue
         if [[ $kind != hidden ]]; then
             format_row "$agent" "$archived" "$recency" "$date" "$mode" "${shown:-$size}" "$cwd" "$title" "$state" \
                 "$title_width" "$rewinds" "$pinned" "$before$US$after" "$style" "${id##sub:*}"
@@ -1725,7 +1722,7 @@ cmd_list() {
         count=$((count + 1))
         if ((size >= 0)); then bytes=$((bytes + size)); else missing=$((missing + 1)); fi
         [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
-    done
+    done < <(printf '%s\n' "${lines[@]}")
 
     human_size hbytes "$bytes"
     printf '\n%s%d session(s) · %s' "$C_DIM" "$count" "$hbytes"
@@ -2977,6 +2974,8 @@ cmd_pick() {
         # footer no row would be left, so these two take turns.
         (($(tput cols 2>/dev/null || echo 120) >= 112)) || tight=1
     fi
+    local f1_extra=""
+    ((!tight)) || f1_extra=+hide-preview
     if [[ $features == *--footer=* && $features == *--list-border* ]]; then
         # fzf >= 0.63: separate panels, keys in a footer.
         LETHE_COLUMNS=1
@@ -2992,7 +2991,7 @@ cmd_pick() {
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
             --bind="multi:transform-list-label($me __marked {+1})"
-            --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$( ((tight)) && echo +hide-preview)"
+            --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$f1_extra"
             --header-lines=1 --header-lines-border=inline --color='header:8'
         )
         refresh="+transform-prompt($me __state prompt)+transform-footer($me __state footer)+reload($me __rows)"

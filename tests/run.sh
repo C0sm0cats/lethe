@@ -1226,9 +1226,15 @@ if [[ -r /proc/$$/stat ]]; then
     expect_ids "a recycled PID does not make a session open" "$I" --running
 fi
 reset_fixture
-printf '#!/bin/sh\ncase "$1" in --help) exit 0 ;; esac\ncat >"%s/fzf.in"\n' "$WORK" >"$WORK/bin/fzf" && chmod +x "$WORK/bin/fzf"
-"$LETHE" pick </dev/null >/dev/null 2>&1 || true
-check "lethe pick starts fzf with the rows" 'grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.in" 2>/dev/null)"
+printf '#!/bin/sh\ncase "$1" in --help) echo "--footer=X --list-border --id-nth --gutter"; exit 0 ;; esac\ncat >"%s/fzf.in"\nprintf "%%s\\n" "$@" >"%s/fzf.args"\n' "$WORK" "$WORK" >"$WORK/bin/fzf" && chmod +x "$WORK/bin/fzf"
+for size in "200 50" "80 24" "50 18"; do
+    rm -f "$WORK/fzf.in" "$WORK/fzf.args"
+    COLUMNS=${size% *} LINES=${size#* } "$LETHE" pick </dev/null >/dev/null 2>&1 || true
+    check "lethe pick starts fzf with the rows, panel layout, at $size" 'grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.in" 2>/dev/null)"
+done
+COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
+check "on a short terminal the preview and the full key list take turns" \
+    'grep -q "f1:.*hide-preview" "$WORK/fzf.args" && grep -q "ctrl-p:toggle-preview+execute-silent(.*__state keys short)" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
 rm -f "$WORK/bin/fzf"
 printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"assistant says hello"}]}}' \
     '{"type":"realtime_item","payload":{"type":"transcript_segment","role":"user","text":"spoken words"}}' >>"$(codex_file "$B" 0)"
