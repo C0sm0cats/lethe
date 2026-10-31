@@ -262,7 +262,13 @@ def frame_body(term, top):
             # One element per word, placed on its own cell: viewers render runs of
             # spaces differently, which would shift columns.
             weight = ' font-weight="bold"' if bold else ""
-            for word in re.finditer(r"\S+", text):
+            for word in re.finditer(r"[─│╭╮╰╯├┤]+|[^\s─│╭╮╰╯├┤]+", text):
+                if word.group()[0] in "─│╭╮╰╯├┤":
+                    # Borders: each cell at its place. Not every renderer honors
+                    # textLength, and a long rule would shift what ends it.
+                    cells = " ".join(f"{left + (word.start() + i) * CELL_W:.1f}" for i in range(len(word.group())))
+                    out.append(f'<text x="{cells}" y="{baseline:.1f}" fill="{fill}"{weight}>{word.group()}</text>')
+                    continue
                 out.append(f'<text x="{left + word.start() * CELL_W:.1f}" y="{baseline:.1f}" fill="{fill}"{weight} '
                            f'textLength="{len(word.group()) * CELL_W:.1f}" lengthAdjust="spacingAndGlyphs">'
                            f'{escape(word.group())}</text>')
