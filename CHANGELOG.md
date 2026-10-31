@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.5 — 2026-10-31
+
+- The age of a Claude Code session is the date of its **last message** (or of its subagents), not of
+  the file: Claude Code appends metadata to old transcripts, which made sessions nobody used look
+  recent, in the list, the sort and `--older-than`. Any write still protects a session for 10 minutes.
+  The Claude Code index is rebuilt once. Codex sessions keep their date: none was found too recent.
+
 ## 0.7.4 — 2026-10-31
 
 - **`--grep` and Ctrl-G could fail and find nothing in 0.7.3** when many sessions matched: parallel

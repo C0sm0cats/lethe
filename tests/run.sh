@@ -19,7 +19,18 @@ export TRASH=$XDG_DATA_HOME/lethe/trash # used inside check expressions
 passed=0 failed=0
 
 # Portable `touch -d @EPOCH FILE` (BSD touch has no -d @).
-set_mtime() { perl -e 'utime $ARGV[0], $ARGV[0], $ARGV[1] or die' "$1" "$2"; }
+# A Claude Code transcript gets the same date in its messages: it is their activity.
+set_mtime() {
+    perl -MPOSIX=strftime -e '
+        my ($t, $f) = @ARGV;
+        if ($f =~ m{/projects/[^/]+/[^/]+\.jsonl$}) {
+            my $stamp = strftime("%Y-%m-%dT%H:%M:%S.000Z", gmtime $t);
+            open my $in, "<", $f or die; my @lines = <$in>; close $in;
+            s/"timestamp":"[^"]*"/"timestamp":"$stamp"/g for @lines;
+            open my $out, ">", $f or die; print $out @lines; close $out;
+        }
+        utime $t, $t, $f or die' "$1" "$2"
+}
 
 # ── Codex fixture ────────────────────────────────────────────────────────────
 
@@ -756,7 +767,7 @@ mkdir -p "$WORK/claude2/projects/-p"
 cp "$CPROJ/$G.jsonl" "$WORK/claude2/projects/-p/"
 CLAUDE_CONFIG_DIR=$WORK/claude2 "$LETHE" list >/dev/null
 "$LETHE" list >/dev/null
-check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v6-*.sqlite | wc -l) -eq 2 ]]'
+check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v7-*.sqlite | wc -l) -eq 2 ]]'
 
 printf '{"display":"secret prompt","sessionId":"%s"}\n{"display":"other","sessionId":"%s"}\n' "$G" "$H" \
     >"$CLAUDE_CONFIG_DIR/history.jsonl"
@@ -1374,6 +1385,26 @@ done
 find "$SCALE" -name '*.jsonl' -exec perl -e 'utime 1700000000, 1700000000, @ARGV' {} +
 out=$("$LETHE" list --ids --grep scaleword --claude 2>&1 | wc -l)
 check "--grep finds every session among hundreds" '[[ ${out//[[:space:]]/} == 700 ]]' "$out"
+
+echo "age: the last message, protection: any write"
+reset_fixture
+Ag=d1000000-0000-4000-8000-000000000001
+claude_chat "$Ag" 3 "$PROJ" 'user:old work' 'assistant:done'
+printf '{"type":"cost-state","sessionId":"%s"}\n{"type":"mode","mode":"normal","sessionId":"%s"}\n' "$Ag" "$Ag" >>"$CPROJ/$Ag.jsonl"
+out=$("$LETHE" list --claude | grep "old work")
+check "metadata written today does not make a session young" '[[ $out == *" 3d "* ]]' "$out"
+expect_ids "... --older-than still sees it old" "$Ag $G $H $I" --claude --older-than 1d
+expect_ids "... but it counts as just written, and is protected" "$E $Ag" --recent
+out=$("$LETHE" delete -n "$Ag")
+check "... a deletion leaves it alone" '[[ $out == *"active in the last 10 minutes"* ]]' "$out"
+out=$("$LETHE" delete -n --force "$Ag")
+check "... --force lifts that" '[[ $out == *"Delete 1 session"* ]]' "$out"
+out=$("$LETHE" show "$Ag" | sed -n 2p)
+check "... show says so" '[[ $out == *recent* ]]' "$out"
+printf '{"type":"cost-state","sessionId":"%s"}\n' "$Ag" >>"$CPROJ/$Ag.jsonl"
+set_mtime "$(($(date +%s) - 3600))" "$CPROJ/$Ag.jsonl"
+out=$("$LETHE" delete -n "$Ag")
+check "... an hour later it can be deleted" '[[ $out == *"Delete 1 session"* ]]' "$out"
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

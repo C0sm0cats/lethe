@@ -111,7 +111,7 @@ def build_demo(root):
             os.makedirs(project_dir, exist_ok=True)
             path = os.path.join(project_dir, f"{session_id}.jsonl")
             entry = "claude-vscode" if mode == "vscode" else "cli"
-            started = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(stamp - 1800))
+            started = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(stamp))
             lines = [{"type": "user" if role == "user" else "assistant", "cwd": cwd, "entrypoint": entry,
                       "timestamp": started, "sessionId": session_id,
                       "message": {"role": role, "model": "claude-opus-5-5",
@@ -143,7 +143,8 @@ def build_demo(root):
     transcript = os.path.join(project_dir, f"{session}.jsonl")
     stamp = os.stat(transcript).st_mtime
     with open(transcript, "a") as file:
-        file.write(json.dumps({"type": "assistant", "uuid": "launch", "cwd": os.path.join(FAKE_HOME, "code/api-server"), "timestamp": "2026-01-01T00:00:00.000Z",
+        file.write(json.dumps({"type": "assistant", "uuid": "launch", "cwd": os.path.join(FAKE_HOME, "code/api-server"),
+                               "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(stamp)),
                                "message": {"role": "assistant", "model": "claude-opus-5-5", "content": [
                                    {"type": "tool_use", "name": "Agent", "id": "toolu_demo"}]}}) + "\n")
     os.utime(transcript, (stamp, stamp))

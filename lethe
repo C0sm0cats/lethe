@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.7.4"
+readonly VERSION="0.7.5"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -409,7 +409,10 @@ init_codex() {
                                           WHERE e.child_thread_id = t.id)" || echo NULL) AS parent,
                $( ((HAS_EDGES)) && echo "(SELECT COUNT(*) FROM cx.thread_spawn_edges AS e
                                           WHERE e.parent_thread_id = t.id)" || echo 0) AS kids,
-               0 AS kidsize
+               0 AS kidsize,
+               MAX(COALESCE($(join_by ', ' "${recency[@]}" 0)),
+                   COALESCE((SELECT mt.mtime FROM mt WHERE mt.id = t.id
+                                AND mt.mtime > COALESCE($(codex_col updated_at 0), 0) + 60), 0)) AS touched
           FROM cx.threads AS t"
 }
 
@@ -431,7 +434,7 @@ readonly JQ_INJECTED='def injected:
 readonly CLAUDE_SUMMARY='
     def text_of: if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end;
     reduce inputs as $line ({e: [], meta: null, cwd: null, custom: null, ai: null, summary: null, prompt: null,
-                             sub: false, model: null};
+                             sub: false, model: null, last: null};
         ($line | fromjson? | select(type == "object")) as $o
         | (if .meta == null and $o.cwd != null and $o.timestamp != null then
                .meta = [$o.cwd, (if $o.entrypoint == null then "" else $o.entrypoint end), $o.timestamp]
@@ -445,6 +448,7 @@ readonly CLAUDE_SUMMARY='
         | (if ($o.type == "user" or $o.type == "assistant") and $o.isMeta != true and $o.isSidechain != true
               and $o.isCompactSummary != true then
                ($o.message.content) as $c
+               | (if ($o.timestamp | type) == "string" then .last = $o.timestamp else . end)
                | (if $o.type == "assistant" then
                       (if $o.message.model != null and ($o.message.model | startswith("claude")) then
                            .model = $o.message.model else . end)
@@ -463,7 +467,8 @@ readonly CLAUDE_SUMMARY='
     | [(.meta // ["", "", ""])[],
        (.custom // .ai // .summary // .prompt // ""),
        (.model // ""), (if .sub then "0" else "1" end),
-       (if $quiet then (.e | branches | .rewinds | tostring) else "NULL" end)]
+       (if $quiet then (.e | branches | .rewinds | tostring) else "NULL" end),
+       (.last // "")]
     | map(tostring | gsub("[\t\n\r\u001f]"; " ")) | join($us)'
 
 # claude_subagent_fields ID PATH — the subagents of Claude Code session ID (PATH
@@ -520,7 +525,7 @@ claude_subagents() {
 
 # Print an INSERT statement with the metadata of one Claude transcript.
 claude_extract() {
-    local path=$1 mtime=$2 fsize=$3 subkey=${4:-} id cwd entry created title model empty rewinds size kb quiet=false mode
+    local path=$1 mtime=$2 fsize=$3 subkey=${4:-} id cwd entry created title model empty rewinds lastmsg size kb quiet=false mode
     id=${path##*/}
     id=${id%.jsonl}
     [[ $id =~ ^$UUID_RE$ ]] || return 0
@@ -528,7 +533,7 @@ claude_extract() {
     # Abandoned branches (the ⑂ badge) are costly on long sessions, so they are
     # left for later (NULL) while the transcript is being written.
     ((NOW - mtime < RECENT_SECONDS)) || quiet=true
-    IFS=$US read -r cwd entry created title model empty rewinds < <(
+    IFS=$US read -r cwd entry created title model empty rewinds lastmsg < <(
         { grep -aE '"uuid"|"cwd"|"type":"(user|assistant|custom-title|ai-title|summary)"' -- "$path" || true; } |
             jq -rRn --arg us "$US" --argjson quiet "$quiet" --argjson side false \
                 "$JQ_INJECTED def entry: $CLAUDE_ENTRIES; def branches: $CLAUDE_BRANCHES; $CLAUDE_SUMMARY" 2>/dev/null) || true
@@ -547,15 +552,17 @@ claude_extract() {
         "") mode=unknown ;;
         *) mode=$entry ;;
     esac
+    # Agents append metadata to old transcripts: the last message is the activity.
+    if [[ $lastmsg =~ ^[0-9][0-9TZ:.+-]*$ ]]; then lastmsg="CAST(strftime('%s', '$lastmsg') AS INTEGER)"; else lastmsg=NULL; fi
     if [[ $created =~ ^[0-9][0-9TZ:.+-]*$ ]]; then created="CAST(strftime('%s', '${created//\'/}') AS INTEGER)"; else created=$mtime; fi
 
     local subs subsize
     # SUBKEY: "count:newest mtime:total size" of its subagent transcripts.
     read -r subs _ subsize <<<"${subkey//:/ }"
-    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s, %d, %d, '%s');\n" \
+    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s, %d, %d, '%s', %s);\n" \
         "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" "$created" \
         "${cwd//\'/\'\'}" "${title//\'/\'\'}" "${mode//\'/}" "${model//\'/\'\'}" "${empty:-1}" "$rewinds" \
-        "${subs:-0}" "${subsize:-0}" "${subkey//\'/}"
+        "${subs:-0}" "${subsize:-0}" "${subkey//\'/}" "$lastmsg"
     claude_subagents "$id" "$path"
 }
 
@@ -566,14 +573,14 @@ init_claude() {
     mkdir -p "$CACHE_DIR"
     # One index per Claude Code directory: profiles (CLAUDE_CONFIG_DIR) do not
     # wipe each other's.
-    CLAUDE_CACHE=$CACHE_DIR/claude-v6-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
-    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v[45]-*.sqlite
+    CLAUDE_CACHE=$CACHE_DIR/claude-v7-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
+    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v[456]-*.sqlite
     # The picker preview only reads the index that the list has just refreshed.
     [[ $REINDEX == 1 || ! -f $CLAUDE_CACHE ]] || return 0
     sqlite3 -cmd '.timeout 5000' "$CLAUDE_CACHE" "CREATE TABLE IF NOT EXISTS claude (
         path TEXT PRIMARY KEY, id TEXT, mtime INTEGER, fsize INTEGER, size INTEGER, created INTEGER,
         cwd TEXT, title TEXT, mode TEXT, model TEXT, empty INTEGER, rewinds INTEGER,
-        subs INTEGER, subsize INTEGER, subkey TEXT);
+        subs INTEGER, subsize INTEGER, subkey TEXT, lastmsg INTEGER);
         CREATE TABLE IF NOT EXISTS claude_sub (
         session TEXT, agent TEXT, path TEXT, size INTEGER, started INTEGER, type TEXT, description TEXT,
         model TEXT, effort TEXT, tooluse TEXT, PRIMARY KEY (session, agent));"
@@ -675,13 +682,16 @@ init() {
     if [[ -n $CLAUDE_CACHE ]]; then
         PRELUDE+="ATTACH '${CLAUDE_CACHE//\'/\'\'}' AS cl;"
         # Named columns: with no Codex part this SELECT names the view's columns.
-        # Activity includes its subagents (subkey: count:newest:total).
+        # recency: the last message, or a subagent's (subkey: count:newest:total).
+        # touched: any write, which is what protects a session.
+        local subnew="COALESCE(CAST(substr(subkey, instr(subkey, ':') + 1) AS INTEGER), 0)"
         parts+=("SELECT 'claude' AS agent, id, 0 AS archived,
-                        MAX(mtime, COALESCE(CAST(substr(subkey, instr(subkey, ':') + 1) AS INTEGER), 0)) AS recency,
+                        MAX(MIN(COALESCE(lastmsg, mtime), mtime), $subnew) AS recency,
                         created, mode,
                         'anthropic' AS provider, empty, cwd, title, path, model, 0 AS tokens, size,
                         COALESCE(rewinds, 0) AS rewinds, 0 AS pinned, NULL AS parent,
-                        COALESCE(subs, 0) AS kids, COALESCE(subsize, 0) AS kidsize FROM cl.claude")
+                        COALESCE(subs, 0) AS kids, COALESCE(subsize, 0) AS kidsize,
+                        MAX(mtime, $subnew) AS touched FROM cl.claude")
     fi
     ((${#parts[@]})) || die "no sessions found: neither $CODEX_DIR nor $CLAUDE_DIR/projects exists"
     PRELUDE+="CREATE TEMP VIEW sessions AS $(join_by ' UNION ALL ' "${parts[@]}");"
@@ -1285,15 +1295,15 @@ readonly JQ_SEARCH='
 # size already includes them).
 fetch_rows() {
     local where agent id archived recency date mode provider empty cwd title path size state rewinds pinned line
-    local parent kids kidsize created
+    local parent kids kidsize created touched
     local candidates=() pending=()
     where=$(build_where)
     load_sizes
     [[ -z $F_GREP ]] || F_GREP_RAW=$(jq -rn --arg text "$F_GREP" '$text | tojson | .[1:-1]')
     while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds pinned \
-        parent kids kidsize created; do
+        parent kids kidsize created touched; do
         # These reach shell arithmetic, which evaluates any text it is given.
-        if [[ ! $archived$recency$empty$rewinds$pinned$kids$kidsize$created =~ ^[0-9]*$ || ! $size =~ ^-?[0-9]*$ ]]; then
+        if [[ ! $archived$recency$empty$rewinds$pinned$kids$kidsize$created$touched =~ ^[0-9]*$ || ! $size =~ ^-?[0-9]*$ ]]; then
             printf '%s: skipping a malformed session row (%s)\n' "$PROG" "${id//[^0-9a-f-]/}" >&2
             continue
         fi
@@ -1318,7 +1328,7 @@ fetch_rows() {
         [[ -z $F_GREP ]] || ((size >= 0)) || continue
         if [[ -n ${OPEN[$id]+x} ]]; then
             state=open
-        elif ((NOW - recency < RECENT_SECONDS)); then
+        elif ((NOW - touched < RECENT_SECONDS)); then
             state=recent
         else
             state=""
@@ -1340,7 +1350,7 @@ fetch_rows() {
         SELECT agent, id, archived, recency,
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
                $(flat mode), $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds, pinned,
-               $(flat parent), kids, kidsize, created
+               $(flat parent), kids, kidsize, created, touched
           FROM ranked
          WHERE $where
          ORDER BY recency DESC, id DESC;")
@@ -1986,13 +1996,13 @@ short_id() {
     short_out=$id
 }
 
-# Fields of one session: agent archived mode provider cwd title created recency path model tokens size.
+# Fields of one session: agent archived mode provider cwd title created recency path model tokens size epoch rewinds touched.
 session_info() {
     query "
         SELECT agent, archived, $(flat mode), $(flat provider), $(flat cwd), $(flat title),
                strftime('%Y-%m-%d %H:%M', created, 'unixepoch', 'localtime'),
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
-               path, $(flat model), tokens, size, recency, rewinds
+               path, $(flat model), tokens, size, recency, rewinds, touched
           FROM sessions WHERE id = '$1';"
 }
 
@@ -2007,17 +2017,17 @@ cmd_show() {
     need jq
     prepare
 
-    local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status rewinds epoch
-    IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size epoch rewinds \
+    local id=${F_IDS[0]} agent archived mode provider cwd title created recency path model tokens size status rewinds epoch touched
+    IFS=$US read -r agent archived mode provider cwd title created recency path model tokens size epoch rewinds touched \
         < <(session_info "$id")
     path=$(codex_path "$agent" "$id" "$path")
-    [[ $archived$tokens$size$epoch$rewinds =~ ^[0-9]*$ ]] || die "malformed session row: $id"
+    [[ $archived$tokens$size$epoch$rewinds$touched =~ ^[0-9]*$ ]] || die "malformed session row: $id"
     clean title
     clean cwd
     clean model
     if [[ -n ${OPEN[$id]+x} ]]; then
         status="${C_GREEN}running (open in an agent)"
-    elif ((NOW - epoch < RECENT_SECONDS)); then
+    elif ((NOW - touched < RECENT_SECONDS)); then
         status="${C_CYAN}recent (closed, active in the last 10 minutes: protected)"
     elif ((archived)); then
         status="${C_YELLOW}archived"
@@ -2726,6 +2736,7 @@ cmd_trash() {
 
 # ── Actions ──────────────────────────────────────────────────────────────────
 
+declare -A RECENT_NOW=() # written to in the last 10 minutes, whatever was written
 declare -A PLAN_OP=() PLAN_DEPTH=() PLAN_ROOT=() PLAN_SIZE=() PLAN_PATH=() PLAN_AGENT=() PLAN_STAMP=() SKIP=()
 
 # session_stamp AGENT PATH — "newest-mtime total-size" of a session's files (for
@@ -2812,10 +2823,10 @@ codex_open_descendants() {
 
 # Is this session protected? Sets REPLY to the reason.
 protected() {
-    local id=$1 recency=$2
+    local id=$1
     if [[ -n ${OPEN[$id]+x} ]]; then
         REPLY="open in a running agent"
-    elif ((!O_FORCE && NOW - recency < RECENT_SECONDS)); then
+    elif ((!O_FORCE)) && [[ -n ${RECENT_NOW[$id]+x} ]]; then
         REPLY="active in the last 10 minutes"
     elif [[ -n ${SKIP[$id]+x} ]]; then
         REPLY=${SKIP[$id]}
@@ -2906,6 +2917,7 @@ run_action() {
     while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
         rows[$id]="$agent$US$archived$US$recency$US$date$US$mode$US$size$US$cwd$US$title$US$state$US$rewinds$US$pinned"
         recency_of[$id]=$recency
+        [[ -z $state ]] || RECENT_NOW[$id]=1
         # Pinned in Codex: kept by any cleanup, changed only when named.
         ((!pinned || explicit)) || SKIP[$id]="pinned in Codex (name it to change it)"
         PLAN_AGENT[$id]=$agent
