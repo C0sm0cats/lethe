@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.7 — 2026-11-01
+
+- **`--orphans` could select a session of a live project**: a session that went into a build directory
+  later removed counted as an orphan. Its start directory must now be gone too (Claude Code; same for
+  `stats` and the Ctrl-F count). `resume`, fork and Ctrl-Y then use the start directory, not wherever
+  lethe was started. The README now says what `--dir` and resume do: the directory the session is in.
+- Ctrl-D, Ctrl-X and the marked size work with more than about 3,300 marked sessions. Ctrl-D and
+  Ctrl-X did nothing, without a message.
+- Listing no longer writes to a Codex database left in WAL mode by a killed Codex: it is now attached
+  read-only.
+- `show`, `export`, Enter and the preview work on sessions with very many subagents.
+- `--grep` ignores the case of accented text outside a UTF-8 locale too (cron), where one is installed.
+- The Claude Code index is rebuilt once.
+
 ## 0.7.6 — 2026-11-01
 
 - **A running session could be deleted.** One unreadable file in `sessions/` or `jobs/` (a write cut

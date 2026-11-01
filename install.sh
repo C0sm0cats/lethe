@@ -3,7 +3,7 @@
 #
 # Downloads lethe to ~/.local/bin (or $LETHE_BIN), adds that directory to your
 # PATH if needed, and tells you exactly how to install anything missing.
-# LETHE_VERSION=v0.7.6 installs a given release instead of the latest code.
+# LETHE_VERSION=v0.7.7 installs a given release instead of the latest code.
 set -eu
 
 bin=${LETHE_BIN:-$HOME/.local/bin}

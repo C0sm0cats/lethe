@@ -767,7 +767,7 @@ mkdir -p "$WORK/claude2/projects/-p"
 cp "$CPROJ/$G.jsonl" "$WORK/claude2/projects/-p/"
 CLAUDE_CONFIG_DIR=$WORK/claude2 "$LETHE" list >/dev/null
 "$LETHE" list >/dev/null
-check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v8-*.sqlite | wc -l) -eq 2 ]]'
+check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v9-*.sqlite | wc -l) -eq 2 ]]'
 
 printf '{"display":"secret prompt","sessionId":"%s"}\n{"display":"other","sessionId":"%s"}\n' "$G" "$H" \
     >"$CLAUDE_CONFIG_DIR/history.jsonl"
@@ -1516,6 +1516,97 @@ check "without sqlite3, a valid duration is not called invalid" '[[ $out == *"re
 sqlite3 "$DB" "UPDATE threads SET updated_at = 1700000000, recency_at = 1700000000 WHERE id = '$A';" </dev/null
 out=$("$LETHE" delete -n "$A")
 check "no trash notice when only Codex sessions are deleted" '[[ $out == *"Delete"* && $out != *"go to the trash"* ]]' "$out"
+
+echo "0.7.7: orphans, many marks, read-only Codex, many subagents, locale"
+TX=$WORK/v77
+lx() { CLAUDE_CONFIG_DIR=$TX/claude CODEX_HOME=$TX/codex XDG_CACHE_HOME=$TX/cache XDG_DATA_HOME=$TX/data "$LETHE" "$@"; }
+# tx_session ID PROMPT START_DIR [LAST_DIR]
+tx_session() {
+    local f=$TX/claude/projects/-p/$1.jsonl stamp=2026-01-01T00:00:00.000Z
+    mkdir -p "${f%/*}"
+    jq -nc --arg c "$3" --arg t "$stamp" --arg p "$2" \
+        '{type:"user",uuid:"u1",parentUuid:null,cwd:$c,timestamp:$t,entrypoint:"cli",message:{role:"user",content:$p}}' >"$f"
+    jq -nc --arg c "${4:-$3}" --arg t "$stamp" \
+        '{type:"assistant",uuid:"a1",parentUuid:"u1",cwd:$c,timestamp:$t,message:{role:"assistant",model:"claude-x",content:[{type:"text",text:"answer"}]}}' >>"$f"
+    perl -e 'utime 1767225600, 1767225600, $ARGV[0]' "$f"
+}
+X1=81000000-0000-4000-8000-000000000001 X2=82000000-0000-4000-8000-000000000002
+mkdir -p "$TX/live/build" "$TX/dead/build"
+tx_session "$X1" "went into a build directory" "$TX/live" "$TX/live/build"
+tx_session "$X2" "project gone too" "$TX/dead" "$TX/dead/build"
+expect_x=$(lx list --dir "$TX/live/build" --ids)
+check "--dir is where the session is now" '[[ $expect_x == "$X1" ]]' "$expect_x"
+rm -rf "$TX/live/build" "$TX/dead"
+expect_x=$(lx list --orphans --ids)
+check "a removed build directory does not make an orphan; a removed project does" '[[ $expect_x == "$X2" ]]' "$expect_x"
+out=$(lx stats)
+check "... stats counts the same" '[[ $out == *"1 session(s) whose project directory is gone"* ]]' "$out"
+printf '#!/bin/sh\necho "in $PWD: $*"\n' >"$WORK/bin/claude" && chmod +x "$WORK/bin/claude"
+out=$(cd "$WORK" && lx resume "$X1" 2>&1)
+check "resume falls back to where the session started" '[[ $out == *"in $TX/live: --resume $X1"* && $out == *"no longer exists"* ]]' "$out"
+rm -f "$WORK/bin/claude"
+
+mkdir -p "$TX/st"
+for f in agent status sort filter; do : >"$TX/st/$f"; done
+printf 'all\n' | tee "$TX/st/agent" "$TX/st/status" "$TX/st/filter" >/dev/null
+printf 'recent\n' >"$TX/st/sort"
+: >"$TX/st/grep"; : >"$TX/st/dir"; : >"$TX/st/label"
+printf '%s\t10\n' "$X2" >"$TX/st/sizes"
+printf '%s\n' "$X2" >"$TX/marks"
+out=$(FZF_SELECT_COUNT=1 LETHE_STATE=$TX/st lx __marked --from "$TX/marks")
+check "the marked size reads the ids from a file" '[[ $out == " 1 marked · 10B"* ]]' "$out"
+out=$(printf '\n' | lx __action delete --from "$TX/marks" 2>&1 || true)
+check "the picker's actions read the ids from a file" '[[ $out == *"Delete 1 session"* ]]' "$out"
+out=$(lx __action delete --from "$TX/nothing" 2>&1 </dev/null || true)
+check "... a missing file changes nothing" '[[ -z $out ]]' "$out"
+
+if command -v python3 >/dev/null 2>&1; then
+    mkdir -p "$TX/wal/sessions"
+    python3 - "$TX/wal/state_5.sqlite" <<'WAL' || true
+import os, signal, sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute("pragma journal_mode=wal")
+c.execute("pragma wal_autocheckpoint=0")
+c.execute("create table threads(id text primary key, rollout_path text, created_at int, updated_at int, source text, model_provider text, cwd text, title text, archived int default 0)")
+for i in range(20):
+    c.execute("insert into threads values(?,?,1700000000,1700000000,'cli','openai','/x','t',0)", (f"aaaaaaaa-0000-4000-8000-{i:012d}", f"/nope/{i}"))
+c.commit()
+os.kill(os.getpid(), signal.SIGKILL)
+WAL
+    if [[ -s $TX/wal/state_5.sqlite-wal ]]; then
+        # shellcheck disable=SC2034 # read in the check below
+        before=$(cksum <"$TX/wal/state_5.sqlite")
+        n=$(CODEX_HOME=$TX/wal CLAUDE_CONFIG_DIR=$TX/none XDG_CACHE_HOME=$TX/cache XDG_DATA_HOME=$TX/data "$LETHE" list --ids | wc -l)
+        check "a Codex database left in WAL mode is read, with what its WAL holds" '[[ ${n//[[:space:]]/} == 20 ]]' "$n"
+        check "... and not written" '[[ $(cksum <"$TX/wal/state_5.sqlite") == "$before" && -s $TX/wal/state_5.sqlite-wal ]]'
+    fi
+fi
+# A directory name SQLite's URIs would misread.
+mkdir -p "$TX/o%41dd?#/sessions"
+cp "$DB" "$TX/o%41dd?#/state_5.sqlite"
+n=$(CODEX_HOME="$TX/o%41dd?#" CLAUDE_CONFIG_DIR=$TX/none XDG_CACHE_HOME=$TX/cache XDG_DATA_HOME=$TX/data "$LETHE" list --ids --subagents 2>&1 | wc -l)
+check "a Codex home with %, ? and # in its name is read" '((n > 0))' "$n"
+
+X3=83000000-0000-4000-8000-000000000003
+tx_session "$X3" "very many subagents" "$TX/live"
+mkdir -p "$TX/claude/projects/-p/$X3/subagents"
+perl -e 'my ($d) = @ARGV; for my $n (1 .. 800) {
+    open my $o, ">", "$d/agent-a$n.jsonl" or die; close $o;
+    open my $m, ">", "$d/agent-a$n.meta.json" or die;
+    printf $m q({"agentType":"g","description":"%0150d","toolUseId":"toolu_%024d"}), $n, $n; close $m; }' "$TX/claude/projects/-p/$X3/subagents"
+out=$(lx show "$X3" 2>&1)
+check "show works with very many subagents" '[[ $out == *"answer"* && $out != *"too long"* ]]' "${out:0:300}"
+out=$(lx export "$X3" 2>&1)
+check "... and export" '[[ $out == *"answer"* && $out != *"too long"* ]]' "${out:0:300}"
+out=$(FZF_PREVIEW_COLUMNS=60 lx show --preview "$X3" 2>&1)
+check "... and the preview" '[[ $out == *"answer"* ]]' "${out:0:300}"
+
+X4=84000000-0000-4000-8000-000000000004
+tx_session "$X4" "été chaud" "$TX/live"
+if LC_ALL=C.UTF-8 grep -qiF 'É' <<<'é' 2>/dev/null; then
+    expect_x=$(LC_ALL=C lx list --ids --grep 'ÉTÉ')
+    check "--grep ignores the case of accents in the C locale" '[[ $expect_x == "$X4" ]]' "$expect_x"
+fi
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

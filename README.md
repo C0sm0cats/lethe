@@ -22,7 +22,7 @@ On Linux and macOS. The installer puts lethe in `~/.local/bin`, adds it to your 
 ## Features
 
 - **Every session, one list.** Claude Code and Codex side by side, with age, size, project and title, and a live preview of the conversation.
-- **Resume anything.** `Ctrl-R` reopens a session in its agent, in the directory it was started from. `Ctrl-K` forks it into a new session, and `Ctrl-E` exports it as Markdown.
+- **Resume anything.** `Ctrl-R` reopens a session in its agent, in the directory it was last in (or where it started, if that one is gone). `Ctrl-K` forks it into a new session, and `Ctrl-E` exports it as Markdown.
 - **Clean up in seconds.** Mark with `Tab`, delete with `Ctrl-D`. Or `lethe delete --older-than 1mo --keep 3`.
 - **Running sessions are untouchable.** Sessions open in a running agent, or active in the last 10 minutes, are detected and skipped. Always, even with `--yes`.
 - **Undo.** Deleted Claude Code sessions go to a trash and can be restored. Codex sessions can be archived instead of deleted.
@@ -49,7 +49,7 @@ Two options, set in front of `sh`, if you need them:
 
 ```sh
 # install a given release instead of the latest version
-curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.6 sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.7 sh
 
 # install in another directory than ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
@@ -186,12 +186,12 @@ The trash lives in `~/.local/share/lethe/trash`. Restoring never overwrites exis
 | `--unarchived` | all but archived sessions (formerly `--active`) |
 | `--older-than D` | last activity before `D` ago: `12h`, `30d`, `8w`, `6mo` (or `6m`), `1y` |
 | `--newer-than D` | last activity within `D` |
-| `--dir PATH` | sessions started in `PATH` or below it (repeatable; symlinks are followed) |
+| `--dir PATH` | sessions in `PATH` or below it, where they are now (repeatable; symlinks are followed) |
 | `--mode MODE` | `cli`, `exec`, `vscode`, `subagent`, … |
 | `--provider NAME` | `anthropic`, `openai`, … |
 | `--grep TEXT` | the conversation contains `TEXT` (any case, any branch, subagents included) |
 | `--empty` | sessions with no message and no reply |
-| `--orphans` | sessions whose project directory no longer exists (an unmounted disk or an unreadable parent does not count) |
+| `--orphans` | sessions whose directory, and the one they started in, no longer exist (an unmounted disk or an unreadable parent does not count) |
 | `--missing` | Codex index entries whose transcript is gone |
 | `--keep N` | spares the `N` most recent sessions of each project, both agents together; subagents follow the session that started them |
 | `ID…` | session ids or unique prefixes |

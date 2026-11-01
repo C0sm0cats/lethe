@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.7.6"
+readonly VERSION="0.7.7"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -412,7 +412,8 @@ init_codex() {
                0 AS kidsize,
                MAX(COALESCE($(join_by ', ' "${recency[@]}" 0)),
                    COALESCE((SELECT mt.mtime FROM mt WHERE mt.id = t.id
-                                AND mt.mtime > COALESCE($(codex_col updated_at 0), 0) + 60), 0)) AS touched
+                                AND mt.mtime > COALESCE($(codex_col updated_at 0), 0) + 60), 0)) AS touched,
+               '' AS origin
           FROM cx.threads AS t"
 }
 
@@ -470,12 +471,13 @@ readonly CLAUDE_SUMMARY='
                   end)
            else . end)
         | if $quiet then .e += [$o | entry] else . end)
+    | ((.meta // [""])[0]) as $origin
     | (if .cwd != null and .meta != null then .meta[0] = .cwd else . end)
     | [(.meta // ["", "", ""])[],
        (.custom // .ai // .summary // .prompt // ""),
        (.model // ""), (if .sub then "0" else "1" end),
        (if $quiet then (.e | branches | .rewinds | tostring) else "NULL" end),
-       (.last // "")]
+       (.last // ""), $origin]
     | map(tostring | gsub("[\t\n\r\u001f]"; " ")) | join($us)'
 
 # claude_subagent_fields ID PATH — the subagents of Claude Code session ID (PATH
@@ -532,7 +534,7 @@ claude_subagents() {
 
 # Print an INSERT statement with the metadata of one Claude transcript.
 claude_extract() {
-    local path=$1 mtime=$2 fsize=$3 subkey=${4:-} id cwd entry created title model empty rewinds lastmsg size kb quiet=false mode
+    local path=$1 mtime=$2 fsize=$3 subkey=${4:-} id cwd entry created title model empty rewinds lastmsg origin size kb quiet=false mode
     id=${path##*/}
     id=${id%.jsonl}
     [[ $id =~ ^$UUID_RE$ ]] || return 0
@@ -540,7 +542,7 @@ claude_extract() {
     # Abandoned branches (the ⑂ badge) are costly on long sessions, so they are
     # left for later (NULL) while the transcript is being written.
     ((NOW - mtime < RECENT_SECONDS)) || quiet=true
-    IFS=$US read -r cwd entry created title model empty rewinds lastmsg < <(
+    IFS=$US read -r cwd entry created title model empty rewinds lastmsg origin < <(
         { grep -aE '"uuid"|"cwd"|"type":"(user|assistant|custom-title|ai-title|summary)"' -- "$path" || true; } |
             jq -rRn --arg us "$US" --argjson quiet "$quiet" --argjson side false \
                 "$JQ_INJECTED def entry: $CLAUDE_ENTRIES; def branches: $CLAUDE_BRANCHES; $CLAUDE_SUMMARY" 2>/dev/null) || true
@@ -570,10 +572,10 @@ claude_extract() {
     local subs subsize
     # SUBKEY: "count:newest mtime:total size" of its subagent transcripts.
     read -r subs _ subsize <<<"${subkey//:/ }"
-    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s, %d, %d, '%s', %s);\n" \
+    printf "INSERT OR REPLACE INTO claude VALUES ('%s', '%s', %d, %d, %d, %s, '%s', '%s', '%s', '%s', %d, %s, %d, %d, '%s', %s, '%s');\n" \
         "${path//\'/\'\'}" "$id" "$mtime" "$fsize" "$size" "$created" \
         "${cwd//\'/\'\'}" "${title//\'/\'\'}" "${mode//\'/}" "${model//\'/\'\'}" "${empty:-1}" "$rewinds" \
-        "${subs:-0}" "${subsize:-0}" "${subkey//\'/}" "$lastmsg"
+        "${subs:-0}" "${subsize:-0}" "${subkey//\'/}" "$lastmsg" "${origin//\'/\'\'}"
     claude_subagents "$id" "$path"
 }
 
@@ -584,14 +586,14 @@ init_claude() {
     mkdir -p "$CACHE_DIR"
     # One index per Claude Code directory: profiles (CLAUDE_CONFIG_DIR) do not
     # wipe each other's.
-    CLAUDE_CACHE=$CACHE_DIR/claude-v8-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
-    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v[4567]-*.sqlite
+    CLAUDE_CACHE=$CACHE_DIR/claude-v9-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
+    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v[45678]-*.sqlite
     # The picker preview only reads the index that the list has just refreshed.
     [[ $REINDEX == 1 || ! -f $CLAUDE_CACHE ]] || return 0
     sqlite3 -cmd '.timeout 5000' "$CLAUDE_CACHE" "CREATE TABLE IF NOT EXISTS claude (
         path TEXT PRIMARY KEY, id TEXT, mtime INTEGER, fsize INTEGER, size INTEGER, created INTEGER,
         cwd TEXT, title TEXT, mode TEXT, model TEXT, empty INTEGER, rewinds INTEGER,
-        subs INTEGER, subsize INTEGER, subkey TEXT, lastmsg INTEGER);
+        subs INTEGER, subsize INTEGER, subkey TEXT, lastmsg INTEGER, origin TEXT);
         CREATE TABLE IF NOT EXISTS claude_sub (
         session TEXT, agent TEXT, path TEXT, size INTEGER, started INTEGER, type TEXT, description TEXT,
         model TEXT, effort TEXT, tooluse TEXT, PRIMARY KEY (session, agent));"
@@ -675,7 +677,11 @@ init() {
     init_codex
     init_claude
     if [[ -n $CODEX_DB ]]; then
-        PRELUDE+="ATTACH '${CODEX_DB//\'/\'\'}' AS cx;"
+        # Read-only for SQLite itself: query_only does not stop the checkpoint that
+        # closing the last connection does on a database left in WAL mode.
+        local uri=${CODEX_DB//%/%25}
+        uri=${uri//\?/%3f} uri=${uri//#/%23}
+        PRELUDE+="ATTACH 'file:${uri//\'/\'\'}?mode=ro' AS cx;"
         # Transcript dates, by session id (see CODEX_SELECT).
         load_sizes
         local id mt_rows=() n=0
@@ -702,7 +708,7 @@ init() {
                         'anthropic' AS provider, empty, cwd, title, path, model, 0 AS tokens, size,
                         COALESCE(rewinds, 0) AS rewinds, 0 AS pinned, NULL AS parent,
                         COALESCE(subs, 0) AS kids, COALESCE(subsize, 0) AS kidsize,
-                        MAX(mtime, $subnew) AS touched FROM cl.claude")
+                        MAX(mtime, $subnew) AS touched, origin FROM cl.claude")
     fi
     ((${#parts[@]})) || die "no sessions found: neither $CODEX_DIR nor $CLAUDE_DIR/projects exists"
     PRELUDE+="CREATE TEMP VIEW sessions AS $(join_by ' UNION ALL ' "${parts[@]}");"
@@ -944,6 +950,13 @@ dir_gone() {
         fi
     fi
     ((GONE[$dir]))
+}
+
+# session_gone CWD ORIGIN — an orphan: where the session is now is gone, and so is
+# where it started. A build directory it went into does not make its project gone.
+session_gone() {
+    dir_gone "$1" || return 1
+    [[ -z ${2:-} || $2 == "$1" ]] || dir_gone "$2"
 }
 
 # parse_args ALLOWED ARGS... — ALLOWED lists the extra flags a command accepts
@@ -1283,7 +1296,7 @@ session_matches() {
     # The transcript is JSON: a " or \ in the text is stored escaped.
     # grep -q stops reading at the first match: the reader may die of SIGPIPE.
     { for file in "${files[@]}"; do transcript_cat "$file" || true; done; } |
-        grep -aqiF -- "$F_GREP_RAW" || return 1
+        LC_ALL=$grep_locale grep -aqiF -- "$F_GREP_RAW" || return 1
     # Every branch: a session is found by anything it still contains. Claude Code
     # needs no branch walk for that, so one jq reads the texts directly.
     if [[ $1 == claude ]]; then
@@ -1295,9 +1308,9 @@ session_matches() {
             fromjson? | select((.type == "user" or .type == "assistant") and .isMeta != true
                                and .isCompactSummary != true)
             | .message.content | if type == "string" then . else (.[]? | select(.type == "text") | .text) end
-            | strings | unwrap | select(injected | not)' 2>/dev/null | grep -aiF -- "$F_GREP" >/dev/null
+            | strings | unwrap | select(injected | not)' 2>/dev/null | LC_ALL=$grep_locale grep -aiF -- "$F_GREP" >/dev/null
     else
-        messages "$1" "$2" all | jq -r '.text' | grep -aiF -- "$F_GREP" >/dev/null
+        messages "$1" "$2" all | jq -r '.text' | LC_ALL=$grep_locale grep -aiF -- "$F_GREP" >/dev/null
     fi
 }
 
@@ -1351,13 +1364,13 @@ readonly JQ_SEARCH='
 # size already includes them).
 fetch_rows() {
     local where agent id archived recency date mode provider empty cwd title path size state rewinds pinned line
-    local parent kids kidsize created touched
+    local parent kids kidsize created touched origin
     local candidates=() pending=()
     where=$(build_where)
     load_sizes
     [[ -z $F_GREP ]] || F_GREP_RAW=$(jq -rn --arg text "$F_GREP" '$text | tojson | .[1:-1]')
     while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds pinned \
-        parent kids kidsize created touched; do
+        parent kids kidsize created touched origin; do
         # These reach shell arithmetic, which evaluates any text it is given.
         if [[ ! $archived$recency$empty$rewinds$pinned$kids$kidsize$created$touched =~ ^[0-9]*$ || ! $size =~ ^-?[0-9]*$ ]]; then
             printf '%s: skipping a malformed session row (%s)\n' "$PROG" "${id//[^0-9a-f-]/}" >&2
@@ -1379,7 +1392,7 @@ fetch_rows() {
             size=-1
         fi
         ((!F_MISSING || size < 0)) || continue
-        ((!F_ORPHANS)) || dir_gone "$cwd" || continue
+        ((!F_ORPHANS)) || session_gone "$cwd" "$origin" || continue
         # Searched below, all at once.
         [[ -z $F_GREP ]] || ((size >= 0)) || continue
         if [[ -n ${OPEN[$id]+x} ]]; then
@@ -1394,7 +1407,7 @@ fetch_rows() {
         [[ $F_STATUS != running || $state == open ]] || continue
         [[ $F_STATUS != recent || $state == recent ]] || continue
         [[ $F_STATUS != idle || -z $state ]] || continue
-        line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}$US${pinned:-0}$US$parent$US${kids:-0}$US${kidsize:-0}$US${created:-0}"
+        line="$agent$US$id$US$archived$US$recency$US$date$US$mode$US$provider$US$empty$US$size$US$cwd$US$title$US$path$US$state$US${rewinds:-0}$US${pinned:-0}$US$parent$US${kids:-0}$US${kidsize:-0}$US${created:-0}$US$origin"
         if [[ -n $F_GREP ]]; then
             # Same index in both arrays: results are joined by position.
             pending+=("$line")
@@ -1406,7 +1419,7 @@ fetch_rows() {
         SELECT agent, id, archived, recency,
                strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
                $(flat mode), $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds, pinned,
-               $(flat parent), kids, kidsize, created, touched
+               $(flat parent), kids, kidsize, created, touched, $(flat origin)
           FROM ranked
          WHERE $where
          ORDER BY recency DESC, id DESC;")
@@ -1421,7 +1434,18 @@ fetch_rows() {
     local -A raw_hit=() raw_maybe=()
     local file hit verdict grep_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}} xargs_opts=()
     # Plain ASCII needs no multibyte case folding, which is much slower.
-    [[ $F_GREP_RAW == *[![:ascii:]]* ]] || grep_locale=C
+    if [[ $F_GREP_RAW != *[![:ascii:]]* ]]; then
+        grep_locale=C
+    elif [[ $grep_locale != *[Uu][Tt][Ff]* ]]; then
+        # Accents need a UTF-8 locale to ignore case (cron has none).
+        local candidate
+        for candidate in C.UTF-8 C.utf8 en_US.UTF-8; do
+            if LC_ALL=$candidate grep -qiF 'É' <<<'é' 2>/dev/null; then
+                grep_locale=$candidate
+                break
+            fi
+        done
+    fi
     # Several at once, where xargs can (busybox may not). They share one pipe: jq
     # must write line by line, or their blocks would cut lines in two.
     if xargs -P 1 true </dev/null >/dev/null 2>&1; then xargs_opts=(-n 64 -P "$jobs"); fi
@@ -1896,7 +1920,7 @@ cmd_stats() {
 # stats_report — disk usage of the sessions matched by the current filters.
 stats_report() {
     local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
-    local total=0 bytes=0 empties=0 missing=0 open=0 orphans=0 key bucket hsize i trash_bytes trash_count
+    local origin total=0 bytes=0 empties=0 missing=0 open=0 orphans=0 key bucket hsize i trash_bytes trash_count
     local sub_n=0 sub_bytes=0 sub_in=0 recent=0 scope="" arg
     # The cleanup commands suggested below keep the filters of this report.
     local scope_args=("${FILTER_ARGS[@]}")
@@ -1913,7 +1937,7 @@ stats_report() {
     local limits=(86400 604800 2592000 7776000 31536000)
     declare -A n_agent=() b_agent=() n_mode=() n_dir=() b_dir=() n_age=() b_age=()
 
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created origin; do
         ((size >= 0)) || { missing=$((missing + 1)) && size=0; }
         ((!empty)) || empties=$((empties + 1))
         # Subagents: Claude Code ones live inside their session (and its size);
@@ -1926,7 +1950,7 @@ stats_report() {
         [[ $agent != codex ]] || ((${kids:-0} == 0)) || sub_in=$((sub_in + 1))
         [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
         [[ $state != recent ]] || recent=$((recent + 1))
-        ! dir_gone "$cwd" || orphans=$((orphans + 1))
+        ! session_gone "$cwd" "$origin" || orphans=$((orphans + 1))
         total=$((total + 1))
         bytes=$((bytes + size))
         key=$agent
@@ -2269,6 +2293,9 @@ render_conversation() {
             printf '%sVery long transcript: this preview reads its start and end. Enter reads it all.%s\n\n' "$C_DIM" "$C_RESET"
         fi
     fi
+    # Through a file: as an argument, a session with many subagents would not fit.
+    local marks_fd
+    exec {marks_fd}<<<"$([[ $agent == claude ]] && subagent_marks "$agent" "$id" "$path" || echo '{}')"
     local render_args=(
         --arg you "$C_CYAN${C_BOLD}● You$C_RESET"
         --arg abandoned_you "${C_DIM}○ You (abandoned)$C_RESET"
@@ -2280,7 +2307,7 @@ render_conversation() {
         --arg activity "$C_CODEX${C_BOLD}● Codex$C_RESET$C_DIM (subagent: commands and edits)$C_RESET"
         --arg dim "$C_DIM" --arg reset "$C_RESET" --arg bold "$C_BOLD" --arg code "$C_CYAN"
         --argjson preview "$preview" --argjson width "$((width > 20 ? width - 1 : 0))"
-        --argjson marks "$([[ $agent == claude ]] && subagent_marks "$agent" "$id" "$path" || echo '{}')"
+        --slurpfile marks_in "/dev/fd/$marks_fd"
         --arg focus "${FOCUS:-}" --arg mark "$C_RESET$C_YELLOW$C_BOLD"
         --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)"
         --argjson partial "$partial"
@@ -2321,7 +2348,7 @@ render_conversation() {
                 | (if $nl > 600 then $head[:$nl] else $head[:($head | rindex(" ") // 1200)] end) + " …"
             else . end;
         # Where a subagent was started: a line under the message, not a message.
-        def launches: [(.subagents // [])[] | $dim + "↳ subagent " + ($marks[.] // "") + $reset] | join("\n");
+        def launches: [(.subagents // [])[] | $dim + "↳ subagent " + ($marks_in[0][.] // "") + $reset] | join("\n");
         def render:
             (if .abandoned then
                 (if .role == "user" then $abandoned_you else $abandoned_agent end) + "\n"
@@ -2359,6 +2386,7 @@ render_conversation() {
                        + (if $m.eof and ($before or (.out | length) > 0 | not) then $none + "\n" else "" end))
             | .any = ($before or (.out | length) > 0);
             .emit)'
+        exec {marks_fd}<&-
         return
     fi
     # shellcheck disable=SC2016 # a jq program
@@ -2404,6 +2432,7 @@ render_conversation() {
                    else [$all[] | render] end
                | .[]
           end')
+    exec {marks_fd}<&-
     printf '%s\n' "${conversation:-${C_DIM}(no messages)${C_RESET}}"
 }
 
@@ -2442,10 +2471,12 @@ export_sub() {
 
 # export_markdown AGENT FILE ID SUBAGENTS — the messages as Markdown sections.
 export_markdown() {
-    local agent=$1 name
+    local agent=$1 name marks_fd
     if [[ $agent == claude ]]; then name="Claude"; else name="Codex"; fi
+    # Through a file: as an argument, a session with many subagents would not fit.
+    exec {marks_fd}<<<"$([[ $agent == claude ]] && subagent_marks "$agent" "$3" "$2" || echo '{}')"
     FOCUS="" conversation "$@" | jq -rs --arg name "$name" --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)" \
-        --argjson marks "$([[ $agent == claude ]] && subagent_marks "$agent" "$3" "$2" || echo '{}')" '
+        --slurpfile marks_in "/dev/fd/$marks_fd" '
         reduce .[] as $m ([];
             if $m.role != "section" and $m.text == "" and length > 0 and .[-1].role != "section"
             then .[-1].subagents += ($m.subagents) else . + [$m] end)
@@ -2458,9 +2489,10 @@ export_markdown() {
                   elif .section > 0 or $side then "\($name) (subagent)"
                   else $name end)
                + (if .abandoned then " (abandoned)" else "" end) + "\n\n"
-               + ([.text, ((.subagents // [])[] | "_↳ subagent \($marks[.] // "")_")] | map(select(. != "")) | join("\n\n"))
+               + ([.text, ((.subagents // [])[] | "_↳ subagent \($marks_in[0][.] // "")_")] | map(select(. != "")) | join("\n\n"))
                + "\n"
           end'
+    exec {marks_fd}<&-
 }
 
 # codex_path AGENT ID PATH — PATH, or where a Codex transcript is now if the
@@ -2494,8 +2526,14 @@ cmd_resume() {
     # Two agents writing the same transcript would interleave it.
     ((fork)) || [[ -z ${OPEN[$id]+x} ]] ||
         die "$id is already open in a running agent; switch to it, or use '$PROG fork $id' for a copy"
+    # Where it went may be gone while its project is not.
+    local origin
+    origin=$(query "SELECT $(flat origin) FROM sessions WHERE id = '$id';")
     if [[ -d $cwd ]]; then
         cd -- "$cwd"
+    elif [[ -n $origin && -d $origin ]]; then
+        printf '%s: %s no longer exists, starting from %s\n' "$PROG" "$cwd" "$origin" >&2
+        cd -- "$origin"
     else
         printf '%s: %s, starting from %s\n' "$PROG" \
             "$([[ -n $cwd ]] && echo "$cwd no longer exists" || echo "no project directory is recorded")" "$PWD" >&2
@@ -3233,7 +3271,7 @@ cmd_pick() {
             --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,info:8,ghost:8'
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
-            --bind="multi:transform-list-label($me __marked {+1})"
+            --bind="multi:transform-list-label($me __marked --from {+f1})"
             --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$f1_extra+clear-screen"
             --header-lines=1 --header-lines-border=inline --color='header:8'
         )
@@ -3261,8 +3299,8 @@ cmd_pick() {
         --delimiter=$'\t' --with-nth=2.. --tiebreak=index "${track[@]}" "${layout[@]}" \
         --prompt="$("$SELF" __state prompt)" --pointer='▌' --marker='✓' \
         --preview="$me __preview {1}" \
-        --bind="ctrl-d:execute($me __action delete {+1})+deselect-all+reload($me __rows)" \
-        --bind="ctrl-x:execute($me __action toggle {+1})+deselect-all+reload($me __rows)" \
+        --bind="ctrl-d:execute($me __action delete --from {+f1})+deselect-all+reload($me __rows)" \
+        --bind="ctrl-x:execute($me __action toggle --from {+f1})+deselect-all+reload($me __rows)" \
         --bind="ctrl-r:execute($me __resume {1})+reload($me __rows)" \
         --bind="ctrl-k:execute($me __resume {1} fork)+reload($me __rows)" \
         --bind="ctrl-e:execute($me __export {1})" \
@@ -3325,13 +3363,14 @@ choose_lines() {
     ((menu_cols - 24 >= 40)) || menu_w=$((menu_cols - 24 < 16 ? 16 : menu_cols - 24))
     if [[ $kind == filter ]]; then picker_setup nofilter; else picker_setup nodir; fi
     setup_colors always
-    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
+    local origin
+    while IFS=$US read -r agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created origin; do
         ((size >= 0)) || size=0
         [[ $id != "$current" ]] || current=$cwd
         add() { n[$1]=$((${n[$1]:-0} + 1)) && b[$1]=$((${b[$1]:-0} + size)); }
         add all
         ((!empty)) || add empty
-        ! dir_gone "$cwd" || add orphans
+        ! session_gone "$cwd" "$origin" || add orphans
         [[ $path == /* && -f $path ]] || [[ $agent != codex ]] || add missing
         ((NOW - recency < 30 * 86400)) || add idle30
         ((NOW - recency < 90 * 86400)) || add idle90
@@ -3733,9 +3772,23 @@ render_conversation_sub() {
     O_SUBAGENTS=$saved
 }
 
+# picker_marked ARG... — the ids a key acts on, in MARKED. fzf gives them in a file
+# ({+f1}, --from FILE): as arguments, about 3,300 sessions would not fit.
+picker_marked() {
+    MARKED=()
+    if [[ ${1:-} == --from ]]; then
+        [[ -f ${2:-} ]] || return 0
+        mapfile -t MARKED <"$2"
+    else
+        MARKED=("$@")
+    fi
+}
+
 internal_action() {
     local action=$1 arg ignored=0 ids=()
     shift
+    picker_marked "$@"
+    set -- "${MARKED[@]}"
     # Context rows and Claude Code subagents are not sessions to change.
     for arg; do
         if [[ $arg == trash:* ]]; then
@@ -3894,6 +3947,8 @@ internal_marked() {
     fi
     declare -A marked=()
     local count=0
+    picker_marked "$@"
+    set -- "${MARKED[@]}"
     for id; do [[ -z $id ]] || marked[$id]=1; done
     # Only sessions: context rows and Claude Code subagents are not in sizes.
     while IFS=$'\t' read -r id size; do
@@ -3923,6 +3978,7 @@ internal_copy() {
     init
     IFS=$US read -r agent _ _ _ cwd _ < <(session_info "$1")
     [[ -n $agent ]] || return 0
+    [[ -d $cwd ]] || cwd=$(query "SELECT $(flat origin) FROM sessions WHERE id = '$1';")
     if [[ $agent == claude ]]; then command="claude --resume $1"; else command="codex resume $1"; fi
     [[ ! -d $cwd ]] || command="cd $(printf '%q' "$cwd") && $command"
     { printf '\e]52;c;%s\a' "$(printf '%s' "$command" | base64 | tr -d '\n')" >/dev/tty; } 2>/dev/null || true
@@ -4080,13 +4136,13 @@ Filters (combined with AND):
   --archived              archived (Codex); --unarchived: all but those
   --older-than DURATION   last activity before DURATION ago (12h, 30d, 6mo, 1y)
   --newer-than DURATION   last activity within DURATION
-  --dir PATH              started in PATH or below it (repeatable)
+  --dir PATH              now in PATH or below it (repeatable)
   --mode MODE             cli, exec, vscode, subagent, ...
   --provider NAME         model provider (anthropic, openai, ...)
   --grep TEXT             conversation contains TEXT (case-insensitive)
   --empty                 sessions with no message and no reply
   --missing               Codex index entries whose transcript file is gone
-  --orphans               sessions whose project directory no longer exists
+  --orphans               sessions whose directory and start directory are gone
   --keep N                spare the N most recent sessions of each project
                           (both agents together)
   ID...                   session ids; unique prefixes are accepted
