@@ -767,7 +767,7 @@ mkdir -p "$WORK/claude2/projects/-p"
 cp "$CPROJ/$G.jsonl" "$WORK/claude2/projects/-p/"
 CLAUDE_CONFIG_DIR=$WORK/claude2 "$LETHE" list >/dev/null
 "$LETHE" list >/dev/null
-check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v7-*.sqlite | wc -l) -eq 2 ]]'
+check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v8-*.sqlite | wc -l) -eq 2 ]]'
 
 printf '{"display":"secret prompt","sessionId":"%s"}\n{"display":"other","sessionId":"%s"}\n' "$G" "$H" \
     >"$CLAUDE_CONFIG_DIR/history.jsonl"
@@ -1405,6 +1405,117 @@ printf '{"type":"cost-state","sessionId":"%s"}\n' "$Ag" >>"$CPROJ/$Ag.jsonl"
 set_mtime "$(($(date +%s) - 3600))" "$CPROJ/$Ag.jsonl"
 out=$("$LETHE" delete -n "$Ag")
 check "... an hour later it can be deleted" '[[ $out == *"Delete 1 session"* ]]' "$out"
+
+echo "0.7.6: running sessions, unread transcripts, hidden prompts"
+TW=$WORK/v76
+lv() { CLAUDE_CONFIG_DIR=$TW/claude CODEX_HOME=$TW/codex XDG_CACHE_HOME=$TW/cache XDG_DATA_HOME=$TW/data "$LETHE" "$@"; }
+# tw_session ID TEXT — an old, closed session of throwaway home $TW, with a reply.
+tw_session() {
+    local f=$TW/claude/projects/-p/$1.jsonl stamp=2026-01-01T00:00:00.000Z
+    mkdir -p "${f%/*}" "$TW/proj"
+    jq -nc --arg c "$TW/proj" --arg t "$stamp" --arg p "$2" \
+        '{type:"user",uuid:"u1",parentUuid:null,cwd:$c,timestamp:$t,entrypoint:"cli",message:{role:"user",content:$p}}' >"$f"
+    [[ ${3:-} == noreply ]] || jq -nc --arg c "$TW/proj" --arg t "$stamp" \
+        '{type:"assistant",uuid:"a1",parentUuid:"u1",cwd:$c,timestamp:$t,message:{role:"assistant",model:"claude-x",content:[{type:"text",text:"answer"}]}}' >>"$f"
+    perl -e 'utime 1767225600, 1767225600, $ARGV[0]' "$f"
+}
+T1=71000000-0000-4000-8000-000000000001 T2=72000000-0000-4000-8000-000000000002
+tw_session "$T1" "live one"
+tw_session "$T2" "closed one"
+mkdir -p "$TW/claude/sessions" "$TW/claude/jobs/a" "$TW/claude/jobs/b"
+printf '{"pid":%d,"sessionId":"%s"}\n' "$$" "$T1" >"$TW/claude/sessions/$$.json"
+printf '{"pid":999999999,"sess' >"$TW/claude/sessions/0bad.json" # sorted first
+check "an invalid manifest does not hide a running session" '[[ $(lv list --running --ids) == "$T1" ]]'
+out=$(lv delete -y "$T1" 2>&1)
+check "... which cannot be deleted" '[[ -f $TW/claude/projects/-p/$T1.jsonl && $out == *"open in a running agent"* ]]' "$out"
+rm -f "$TW/claude/sessions/0bad.json"
+printf '[1]' >"$TW/claude/sessions/2.json"
+check "... nor by a manifest that is valid JSON of another shape" '[[ $(lv list --running --ids) == "$T1" ]]'
+rm -f "$TW/claude/sessions/2.json" "$TW/claude/sessions/$$.json"
+# The live process's own manifest, cut short.
+printf '{"pid":%d,"sessionId":"%s","pro' "$$" "$T1" >"$TW/claude/sessions/$$.json"
+check "a cut manifest of a live process still protects what it names" '[[ $(lv list --running --ids) == "$T1" ]]'
+: >"$TW/claude/sessions/$$.json"
+out=$(lv delete -y "$T2" 2>&1) && rc=0 || rc=$?
+check "a live process with an unreadable manifest: nothing changes, and it says why" \
+    '[[ $rc == 1 && -f $TW/claude/projects/-p/$T2.jsonl && $out == *"cannot read"*"nothing changed"* ]]' "$out"
+rm -f "$TW/claude/sessions/$$.json"
+printf '{"pid":999999999,"sess' >"$TW/claude/sessions/999999999.json"
+out=$(lv delete -n "$T2" 2>&1)
+check "a bad manifest of a dead process changes nothing" '[[ $out == *"Delete 1 session"* ]]' "$out"
+rm -f "$TW/claude/sessions/999999999.json"
+printf '{bad' >"$TW/claude/jobs/a/state.json"
+printf '{"state":"running","sessionId":"%s"}\n' "$T1" >"$TW/claude/jobs/b/state.json"
+check "an invalid job file does not hide a running job" '[[ $(lv list --running --ids) == "$T1" ]]'
+out=$(lv delete -y "$T2" 2>&1) && rc=0 || rc=$?
+check "... and if it names no session, nothing changes" '[[ $rc == 1 && $out == *"jobs/a/state.json"* ]]' "$out"
+rm -rf "$TW/claude/jobs"
+
+if [[ $(id -u) != 0 ]]; then
+    T9=79000000-0000-4000-8000-000000000009
+    tw_session "$T9" "never read yet"
+    chmod 000 "$TW/claude/projects/-p/$T9.jsonl"
+    check "an unreadable transcript is not empty" '[[ -z $(lv list --empty --ids 2>/dev/null) ]]'
+    out=$(lv list 2>/dev/null)
+    check "... and says so" '[[ $out == *"(unreadable transcript)"* ]]' "$out"
+    chmod 644 "$TW/claude/projects/-p/$T9.jsonl"
+    out=$(lv list 2>/dev/null)
+    check "... and is read once it can be" '[[ $out == *"never read yet"* && $out != *"(unreadable"* ]]' "$out"
+    rm -f "$TW/claude/projects/-p/$T9.jsonl"
+fi
+
+T3=73000000-0000-4000-8000-000000000003 T4=74000000-0000-4000-8000-000000000004
+tw_session "$T3" "<my-button>UNIQUEKEBAB</my-button>"
+tw_session "$T4" "<app-root>ONLYPROMPT</app-root>" noreply
+check "a prompt in a hyphenated tag is found" '[[ $(lv list --ids --grep UNIQUEKEBAB) == "$T3" ]]'
+out=$(lv export "$T3")
+check "... and exported" '[[ $out == *"UNIQUEKEBAB"* ]]' "$out"
+check "... and its session is not empty" '[[ -z $(lv list --empty --ids) ]]'
+for tag in system-reminder command-name local-command-stdout environment_context task-notification; do
+    T5=75000000-0000-4000-8000-000000000005
+    tw_session "$T5" "<$tag>ZZINJECTED</$tag>"
+    check "injected <$tag> stays hidden" '[[ -z $(lv list --ids --grep ZZINJECTED) ]]'
+    rm -f "$TW/claude/projects/-p/$T5.jsonl"
+done
+
+T6=76000000-0000-4000-8000-000000000006 T7=77000000-0000-4000-8000-000000000007
+tw_session "$T6" "$(printf '<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>fix the UNIQUEARG parser</command-args>')"
+tw_session "$T7" "$(printf '<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>')" noreply
+check "what is typed after a slash command is found" '[[ $(lv list --ids --grep UNIQUEARG) == "$T6" ]]'
+out=$(lv show "$T6")
+check "... and shown as the command" '[[ $out == *"/review fix the UNIQUEARG parser"* && $out != *"<command-args>"* ]]' "$out"
+expect_t7=$(lv list --empty --ids)
+check "a slash command with no text stays empty" '[[ $expect_t7 == "$T7" ]]' "$expect_t7"
+check "... and its wrapper is not searched" '[[ -z $(lv list --ids --grep "command-message") ]]'
+
+# Too old an fzf, and the installer.
+printf '#!/bin/sh\ncase "$1" in --version) echo "0.38.0 (debian)"; exit 0 ;; esac\necho started >"%s/fzf.old"\n' "$WORK" >"$WORK/bin/fzf"
+chmod +x "$WORK/bin/fzf"
+out=$(lv pick 2>&1) && rc=0 || rc=$?
+check "too old an fzf: the picker says what it needs" '[[ $rc == 1 && $out == *"0.45+"* && ! -e $WORK/fzf.old ]]' "$out"
+printf '#!/bin/sh\nwhile [ $# -gt 1 ]; do if [ "$1" = -o ]; then o=$2; fi; shift; done; cp "%s" "$o"\n' "$LETHE" >"$WORK/bin/curl"
+chmod +x "$WORK/bin/curl"
+out=$(HOME=$TW/h SHELL=/bin/bash PATH=$WORK/bin:$PATH sh "$ROOT/install.sh" 2>&1)
+check "too old an fzf: the installer says so" '[[ $out == *"fzf-0.45+"* && $out == *"0.38.0"* && $out != *"✓ fzf"* ]]' "$out"
+rm -f "$WORK/bin/fzf"
+if command -v dash >/dev/null 2>&1; then
+    out=$(HOME=$TW/h2 dash -c 'unset SHELL; exec dash "$0"' "$ROOT/install.sh" 2>&1) && rc=0 || rc=$?
+    check "the installer works without SHELL" '[[ $rc == 0 && $out == *"added to your PATH"* ]]' "$out"
+fi
+rm -f "$WORK/bin/curl"
+
+# No sqlite3: the missing command is what is reported.
+mkdir -p "$TW/nosql"
+for tool in bash env dirname basename find sed awk grep cut jq sort date cat mktemp rm; do
+    ln -s "$(command -v "$tool")" "$TW/nosql/$tool"
+done
+out=$(PATH=$TW/nosql lv list --older-than 1d 2>&1) || true
+check "without sqlite3, a valid duration is not called invalid" '[[ $out == *"required command not found: sqlite3"* && $out != *"invalid duration"* ]]' "$out"
+
+# The trash notice: only for what is really planned.
+sqlite3 "$DB" "UPDATE threads SET updated_at = 1700000000, recency_at = 1700000000 WHERE id = '$A';" </dev/null
+out=$("$LETHE" delete -n "$A")
+check "no trash notice when only Codex sessions are deleted" '[[ $out == *"Delete"* && $out != *"go to the trash"* ]]' "$out"
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

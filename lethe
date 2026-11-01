@@ -28,7 +28,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); 
     exit 1
 fi
 
-readonly VERSION="0.7.5"
+readonly VERSION="0.7.6"
 readonly PROG="lethe"
 readonly US=$'\x1f'          # internal field separator: unlike tabs, empty fields never collapse
 readonly RECENT_SECONDS=600  # sessions active more recently than this are protected
@@ -419,14 +419,21 @@ init_codex() {
 # ── Claude Code index ────────────────────────────────────────────────────────
 
 # Context the agents inject as user messages (command wrappers, environment,
-# reminders) is a text wrapped in machine-style tags (<command-name>,
-# <environment_context>, <INSTRUCTIONS>) from start to end. Anything else that
-# starts with "<" (HTML, JSX, generics, a whole <div>…</div>) is the user's own
-# text. "[Request interrupted by user]" is written by Claude Code, not typed.
+# reminders): a text wrapped from start to end in tags the agents are known to
+# write. Anything else that starts with "<" (HTML, JSX, <my-button>…</my-button>)
+# is the user's own text: an unknown tag shows as text, it never hides a prompt.
+# "[Request interrupted by user]" is written by Claude Code, not typed.
+# unwrap: what was typed after a slash command is the user's text.
+readonly JQ_TAGS='(?:command-[a-z-]+|local-command-[a-z-]+|bash-[a-z]+|system-reminder|task-notification|user-prompt-submit-hook|ide_[a-z_]+|environment_context|user_instructions|user_shell_command|user_action|turn_aborted|subagent_notification|INSTRUCTIONS|instructions|skill)'
 readonly JQ_INJECTED='def injected:
-    (test("^\\s*<(?:[A-Za-z][A-Za-z0-9]*[-_:][A-Za-z0-9_:-]*|INSTRUCTIONS|instructions|skill)>")
-     and test("</(?:[A-Za-z][A-Za-z0-9]*[-_:][A-Za-z0-9_:-]*|INSTRUCTIONS|instructions|skill)>\\s*$"))
-    or test("^\\[Request interrupted by user");'
+    (test("^\\s*<'"$JQ_TAGS"'>") and test("</'"$JQ_TAGS"'>\\s*$"))
+    or test("^\\[Request interrupted by user");
+  def unwrap:
+    if test("^\\s*<command-") then
+        ((capture("<command-name>(?<x>[^<]*)</command-name>") | .x) // "") as $name
+        | ((capture("<command-args>(?<x>[\\s\\S]*?)</command-args>") | .x) // "") as $args
+        | if ($args | test("\\S")) then ($name + " " + $args | sub("^ "; "")) else . end
+    else . end;'
 
 # CLAUDE_SUMMARY: the metadata of one transcript in a single pass (one jq per
 # file: indexing thousands of sessions is dominated by process starts). The
@@ -456,7 +463,7 @@ readonly CLAUDE_SUMMARY='
                              .sub = true else . end)
                   else
                       ($c | if type == "string" then [.] else [.[]? | select(.type == "text") | .text] end
-                          | map(select(length > 0 and (injected | not)))) as $texts
+                          | map(strings | unwrap | select(length > 0 and (injected | not)))) as $texts
                       | (if ($texts | length) > 0 or ($c | type) == "array" and any($c[]; .type? == "image") then
                              .sub = true else . end)
                       | (if .prompt == null and ($texts | length) > 0 then .prompt = ($texts | join(" ")) else . end)
@@ -538,6 +545,10 @@ claude_extract() {
             jq -rRn --arg us "$US" --argjson quiet "$quiet" --argjson side false \
                 "$JQ_INJECTED def entry: $CLAUDE_ENTRIES; def branches: $CLAUDE_BRANCHES; $CLAUDE_SUMMARY" 2>/dev/null) || true
     [[ $rewinds =~ ^([0-9]+|NULL)$ ]] || rewinds=0
+    # Not read is not "no message": never --empty, and tried again next time.
+    if [[ ! -r $path || -z ${empty:-} ]]; then
+        empty=0 rewinds=NULL title=${title:-(unreadable transcript)}
+    fi
     size=$fsize
     if [[ -d ${path%.jsonl} ]]; then
         kb=$(du -sk -- "${path%.jsonl}" 2>/dev/null | cut -f 1) || kb=0
@@ -573,8 +584,8 @@ init_claude() {
     mkdir -p "$CACHE_DIR"
     # One index per Claude Code directory: profiles (CLAUDE_CONFIG_DIR) do not
     # wipe each other's.
-    CLAUDE_CACHE=$CACHE_DIR/claude-v7-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
-    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v[456]-*.sqlite
+    CLAUDE_CACHE=$CACHE_DIR/claude-v8-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
+    rm -f -- "$CACHE_DIR"/claude-v[1234].sqlite "$CACHE_DIR"/claude-v[4567]-*.sqlite
     # The picker preview only reads the index that the list has just refreshed.
     [[ $REINDEX == 1 || ! -f $CLAUDE_CACHE ]] || return 0
     sqlite3 -cmd '.timeout 5000' "$CLAUDE_CACHE" "CREATE TABLE IF NOT EXISTS claude (
@@ -745,6 +756,7 @@ load_sizes() {
 
 declare -A OPEN=()
 OPEN_WARNING="" # set when running agents could not be fully inspected
+BAD_JSON=()
 
 # Is PID alive, and (Linux) still the process that started at START?
 pid_alive() {
@@ -808,18 +820,61 @@ detect_open() {
     fi
     # Claude Code registers each running session in sessions/<pid>.json, and
     # each background job in jobs/<id>/state.json.
-    local manifests=("$CLAUDE_DIR"/sessions/*.json) jobs=("$CLAUDE_DIR"/jobs/*/state.json)
+    local manifests=("$CLAUDE_DIR"/sessions/*.json) jobs=("$CLAUDE_DIR"/jobs/*/state.json) file
     if [[ -f ${manifests[0]} ]]; then
+        json_lines '[.pid, .sessionId, .procStart] | map(. // "" | tostring) | join($us)' "${manifests[@]}"
         while IFS=$US read -r pid sid start; do
             if [[ -n $sid ]] && pid_alive "$pid" "$start"; then OPEN[$sid]=1; fi
-        done < <(jq -r --arg us "$US" '[.pid, .sessionId, .procStart] | map(. // "" | tostring) | join($us)' \
-            "${manifests[@]}" 2>/dev/null || true)
+        done <<<"$REPLY"
+        # sessions/<pid>.json: a bad one only matters while its process lives.
+        for file in "${BAD_JSON[@]}"; do
+            pid=${file##*/}
+            pid_alive "${pid%.json}" "" || continue
+            salvage_open "$file"
+        done
     fi
     if [[ -f ${jobs[0]} ]]; then
+        json_lines 'select(.state != "done" and .state != "failed" and .state != "cancelled") | .sessionId // empty' "${jobs[@]}"
         while IFS= read -r sid; do
             [[ -z $sid ]] || OPEN[$sid]=1
-        done < <(jq -r 'select(.state != "done" and .state != "failed" and .state != "cancelled")
-                        | .sessionId // empty' "${jobs[@]}" 2>/dev/null || true)
+        done <<<"$REPLY"
+        for file in "${BAD_JSON[@]}"; do salvage_open "$file"; done
+    fi
+}
+
+# json_lines FILTER FILE... — REPLY: what FILTER prints for these files; BAD_JSON:
+# the files it could not read. jq stops at the first bad file: one must not hide
+# the others, as they are what protects running sessions.
+json_lines() {
+    local filter=$1 file out good=()
+    shift
+    BAD_JSON=()
+    for file; do
+        # Empty: a write in progress.
+        if [[ -s $file ]]; then good+=("$file"); else BAD_JSON+=("$file"); fi
+    done
+    REPLY=""
+    ((${#good[@]})) || return 0
+    if REPLY=$(jq -r --arg us "$US" "$filter" "${good[@]}" 2>/dev/null); then return 0; fi
+    REPLY=""
+    for file in "${good[@]}"; do
+        if out=$(jq -r --arg us "$US" "$filter" "$file" 2>/dev/null); then
+            REPLY+=$out$'\n'
+        else
+            BAD_JSON+=("$file")
+        fi
+    done
+}
+
+# salvage_open FILE — a registration that cannot be parsed: protect the session it
+# names, or change nothing at all if it names none.
+salvage_open() {
+    local found
+    found=$(grep -aoE "\"sessionId\": *\"$UUID_RE\"" -- "$1" 2>/dev/null | head -n 1 || true)
+    if [[ $found =~ ($UUID_RE) ]]; then
+        OPEN[${BASH_REMATCH[1]}]=1
+    else
+        OPEN_WARNING="${OPEN_WARNING:+$OPEN_WARNING; }cannot read $1 (remove it if no agent is using it)"
     fi
 }
 
@@ -925,6 +980,7 @@ parse_args() {
                 F_STATUS=$value
                 ;;
             --older-than | --newer-than)
+                need sqlite3
                 [[ $value =~ ^[0-9]{1,6}([hdwmy]|mo)$ && -n $(cutoff "$value") ]] ||
                     usage_error "invalid duration '$value' (examples: 12h, 30d, 8w, 6mo, 1y)"
                 if [[ $opt == --older-than ]]; then F_OLDER=$value; else F_NEWER=$value; fi
@@ -1091,7 +1147,7 @@ readonly CLAUDE_ENTRIES='
        .type,
        (if $msg then
             $c | if type == "string" then [.] else [.[]? | select(.type == "text") | .text] end
-               | map(select(injected | not)) | join("\n")
+               | map(strings | unwrap | select(injected | not)) | join("\n")
         else "" end),
        .uuid != null,
        (if .type == "assistant" and ($c | type) == "array" then
@@ -1239,7 +1295,7 @@ session_matches() {
             fromjson? | select((.type == "user" or .type == "assistant") and .isMeta != true
                                and .isCompactSummary != true)
             | .message.content | if type == "string" then . else (.[]? | select(.type == "text") | .text) end
-            | select(injected | not)' 2>/dev/null | grep -aiF -- "$F_GREP" >/dev/null
+            | strings | unwrap | select(injected | not)' 2>/dev/null | grep -aiF -- "$F_GREP" >/dev/null
     else
         messages "$1" "$2" all | jq -r '.text' | grep -aiF -- "$F_GREP" >/dev/null
     fi
@@ -1256,7 +1312,7 @@ readonly JQ_SEARCH='
             if (.type == "user" or .type == "assistant") and .isMeta != true and .isCompactSummary != true
                and (.isSidechain != true or ($file | contains("/subagents/")))
                and any(.message.content | if type == "string" then . else (.[]? | objects | select(.type == "text") | .text) end
-                       | strings | select(injected | not); test($re; "i"))
+                       | strings | unwrap | select(injected | not); test($re; "i"))
             then "H" else "" end
         elif .type == "response_item" and .payload.type == "message" then
             if (.payload.role == "user" or .payload.role == "assistant")
@@ -2986,9 +3042,13 @@ run_action() {
             break
         fi
     done
-    if [[ -n ${counts[delete]+x} ]] && [[ " ${PLAN_AGENT[*]} " == *" claude "* ]]; then
-        printf '%sClaude Code sessions go to the trash: %s trash restore ID%s\n' "$C_DIM" "$PROG" "$C_RESET"
-    fi
+    # Only what is really planned: skipped sessions are no longer in PLAN_OP.
+    for id in "${!PLAN_OP[@]}"; do
+        if [[ ${PLAN_OP[$id]} == delete && ${PLAN_AGENT[$id]} == claude ]]; then
+            printf '%sClaude Code sessions go to the trash: %s trash restore ID%s\n' "$C_DIM" "$PROG" "$C_RESET"
+            break
+        fi
+    done
     printf '\n'
     if ((${#PLAN_OP[@]} == 0)); then
         printf 'Nothing to do.\n'
@@ -3109,6 +3169,12 @@ cmd_action() {
 cmd_pick() {
     parse_args "sort subagents" "$@"
     need fzf jq
+    # An older fzf refuses the options below, with a message that says nothing of this.
+    local fzf_version
+    fzf_version=$(fzf --version 2>/dev/null </dev/null || true)
+    if [[ $fzf_version =~ ^0\.([0-9]+) ]] && ((BASH_REMATCH[1] < 45)); then
+        die "fzf ${fzf_version%% *} is too old for the picker: it needs 0.45+ (https://github.com/junegunn/fzf/releases). 'lethe list' works without it."
+    fi
     prepare
 
     local state me track=() layout=() refresh label

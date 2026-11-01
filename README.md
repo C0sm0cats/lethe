@@ -49,7 +49,7 @@ Two options, set in front of `sh`, if you need them:
 
 ```sh
 # install a given release instead of the latest version
-curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.5 sh
+curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_VERSION=v0.7.6 sh
 
 # install in another directory than ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/C0sm0cats/lethe/main/install.sh | LETHE_BIN=~/bin sh
@@ -83,7 +83,7 @@ Dependencies:
 | Arch, Manjaro | `sudo pacman -S fzf jq sqlite zstd` |
 | Alpine | `sudo apk add bash fzf jq sqlite zstd` |
 
-Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout). `zstd` is only needed to read the old transcripts that Codex 0.163+ compresses; without it they are still listed, protected and deletable, just not readable or searchable. lethe works with whichever agents you have; you don't need both.
+Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout; Debian 12 ships 0.38, so take a [release](https://github.com/junegunn/fzf/releases) there). `zstd` is only needed to read the old transcripts that Codex 0.163+ compresses; without it they are still listed, protected and deletable, just not readable or searchable. lethe works with whichever agents you have; you don't need both.
 
 Tab completion: add `source <(lethe completion zsh)` to `~/.zshrc`, or `source <(lethe completion bash)` to `~/.bashrc`.
 
@@ -209,6 +209,7 @@ lethe list --json | jq -r '.[] | select(.subagents) | "\(.id) \(.subagents.count
   - a running process holds its transcript open (this is how Codex works);
   - Claude Code lists it in `~/.claude/sessions/` with a live process, checked against the process start time so that a recycled PID doesn't count;
   - it is an unfinished Claude Code background job;
+  - its registration cannot be parsed but names it. If a live agent's registration names no session, lethe changes nothing;
   - it was written to in the last 10 minutes, subagents included. (Its age, shown and filtered on, is the date of its last message.)
 
   Protection is checked when the plan is shown, and again right before each change: a session that was opened, written to or moved in the meantime is left alone. `--force` lifts only the 10-minute rule. If a running agent's open files cannot be listed, lethe changes nothing. Homes reached through symlinks (`~/.codex` in a dotfiles repo, say) are resolved.

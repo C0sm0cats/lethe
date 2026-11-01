@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.6 — 2026-11-01
+
+- **A running session could be deleted.** One unreadable file in `sessions/` or `jobs/` (a write cut
+  short) hid every running session and job after it, without a word, so a session open for over 10
+  minutes could go to the trash. Each file now counts on its own; one that cannot be parsed still
+  protects the session it names, and if a live agent's file names none, lethe changes nothing and
+  says which file. Update if you use `delete` or `--yes`.
+- A transcript lethe cannot read (`chmod 000`, owned by root) no longer counts as empty, so
+  `--empty` leaves it alone. It shows as `(unreadable transcript)`.
+- Prompts in tags with `-`, `_` or `:` (`<my-button>…</my-button>`) were hidden, and could make a
+  session `--empty`. Only tags the agents are known to write now count as injected. An unknown
+  agent tag shows as text.
+- What you type after a slash command (`/review fix the parser`) now shows in `show`, `export`, the
+  title and `--grep`.
+- The Claude Code index is rebuilt once, for the three fixes above.
+- A too old fzf (Debian 12: 0.38) gave a cryptic error and exit 0. The picker and the installer now
+  say that 0.45+ is needed.
+- The installer no longer stops when `SHELL` is not set (containers, with dash as `sh`).
+- Without `sqlite3`, `--older-than 1d` reported an invalid duration instead of the missing command.
+- The plan no longer mentions the Claude Code trash when only Codex sessions are deleted.
+
 ## 0.7.5 — 2026-10-31
 
 - The age of a Claude Code session is the date of its **last message** (or of its subagents), not of

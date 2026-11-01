@@ -3,7 +3,7 @@
 #
 # Downloads lethe to ~/.local/bin (or $LETHE_BIN), adds that directory to your
 # PATH if needed, and tells you exactly how to install anything missing.
-# LETHE_VERSION=v0.7.5 installs a given release instead of the latest code.
+# LETHE_VERSION=v0.7.6 installs a given release instead of the latest code.
 set -eu
 
 bin=${LETHE_BIN:-$HOME/.local/bin}
@@ -26,7 +26,8 @@ say "✓ lethe installed in $bin/lethe"
 case ":$PATH:" in
     *":$bin:"*) ;;
     *)
-        case ${SHELL##*/} in
+        shell=${SHELL:-}
+        case ${shell##*/} in
             # zsh reads $ZDOTDIR/.zshrc; ZDOTDIR is often set in ~/.zshenv only.
             zsh) rc=$(zsh -c 'printf %s "${ZDOTDIR:-$HOME}"' 2>/dev/null || printf %s "${ZDOTDIR:-$HOME}")/.zshrc ;;
             bash) if [ "$(uname -s)" = Darwin ]; then rc=$HOME/.bash_profile; else rc=$HOME/.bashrc; fi ;;
@@ -50,6 +51,15 @@ missing=""
 for tool in fzf jq sqlite3; do
     command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
 done
+# Distributions can ship an fzf too old for the picker (Debian 12: 0.38).
+fzf_old=""
+if command -v fzf >/dev/null 2>&1; then
+    fzf_minor=$(fzf --version 2>/dev/null </dev/null | sed -n 's/^0\.\([0-9]*\).*/\1/p')
+    if [ -n "$fzf_minor" ] && [ "$fzf_minor" -lt 45 ]; then
+        fzf_old=$(fzf --version 2>/dev/null </dev/null | cut -d ' ' -f 1)
+        missing="$missing fzf-0.45+"
+    fi
+fi
 bash_ok=$(bash -c 'if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4))); then echo yes; fi' 2>/dev/null || true)
 if [ -n "$missing" ] || [ "$bash_ok" != yes ]; then
     say ""
@@ -72,6 +82,10 @@ if [ -n "$missing" ] || [ "$bash_ok" != yes ]; then
         say "  sudo apk add bash fzf jq sqlite zstd"
     else
         say "  Install them with your package manager."
+    fi
+    if [ -n "$fzf_old" ]; then
+        say "  Your fzf is $fzf_old and the picker needs 0.45+. If your package manager has nothing newer:"
+        say "  https://github.com/junegunn/fzf/releases (lethe list, delete and the others work without it)"
     fi
     say "Then run: lethe"
 else
