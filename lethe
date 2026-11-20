@@ -3179,12 +3179,20 @@ run_action() {
         fi
     done
     # Only what is really planned: skipped sessions are no longer in PLAN_OP.
+    local to_trash=0 for_good=0
     for id in "${!PLAN_OP[@]}"; do
-        if [[ ${PLAN_OP[$id]} == delete && ${PLAN_AGENT[$id]} == claude ]]; then
-            printf '%sClaude Code sessions go to the trash: %s trash restore ID%s\n' "$C_DIM" "$PROG" "$C_RESET"
-            break
+        [[ ${PLAN_OP[$id]} == delete ]] || continue
+        if [[ ${PLAN_AGENT[$id]} == claude ]]; then
+            to_trash=$((to_trash + 1))
+        else
+            for_good=$((for_good + 1))
         fi
     done
+    ((to_trash == 0)) ||
+        printf '%sClaude Code sessions go to the trash: %s trash restore ID%s\n' "$C_DIM" "$PROG" "$C_RESET"
+    ((for_good == 0)) ||
+        printf "%s%sCodex sessions are deleted for good; '%s archive' (Ctrl-X) only hides them.%s\n" \
+            "$C_BOLD" "$C_RED" "$PROG" "$C_RESET"
     printf '\n'
     if ((${#PLAN_OP[@]} == 0)); then
         printf 'Nothing to do.\n'
@@ -3196,7 +3204,13 @@ run_action() {
         return 0
     fi
     local question="Proceed?"
-    [[ -z ${counts[delete]+x} ]] || question="Delete ${counts[delete]} session(s)?"
+    if ((for_good && for_good == ${counts[delete]:-0})); then
+        question="Permanently delete ${counts[delete]} session(s)?"
+    elif ((for_good)); then
+        question="Delete ${counts[delete]} session(s), $for_good of them permanently?"
+    elif [[ -n ${counts[delete]+x} ]]; then
+        question="Delete ${counts[delete]} session(s)?"
+    fi
     if ! confirm "$question"; then
         printf 'Cancelled.\n'
         return 0

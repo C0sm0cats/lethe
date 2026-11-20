@@ -615,6 +615,11 @@ if command -v python3 >/dev/null 2>&1; then
     reset_fixture
     out=$(pty_answer reply "" delete "$A")
     check "Enter at the confirmation cancels" '[[ $out == *Cancelled* ]] && codex_exists "$A"' "$out"
+    check "deleting Codex sessions says it is for good, plan and question" \
+        '[[ $out == *"Codex sessions are deleted for good"* && $out == *"Permanently delete 2 session(s)? [y/N]"* ]]' "$out"
+    out=$(LETHE_STATE=$WORK/st pty_answer reply "" __action delete "$A" "$G")
+    check "picker: Ctrl-D on Codex and Claude Code sessions says which are deleted for good" \
+        '[[ $out == *"go to the trash"* && $out == *"deleted for good"* && $out == *"Delete 3 session(s), 2 of them permanently? [y/N]"* ]] && codex_exists "$A"' "$out"
     reset_fixture
     out=$(pty_answer reply no delete "$A")
     check "... and so does no" '[[ $out == *Cancelled* ]] && codex_exists "$A"' "$out"
@@ -1789,7 +1794,7 @@ check "without sqlite3, a valid duration is not called invalid" '[[ $out == *"re
 # The trash notice: only for what is really planned.
 sqlite3 "$DB" "UPDATE threads SET updated_at = 1700000000, recency_at = 1700000000 WHERE id = '$A';" </dev/null
 out=$("$LETHE" delete -n "$A")
-check "no trash notice when only Codex sessions are deleted" '[[ $out == *"Delete"* && $out != *"go to the trash"* ]]' "$out"
+check "no trash notice when only Codex sessions are deleted" '[[ $out == *"Delete"* && $out != *"go to the trash"* && $out == *"deleted for good"* ]]' "$out"
 
 echo "0.7.7: orphans, many marks, read-only Codex, many subagents, locale"
 TX=$WORK/v77
