@@ -313,6 +313,20 @@ check "--force includes recent sessions" '! codex_exists "$E"'
 out=$("$LETHE" delete -y --force "$I" 2>&1)
 check "--force never includes open sessions" '[[ -f $CPROJ/$I.jsonl ]]' "$out"
 
+# The 10-minute window at its edges: one constant serves both agents.
+reset_fixture
+for age in 540 660; do
+    ts=$(($(date +%s) - age))
+    set_mtime "$ts" "$(codex_file "$B" 0)"
+    sqlite3 "$DB" "UPDATE threads SET updated_at = $ts, recency_at = $ts WHERE id = '$B';"
+    out=$("$LETHE" delete -n "$B" 2>&1) || true
+    if ((age == 540)); then
+        check "a session closed 9 minutes ago is still protected" '[[ $out == *"active in the last 10 minutes"* ]]' "$out"
+    else
+        check "... one closed 11 minutes ago is not" '[[ $out == *"Delete 1 session"* && $out != *"active in the last 10 minutes"* ]]' "$out"
+    fi
+done
+
 reset_fixture
 exec 9<"$(codex_file "$A" 0)" # A is now open, like a running Codex holds its rollout
 out=$("$LETHE" delete -y "$C" 2>&1)
