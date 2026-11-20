@@ -254,6 +254,14 @@ expect_ids "--grep ignores injected context" "" --grep secretword
 expect_ids "--grep ignores hidden reasoning" "" --grep hidden
 expect_ids "filters combine with AND" "$A $C" --codex --dir "$PROJ" --older-than 30d
 expect_ids "--keep spares the latest sessions of each project, both agents together; subagents follow their root" "$A $C $D $F $H $I" --keep 1
+# A subagent written to after its session still takes the session's rank.
+reset_fixture
+ts=$(($(date +%s) - 86400))
+set_mtime "$ts" "$(codex_file "$C" 0)"
+sqlite3 "$DB" "UPDATE threads SET updated_at = $ts, recency_at = $ts WHERE id = '$C';"
+out=$("$LETHE" list --ids --keep 2 --dir "$PROJ")
+check "--keep: a subagent newer than its session does not take its place" '[[ -z $out ]]' "$out"
+reset_fixture
 mv "$WORK/other" "$WORK/other.moved"
 expect_ids "--orphans" "$D $E $F $H $I" --orphans
 mv "$WORK/other.moved" "$WORK/other"
