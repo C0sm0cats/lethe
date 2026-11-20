@@ -1378,7 +1378,8 @@ session_matches() {
     fi
 }
 
-# JQ_SEARCH — fed "FILE:LINE" lines (grep -H) holding the raw text, says for each
+# JQ_SEARCH — fed "FILE:LINE" lines (grep -H) holding the raw text (FILE ends in
+# .jsonl or .jsonl.zst), says for each
 # file whether a message has the text: "H FILE", or "M FILE" for a Codex line that
 # only counts if the transcript has no message in clear. Once a file is known, its
 # other lines are not even parsed.
@@ -1404,7 +1405,8 @@ readonly JQ_SEARCH='
         then "M" else "" end;
       foreach inputs as $line ({seen: {}};
           .out = null
-          | ($line | index(".jsonl:")) as $at
+          | ($line | index(".jsonl.zst:")) as $z | ($line | index(".jsonl:")) as $p
+          | (if $z != null and ($p == null or $z < $p) then $z + 4 else $p end) as $at
           | if $at == null then . else
               $line[:$at + 6] as $file
               | if .seen[$file] then . else
@@ -1519,26 +1521,40 @@ fetch_rows() {
         [[ $verdict == [HM] && -n $hit ]] || continue
         [[ $hit != */subagents/agent-*.jsonl ]] || hit=${hit%/subagents/agent-*.jsonl}.jsonl
         if [[ $verdict == H ]]; then raw_hit[$hit]=1; else raw_maybe[$hit]=1; fi
-    done < <(for i in "${!candidates[@]}"; do
-        path=${candidates[i]#*"$US"}
-        [[ $path != *.zst ]] || continue
-        printf '%s\0' "$path"
-        if [[ ${candidates[i]%%"$US"*} == claude && -d ${path%.jsonl}/subagents && ! -L ${path%.jsonl}/subagents ]]; then
-            for file in "${path%.jsonl}"/subagents/agent-*.jsonl; do
-                if [[ -f $file && ! -L $file ]]; then printf '%s\0' "$file"; fi
-            done
-        fi
-    done | LETHE_RAW=$F_GREP_RAW LETHE_TEXT=$F_GREP LETHE_LOCALE=$grep_locale LETHE_JQ="$JQ_INJECTED $JQ_SEARCH" \
-        LETHE_PROJECTS=$CLAUDE_DIR/projects/ xargs -0 "${xargs_opts[@]}" sh -c '
+    done < <(
+        export LETHE_RAW=$F_GREP_RAW LETHE_TEXT=$F_GREP LETHE_LOCALE=$grep_locale LETHE_JQ="$JQ_INJECTED $JQ_SEARCH" \
+            LETHE_PROJECTS=$CLAUDE_DIR/projects/
+        for i in "${!candidates[@]}"; do
+            path=${candidates[i]#*"$US"}
+            [[ $path != *.zst ]] || continue
+            printf '%s\0' "$path"
+            if [[ ${candidates[i]%%"$US"*} == claude && -d ${path%.jsonl}/subagents && ! -L ${path%.jsonl}/subagents ]]; then
+                for file in "${path%.jsonl}"/subagents/agent-*.jsonl; do
+                    if [[ -f $file && ! -L $file ]]; then printf '%s\0' "$file"; fi
+                done
+            fi
+        done | xargs -0 "${xargs_opts[@]}" sh -c '
             LC_ALL=$LETHE_LOCALE grep -aHiF -- "$LETHE_RAW" "$@" 2>/dev/null |
-                jq -nrR --unbuffered --arg q "$LETHE_TEXT" --arg projects "$LETHE_PROJECTS" "$LETHE_JQ"' _ || true)
+                jq -nrR --unbuffered --arg q "$LETHE_TEXT" --arg projects "$LETHE_PROJECTS" "$LETHE_JQ"' _ || true
+        # Compressed transcripts (Codex) go through the same jq: each is decompressed
+        # once, and its lines holding the text get the FILE: prefix grep -H would add.
+        command -v zstd >/dev/null 2>&1 || exit 0
+        for i in "${!candidates[@]}"; do
+            path=${candidates[i]#*"$US"}
+            [[ $path != *.zst ]] || printf '%s\0' "$path"
+        done | xargs -0 "${xargs_opts[@]}" sh -c '
+            for f; do
+                zstd -dcq -- "$f" 2>/dev/null | LC_ALL=$LETHE_LOCALE grep -aiF -- "$LETHE_RAW" |
+                    LETHE_FILE=$f awk '"'"'{ print ENVIRON["LETHE_FILE"] ":" $0 }'"'"'
+            done | jq -nrR --unbuffered --arg q "$LETHE_TEXT" --arg projects "$LETHE_PROJECTS" "$LETHE_JQ"' _ || true
+    )
     for i in "${!candidates[@]}"; do
         path=${candidates[i]#*"$US"}
         if [[ -n ${raw_hit[$path]+x} ]]; then
             : >"$found/$i"
             continue
         fi
-        [[ $path == *.zst || -n ${raw_maybe[$path]+x} ]] || continue
+        [[ -n ${raw_maybe[$path]+x} ]] || continue
         { session_matches "${candidates[i]%%"$US"*}" "${candidates[i]#*"$US"}" && : >"$found/$i"; } &
         running=$((running + 1))
         if ((running >= jobs)); then

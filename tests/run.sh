@@ -1220,6 +1220,20 @@ if command -v zstd >/dev/null 2>&1; then
     out=$("$LETHE" export "$A")
     check "... it can be read" '[[ $out == *"please refactor the Parser"* ]]' "$out"
     expect_ids "... and searched" "$A $G" --grep PARSER
+    # A zstd that counts its runs: a session found by a message in clear is not
+    # decompressed again to be read in full.
+    mkdir -p "$WORK/countzstd"
+    printf '#!/bin/sh\necho run >>"%s"\nexec "%s" "$@"\n' "$WORK/countzstd/runs" "$(command -v zstd)" >"$WORK/countzstd/zstd"
+    chmod +x "$WORK/countzstd/zstd"
+    "$LETHE" list --ids >/dev/null
+    : >"$WORK/countzstd/runs"
+    PATH=$WORK/countzstd:$PATH "$LETHE" list --ids --grep zzqx-nowhere >/dev/null
+    miss=$(wc -l <"$WORK/countzstd/runs")
+    : >"$WORK/countzstd/runs"
+    PATH=$WORK/countzstd:$PATH "$LETHE" list --ids --grep PARSER >/dev/null
+    hit=$(wc -l <"$WORK/countzstd/runs")
+    check "... a compressed transcript found by its text is decompressed once, as one that is not" \
+        '((hit == miss))' "found: $hit runs, not found: $miss runs"
     out=$("$LETHE" delete -n --missing)
     check "... and delete --missing leaves it alone" '[[ $out != *"Refactor parser"* ]]' "$out"
     exec 9<"$(codex_file "$A" 0).zst"
