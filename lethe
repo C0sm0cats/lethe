@@ -1310,11 +1310,13 @@ readonly CLAUDE_BRANCHES='
 # or with "all" every branch (abandoned ones flagged). Context injected by the
 # agents themselves (environment, instructions, tool output, command
 # wrappers) is skipped.
-messages() {
-    # Control characters (escape sequences) never reach the terminal.
-    # One pass, and only when needed: gsub costs length x matches (a CRLF text).
-    local controls='if test("[\\x{0}-\\x{8}\\x{b}-\\x{1f}\\x{7f}-\\x{9f}]") then explode
+#
+# JQ_CONTROLS: control characters (escape sequences) never reach the terminal.
+# One pass, and only when needed: gsub costs length x matches (a CRLF text).
+readonly JQ_CONTROLS='if test("[\\x{0}-\\x{8}\\x{b}-\\x{1f}\\x{7f}-\\x{9f}]") then explode
         | map(select(. == 9 or . == 10 or (. > 31 and (. < 127 or . > 159)))) | implode else . end'
+messages() {
+    local controls=$JQ_CONTROLS
     if [[ $1 == claude ]]; then
         { transcript_read "$2" | grep -aE '"uuid"|"type":"(user|assistant)"' 2>/dev/null || true; } |
             jq -cR --argjson side "$([[ ${4:-} == sidechain ]] && echo true || echo false)" \
@@ -2366,6 +2368,10 @@ conversation() {
             --argjson side "$( ((${SIDECHAIN:-0})) && echo true || echo false)"
     [[ $subs == shown || -n ${FOCUS:-} ]] || return 0
     hidden=$([[ $subs == shown ]] && echo false || echo true)
+    if [[ $agent == claude ]]; then
+        conversation_claude_subs "$id" "$path" "$hidden"
+        return 0
+    fi
     while IFS=$US read -r key file size name heading tool; do
         n=$((n + 1))
         jq -cn --arg title "$heading" --argjson n "$n" --argjson hidden "$hidden" \
@@ -2377,6 +2383,44 @@ conversation() {
             jq -c --argjson n "$n" --argjson hidden "$hidden" '. + {section: $n, hidden: $hidden}
                 | if .role == "user" and (.activity | not) then .role = "task" else . end'
     done < <(subagent_list "$agent" "$id" "$path")
+}
+
+# conversation_claude_subs ID PATH HIDDEN — the subagent part of conversation for
+# Claude Code, with a fixed number of jq processes however many subagents there
+# are (a session can have hundreds). Each transcript's lines follow a marker line
+# "NONCE TAB n TAB heading" (the nonce: no transcript line can pass for one); the
+# entries are cut at the markers, and each transcript keeps its own branches.
+conversation_claude_subs() {
+    local id=$1 path=$2 hidden=$3 rows key file size name heading tool n=0 nonce
+    mapfile -t rows < <(subagent_list claude "$id" "$path")
+    ((${#rows[@]})) || return 0
+    nonce="lethe-section-$RANDOM$RANDOM$RANDOM$RANDOM"
+    for n in "${!rows[@]}"; do
+        IFS=$US read -r key file size name heading tool <<<"${rows[n]}"
+        printf '%s\t%d\t%s\n' "$nonce" $((n + 1)) "$heading"
+        [[ -f $file ]] && transcript_readable "$file" || continue
+        # One process per transcript: grep reads a plain one itself.
+        if ((${MSG_SAMPLE:-0} == 0)) && [[ $file != *.zst ]]; then
+            grep -aE '"uuid"|"type":"(user|assistant)"' -- "$file" 2>/dev/null || true
+        else
+            { transcript_read "$file" | grep -aE '"uuid"|"type":"(user|assistant)"' 2>/dev/null || true; }
+        fi
+    done | jq -cR --arg nonce "$nonce"$'\t' --argjson side true "$JQ_INJECTED
+            if startswith(\$nonce) then
+                .[(\$nonce | length):] | index(\"\t\") as \$t
+                | {lethe_section: (.[:\$t] | tonumber), title: .[\$t + 1:]}
+            else fromjson? | $CLAUDE_ENTRIES end" |
+        jq -sc --argjson hidden "$hidden" --arg branches "$O_BRANCHES" \
+            --argjson sampled "$( ((${MSG_SAMPLE:-0})) && echo true || echo false)" "
+            def branches: $CLAUDE_BRANCHES;
+            . as \$all | [range(length) | select(\$all[.] | type == \"object\")] as \$at
+            | range(\$at | length) as \$k | \$all[\$at[\$k]] as \$head
+            | {role: \"section\", section: \$head.lethe_section, title: \$head.title, hidden: \$hidden},
+              (\$all[\$at[\$k] + 1:(\$at[\$k + 1] // (\$all | length))] | select(length > 0)
+               | branches | .messages[] | (if \$sampled then .abandoned = false else . end)
+               | select(\$branches == \"all\" or (.abandoned | not)) | .text |= $JQ_CONTROLS
+               | . + {section: \$head.lethe_section, hidden: \$hidden}
+               | if .role == \"user\" and (.activity | not) then .role = \"task\" else . end)"
 }
 
 # The labels of the subagent launches of a session, by tool_use id (Claude Code).

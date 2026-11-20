@@ -1990,6 +1990,18 @@ check "indexing 60 subagents starts no more jq than indexing 2" '((many - few < 
 out=$(sqlite3 "$TJ"/cache/lethe/claude-v9-*.sqlite "SELECT count(*), count(DISTINCT tooluse), min(started) > 0 FROM claude_sub
     WHERE tooluse = 'toolu_' || CASE WHEN CAST(substr(agent, 2) AS INTEGER) % 2 THEN 'm' ELSE 'p' END || substr(agent, 2);")
 check "... each with its tool call, from its meta file or its session, and its start" '[[ $out == "60|60|1" ]]' "$out"
+# Nor does reading it with its subagents (export, show, the previews).
+jq_export_calls() { # jq_export_calls N: jq processes started to export a session with N subagents
+    jq_calls "$1" >/dev/null
+    : >"$TJ/calls"
+    PATH=$TJ/bin:$PATH CLAUDE_CONFIG_DIR=$TJ/claude CODEX_HOME=$TJ/codex XDG_CACHE_HOME=$TJ/cache XDG_DATA_HOME=$TJ/data "$LETHE" export "$X6" --subagents >"$TJ/export"
+    wc -c <"$TJ/calls"
+}
+few=$(jq_export_calls 2)
+many=$(jq_export_calls 60)
+check "exporting 60 subagents starts no more jq than exporting 2" '((many - few < 5))' "2 subagents: $few, 60 subagents: $many"
+out=$(grep -c '^go$' "$TJ/export")
+check "... and gives the task of each" '[[ $out == 60 ]]' "$out $(head -c 600 "$TJ/export")"
 
 X4=84000000-0000-4000-8000-000000000004
 tx_session "$X4" "été chaud" "$TX/live"
