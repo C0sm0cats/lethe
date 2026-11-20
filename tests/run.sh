@@ -448,6 +448,19 @@ exec 9<&-
 check "open sessions are seen through a symlinked CODEX_HOME" \
     '[[ $out == *"open in a running agent"* ]] && codex_exists "$A"' "$out"
 
+reset_fixture
+mv "$CODEX_HOME/sessions" "$WORK/moved-sessions"
+mv "$CODEX_HOME/archived_sessions" "$WORK/moved-archived"
+ln -s "$WORK/moved-sessions" "$CODEX_HOME/sessions"
+ln -s "$WORK/moved-archived" "$CODEX_HOME/archived_sessions"
+exec 8<"$(codex_file "$A" 0)" 9<"$(codex_file "$D" 1)" # both held open by a running Codex
+out=$("$LETHE" delete -y --force "$A" "$D" 2>&1) || true
+exec 8<&- 9<&-
+check "open sessions are seen through symlinked sessions and archived_sessions" \
+    '[[ $out == *"open in a running agent"* ]] && codex_exists "$A" && codex_exists "$D" && [[ ! -s $WORK/codex.log ]]' "$out"
+rm -rf "$WORK/moved-sessions" "$WORK/moved-archived"
+reset_fixture
+
 sqlite3 "$DB" "UPDATE threads SET has_user_event = 1 WHERE id = '$E';"
 expect_ids "a Codex session with a user event is not empty" "$H" --empty
 sqlite3 "$DB" "UPDATE threads SET first_user_message = 'continue the migration' WHERE id = '$E';"

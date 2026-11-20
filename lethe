@@ -56,6 +56,9 @@ physical() {
 }
 CODEX_REAL=$(physical "$CODEX_DIR")
 CLAUDE_REAL=$(physical "$CLAUDE_DIR")
+# sessions and archived_sessions may themselves be links (moved to another disk).
+CODEX_SESS_REAL=$(physical "$CODEX_DIR/sessions")
+CODEX_ARCH_REAL=$(physical "$CODEX_DIR/archived_sessions")
 printf -v NOW '%(%s)T' -1
 # Project column: wider when the list has room (fzf gives its width to reloads).
 PROJECT_WIDTH=16
@@ -813,9 +816,12 @@ detect_open() {
         if ((${#fds[@]})); then
             while IFS= read -r target; do
                 [[ $target == "$CODEX_REAL"/*rollout-*.jsonl || $target == "$CODEX_REAL"/*rollout-*.jsonl.zst ||
+                    $target == "$CODEX_SESS_REAL"/*rollout-*.jsonl || $target == "$CODEX_SESS_REAL"/*rollout-*.jsonl.zst ||
+                    $target == "$CODEX_ARCH_REAL"/*rollout-*.jsonl || $target == "$CODEX_ARCH_REAL"/*rollout-*.jsonl.zst ||
                     $target == "$CLAUDE_REAL"/projects/* ]] || continue
                 mark_open_path "$target"
-            done < <(fd_targets "${fds[@]}" | grep -F -e "$CODEX_REAL/" -e "$CLAUDE_REAL/projects/" || true)
+            done < <(fd_targets "${fds[@]}" |
+                grep -F -e "$CODEX_REAL/" -e "$CODEX_SESS_REAL/" -e "$CODEX_ARCH_REAL/" -e "$CLAUDE_REAL/projects/" || true)
         fi
     elif command -v lsof >/dev/null 2>&1; then
         while IFS= read -r target; do
