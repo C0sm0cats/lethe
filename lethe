@@ -2045,10 +2045,13 @@ stats_report() {
     ((path_width >= 14)) || path_width=14
     bar_width=$((width - path_width - 22))
     ((bar_width <= 20)) || bar_width=20
+    # The agent lines are the widest: 37 columns before the bar.
+    ((bar_width <= width - 39)) || bar_width=$((width - 39))
     ((bar_width >= 4)) || bar_width=4
     ((width >= 90)) || hint_sep=$'\n      '
     if [[ -n ${FZF_PREVIEW_COLUMNS:-} ]]; then
-        printf '%sDisk usage of the listed sessions (typed text not applied)%s\n\n' "$C_BOLD" "$C_RESET"
+        # Short enough to stay clear of fzf's scroll indicator (e.g. 1/36).
+        printf '%sDisk usage (typed text not applied)%s\n\n' "$C_BOLD" "$C_RESET"
     else
         printf '%s%s%s\n\n' "$C_BOLD" "$PROG" "$C_RESET"
     fi
@@ -3444,9 +3447,12 @@ cmd_pick() {
     label=$(printf '%q' "$state/label")
     # Narrow terminals put the preview under the list; when short too, it would
     # leave room for two rows only, so it starts hidden (Ctrl-P shows it).
-    local narrow_preview="down,55%,wrap,border-rounded" tight=0
+    # The preview wraps between words where fzf knows wrap-word.
+    local wrap=wrap
+    [[ $features != *'wrap[-word]'* ]] || wrap=wrap-word
+    local narrow_preview="down,55%,$wrap,border-rounded" tight=0
     if (($(tput lines 2>/dev/null || echo 50) < 32)); then
-        narrow_preview="down,35%,wrap,border-rounded,hidden"
+        narrow_preview="down,35%,$wrap,border-rounded,hidden"
         # Preview under the list, on a short terminal: with all the keys in the
         # footer no row would be left, so these two take turns.
         (($(tput cols 2>/dev/null || echo 120) >= 112)) || tight=1
@@ -3470,7 +3476,7 @@ cmd_pick() {
         layout=(
             --input-border=rounded --input-label=" lethe " --input-label-pos=2
             --list-border=rounded --list-label-pos=2
-            --preview-window="right,45%,wrap,border-rounded,<50(${narrow_preview})"
+            --preview-window="right,45%,$wrap,border-rounded,<50(${narrow_preview})"
             --preview-wrap-sign='  ' --ghost='type to filter'
             --footer="$(FZF_COLUMNS=$(tput cols 2>/dev/null || echo 80) "$SELF" __state footer)" --highlight-line --gutter=' '
             --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
@@ -3488,7 +3494,7 @@ cmd_pick() {
     else
         layout=(
             --border=rounded --border-label-pos=3 --header="$("$SELF" __state header)"
-            --preview-window='right,50%,wrap,<70(down,50%,wrap)'
+            --preview-window="right,50%,$wrap,<70(down,50%,$wrap)"
             # fzf's default colors are for a dark background: follow the
             # terminal's text color instead, readable on light ones too.
             --color='prompt:-1:bold,header:-1,info:8,label:-1'

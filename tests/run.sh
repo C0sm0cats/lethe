@@ -423,7 +423,11 @@ printf 'recent\n' >"$LETHE_STATE/sort"
 printf 'stats\n' >"$LETHE_STATE/panel" && printf 'codex\n' >"$LETHE_STATE/agent"
 out=$(NO_COLOR=1 FZF_PREVIEW_COLUMNS=60 "$LETHE" __preview "$A")
 check "picker: Ctrl-B shows the stats of the listed sessions in the panel" \
-    '[[ $out == *"Disk usage of the listed sessions"* && $out == *"codex"* && $out != *"claude  "* ]] && perl -CSD -ne "exit 1 if length > 61" <<<"$out"' "$out"
+    '[[ $out == *"Disk usage (typed text not applied)"* && $out == *"codex"* && $out != *"claude  "* ]] && perl -CSD -ne "exit 1 if length > 61" <<<"$out"' "$out"
+out=$(NO_COLOR=1 FZF_PREVIEW_COLUMNS=47 "$LETHE" __preview "$A")
+# fzf's scroll indicator (e.g. 1/36) covers the end of the first line.
+check "picker: in a 47-column panel the Ctrl-B title and bars fit" \
+    '[[ $(head -n 1 <<<"$out" | perl -pe "s/\e\[[0-9;]*m//g") == "Disk usage (typed text not applied)" && $out == *"codex "* ]] && grep "█" <<<"$out" | perl -CSD -ne "exit 1 if length > 48"' "$out"
 printf 'conversation\n' >"$LETHE_STATE/panel" && printf 'all\n' >"$LETHE_STATE/agent"
 printf 'full\n' >"$LETHE_STATE/keys"
 "$LETHE" __state keys
@@ -1531,6 +1535,11 @@ for size in "200 50" "80 24" "50 18"; do
 done
 check "F1 redraws: fzf leaves old borders when the footer changes height" 'grep -q "^--bind=f1:.*+clear-screen$" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
 check "a resized terminal refills the footer to the new width" 'grep -q "^--bind=resize:transform-footer(.*__state footer)+clear-screen$" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+check "the preview wraps per character when fzf knows no wrap-word" 'grep -q "^--preview-window=right,45%,wrap,border-rounded" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+printf '#!/bin/sh\ncase "$1" in --help) echo "--footer=X --list-border --id-nth --gutter [no]wrap[-word]"; exit 0 ;; esac\nprintf "%%s\\n" "$@" >"%s/fzf.args"\n' "$WORK" >"$WORK/bin/fzf"
+COLUMNS=200 LINES=50 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
+check "... and between words when it does" 'grep -q "^--preview-window=right,45%,wrap-word,border-rounded,<50(down,55%,wrap-word," "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+printf '#!/bin/sh\ncase "$1" in --help) echo "--footer=X --list-border --id-nth --gutter"; exit 0 ;; esac\ncat >"%s/fzf.in"\nprintf "%%s\\n" "$@" >"%s/fzf.args"\n' "$WORK" "$WORK" >"$WORK/bin/fzf"
 # bound KEY ACTION: fzf runs ACTION on KEY.
 bound() { grep -- "^--bind=$1:" "$WORK/fzf.args" | grep -qF -- " $2"; }
 check "picker: Ctrl-D deletes the marked sessions" 'bound ctrl-d "__action delete --from {+f1})"' "$(cat "$WORK/fzf.args")"
