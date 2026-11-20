@@ -929,11 +929,24 @@ has_selector() {
         ((F_EMPTY || F_MISSING || F_ORPHANS || ${#F_DIRS[@]} || ${#F_IDS[@]}))
 }
 
+# abs_dir PATH — an absolute path with no . or .. in it, even when the directory
+# is gone (a deleted project), so that it matches the cwd the agents recorded.
 abs_dir() {
-    local path
+    local path rest part
     path=$(absolute "$1")
     if [[ -d $path ]]; then
         path=$(cd -- "$path" && pwd)
+    else
+        rest=${path#/} path=""
+        while [[ -n $rest ]]; do
+            part=${rest%%/*}
+            if [[ $rest == */* ]]; then rest=${rest#*/}; else rest=""; fi
+            case $part in
+                "" | .) ;;
+                ..) path=${path%/*} ;;
+                *) path+=/$part ;;
+            esac
+        done
     fi
     printf '%s' "${path:-/}"
 }
@@ -1021,6 +1034,7 @@ parse_args() {
                 FILTER_ARGS+=("$opt" "$value")
                 ;;
             --dir)
+                [[ -n $value ]] || usage_error "--dir needs a directory (use . for the current one)"
                 value=$(abs_dir "$value")
                 add_dir "$value"
                 FILTER_ARGS+=("$opt" "$value")

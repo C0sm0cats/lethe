@@ -242,6 +242,8 @@ expect_ids "--newer-than" "$B $E" --newer-than 1w
 expect_ids "--dir includes subdirectories, both agents" "$A $B $C $G" --dir "$PROJ"
 out=$(cd "$WORK" && "$LETHE" list --ids --dir proj/sub)
 check "--dir with a relative path" '[[ $out == "$B" ]]' "$out"
+out=$(cd "$WORK/other" && "$LETHE" list --ids --dir ../proj/gone/../sub/./)
+check "--dir with .. and . is resolved even through a directory that is gone" '[[ $out == "$B" ]]' "$out"
 expect_ids "--dir does not match sibling prefixes" "" --dir "${PROJ%/proj}/pro"
 expect_ids "--mode subagent" "$C" --mode subagent
 expect_ids "--provider" "$G $H $I" --provider anthropic
@@ -292,6 +294,8 @@ expect_status "invalid duration" 2 list --older-than 3x
 expect_status "two statuses at once" 2 list --running --idle
 expect_status "delete without filter is refused" 2 delete -y
 expect_status "an agent alone is not a filter" 2 delete --claude -y
+expect_status "an empty --dir is refused, not the current directory" 2 delete --dir '' -n
+expect_status "... --dir= too" 2 list --dir=
 expect_status "--yes is not a list option" 2 list --yes
 expect_status "unknown id" 1 delete -y 99999999
 expect_status "non-interactive delete needs --yes" 1 delete "$A"
@@ -1257,6 +1261,8 @@ sqlite3 "$DB" "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WH
     SELECT printf('b%07x-0000-4000-8000-%012x', i, i), '/gone/' || i, 1000, 1000, 'cli', 'openai', '/gone', 't', 0, '', 1000 FROM n;"
 out=$("$LETHE" delete -n --codex --dir /gone 2>&1)
 check "a selection of thousands of Codex sessions is planned" '[[ $out == *"Delete 3400 session(s)"* ]]' "${out:0:300}"
+out=$(cd / && "$LETHE" delete -n --codex --dir ./gone 2>&1)
+check "a relative --dir finds the sessions of a project that is gone" '[[ $out == *"Delete 3400 session(s)"* ]]' "${out:0:300}"
 
 echo "audit: commands"
 reset_fixture
