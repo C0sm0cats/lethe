@@ -646,7 +646,9 @@ claude_extract() {
 init_claude() {
     [[ -d $CLAUDE_DIR/projects ]] || return 0
     need jq
-    mkdir -p "$CACHE_DIR"
+    # The index copies titles, prompts and project paths that Claude Code keeps
+    # private (0700): keep it private too, existing installs included.
+    mkdir -p "$CACHE_DIR" && chmod 700 -- "$CACHE_DIR"
     # One index per Claude Code directory: profiles (CLAUDE_CONFIG_DIR) do not
     # wipe each other's.
     CLAUDE_CACHE=$CACHE_DIR/claude-v9-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite

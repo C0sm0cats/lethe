@@ -979,6 +979,10 @@ cp "$CPROJ/$G.jsonl" "$WORK/claude2/projects/-p/"
 CLAUDE_CONFIG_DIR=$WORK/claude2 "$LETHE" list >/dev/null
 "$LETHE" list >/dev/null
 check "one index per Claude Code directory" '[[ $(ls "$XDG_CACHE_HOME"/lethe/claude-v9-*.sqlite | wc -l) -eq 2 ]]'
+chmod 755 "$XDG_CACHE_HOME/lethe"
+(umask 022 && "$LETHE" list >/dev/null)
+out=$(ls -ld "$XDG_CACHE_HOME/lethe")
+check "the index is not readable by other local accounts" '[[ $out == drwx------* ]]' "$out"
 
 printf '{"display":"secret prompt","sessionId":"%s"}\n{"display":"other","sessionId":"%s"}\n' "$G" "$H" \
     >"$CLAUDE_CONFIG_DIR/history.jsonl"
