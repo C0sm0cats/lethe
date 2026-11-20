@@ -2062,6 +2062,20 @@ out=$(lp show "$X6" 2>&1)
 elapsed=$((SECONDS - start))
 check "... and shown quickly, without its carriage returns" \
     '((elapsed < 8)) && [[ $out == *"batch 7999 status=ok"* && $out != *"$cr"* ]]' "${elapsed}s"$'\n'"${out:0:2000}"
+# A pasted text of 32,000 lines is shown in linear time: it took about 15 s, with jq's
+# join and a reduce growing an array, both copying at each line (now under 1 s).
+X7=86000000-0000-4000-8000-000000000007
+awk 'BEGIN { for (i = 0; i < 32000; i++) printf "line %d of a long pasted text, ten words in it\n", i }' >"$TL/text"
+jq -nc --rawfile t "$TL/text" --arg id "$X7" '{type: "user", uuid: "u1", cwd: "/p", sessionId: $id,
+    timestamp: "2026-01-01T10:00:01.000Z", message: {role: "user", content: $t}}' >"$TL/claude/projects/-p/$X7.jsonl"
+set_mtime 1700000000 "$TL/claude/projects/-p/$X7.jsonl"
+lp list >/dev/null 2>&1
+start=$SECONDS
+out=$(COLUMNS=100 lp show "$X7" 2>&1)
+elapsed=$((SECONDS - start))
+check "a prompt of 32,000 lines is shown quickly" \
+    '((elapsed < 5)) && [[ $out == *"line 0 of a long"* && $out == *"line 31999 of a long pasted text, ten words in it"* ]]' \
+    "${elapsed}s"$'\n'"${out:0:2000}"
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"

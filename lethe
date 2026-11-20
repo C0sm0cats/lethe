@@ -2488,25 +2488,29 @@ render_conversation() {
     )
     # shellcheck disable=SC2016 # a jq program
     local defs='        def vlen: gsub("\u001b\\[[0-9;]*m|[\u0001\u0002]"; "") | length;
+        # join("\n") in linear time: the join of jq copies the string built so far
+        # at each element (a 32,000-line message took 8 s).
+        def njoin: (.[:1] + (.[1:] | map("\n" + .))) | add // "";
         # Wrap on spaces to the preview width (fzf would cut words in two).
         def wrap: if $width == 0 or vlen <= $width then . else
             reduce (split(" ") | .[]) as $word ({lines: [], cur: null};
                 if .cur == null then .cur = $word
                 elif ((.cur + " " + $word) | vlen) <= $width then .cur += " " + $word
                 else .lines += [.cur] | .cur = $word end)
-            | .lines + [.cur] | join("\n") end;
+            | .lines + [.cur] | njoin end;
         # Light Markdown: headings and **bold** in bold, `code` and code blocks in color.
         def inline: gsub("\\*\\*(?<x>[^*]+)\\*\\*"; $bold + .x + $reset) | gsub("`(?<x>[^`]+)`"; $code + .x + $reset);
         # Without colors the Markdown stays as written, only wrapped.
+        # One line out per line in (foreach): a reduce growing an array would copy it at each line.
         def styled:
-            reduce split("\n")[] as $line ({out: [], fence: false};
-                if ($line | startswith("```")) then .out += [$dim + $line + $reset] | .fence = (.fence | not)
-                elif .fence then .out += [$code + $line + $reset]
-                elif $reset != "" and ($line | test("^#{1,6} ")) then
-                    .out += [$bold + ($line | sub("^#{1,6} "; "")) + $reset]
-                elif $reset != "" then .out += [$line | inline | wrap]
-                else .out += [$line | wrap] end)
-            | .out | join("\n");
+            [foreach split("\n")[] as $line (false;
+                if ($line | startswith("```")) then not else . end;
+                if ($line | startswith("```")) then $dim + $line + $reset
+                elif . then $code + $line + $reset
+                elif $reset != "" and ($line | test("^#{1,6} ")) then $bold + ($line | sub("^#{1,6} "; "")) + $reset
+                elif $reset != "" then $line | inline | wrap
+                else $line | wrap end)]
+            | njoin;
         # The searched text (Ctrl-G), as a case-insensitive literal regex.
         def focus_re: $focus | gsub("(?<c>[.*+?^${}()|\\[\\]\\\\/])"; "\\\(.c)");
         # Matches are marked before styling (with \u0001 \u0002), so that no color
@@ -2525,8 +2529,8 @@ render_conversation() {
         def render:
             (if .abandoned then
                 (if .role == "user" then $abandoned_you else $abandoned_agent end) + "\n"
-                + (.text | cut | split("\n") | map(wrap) | join("\n") | split("\n")
-                   | map($dim + . + $reset) | join("\n"))
+                + (.text | cut | split("\n") | map(wrap) | njoin | split("\n")
+                   | map($dim + . + $reset) | njoin)
             elif .text == "" then ""
             else
                 (if .activity then (if .role == "user" then $other else $activity end)
@@ -2582,9 +2586,8 @@ render_conversation() {
               + (if $insub > 0 then " · \($insub) in subagents"
                     + (if ($shown | length) < ($hits | length) then ", Alt-S shows them" else "" end) else "" end)
               + $reset + "\n\n"
-              + (reduce $shown[] as $m ({out: [], at: 0};
-                    (if $m.section != .at then .out += [title($titles[$m.section | tostring])] else . end)
-                    | .at = $m.section | .out += [$m | render]) | .out | join("\n"))
+              + ([foreach $shown[] as $m ({at: 0, new: false}; {at: $m.section, new: ($m.section != .at)};
+                    (if .new then title($titles[$m.section | tostring]) else empty end), ($m | render))] | njoin)
           else
             # Section by section: long previews keep the start and the end, and
             # every abandoned message with the one before it (Alt-B).
