@@ -492,7 +492,8 @@ readonly CLAUDE_SUMMARY='
     | ((.meta // [""])[0]) as $origin
     | (if .cwd != null and .meta != null then .meta[0] = .cwd else . end)
     | [(.meta // ["", "", ""])[],
-       (.custom // .ai // .summary // .prompt // ""),
+       # Bash keeps 200 characters: cut first, gsub costs length x matches.
+       (.custom // .ai // .summary // .prompt // "" | tostring | .[:200]),
        (.model // ""), (if .sub then "0" else "1" end),
        (if $quiet then (.e | branches | .rewinds | tostring) else "NULL" end),
        (.last // ""), $origin]
@@ -1267,7 +1268,9 @@ readonly CLAUDE_BRANCHES='
 # wrappers) is skipped.
 messages() {
     # Control characters (escape sequences) never reach the terminal.
-    local controls='gsub("[\\x{0}-\\x{8}\\x{b}-\\x{1f}\\x{7f}-\\x{9f}]"; "")'
+    # One pass, and only when needed: gsub costs length x matches (a CRLF text).
+    local controls='if test("[\\x{0}-\\x{8}\\x{b}-\\x{1f}\\x{7f}-\\x{9f}]") then explode
+        | map(select(. == 9 or . == 10 or (. > 31 and (. < 127 or . > 159)))) | implode else . end'
     if [[ $1 == claude ]]; then
         { transcript_read "$2" | grep -aE '"uuid"|"type":"(user|assistant)"' 2>/dev/null || true; } |
             jq -cR --argjson side "$([[ ${4:-} == sidechain ]] && echo true || echo false)" \

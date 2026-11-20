@@ -1987,6 +1987,28 @@ rm -rf "$TC/start"
 expect_x=$(lc list --orphans --ids)
 check "... it is an orphan once both are gone" '[[ $expect_x == "$X5" ]]' "$expect_x"
 
+# A pasted log of thousands of CRLF lines, in a session without a title: the title
+# and the control characters are cleaned in linear time (it took about 40 s and 20 s).
+TL=$WORK/longpaste
+X6=86000000-0000-4000-8000-000000000006
+lp() { CLAUDE_CONFIG_DIR=$TL/claude CODEX_HOME=$TL/codex XDG_CACHE_HOME=$TL/cache XDG_DATA_HOME=$TL/data "$LETHE" "$@"; }
+mkdir -p "$TL/claude/projects/-p" "$TL/codex"
+awk 'BEGIN { for (i = 0; i < 8000; i++) printf "2026-11-19 10:00:00 INFO worker processed batch %d status=ok\r\n", i }' >"$TL/log"
+jq -nc --rawfile t "$TL/log" --arg id "$X6" '{type: "user", uuid: "u1", cwd: "/p", sessionId: $id,
+    timestamp: "2026-01-01T10:00:01.000Z", message: {role: "user", content: $t}}' >"$TL/claude/projects/-p/$X6.jsonl"
+set_mtime 1700000000 "$TL/claude/projects/-p/$X6.jsonl"
+start=$SECONDS
+out=$(lp list 2>&1)
+elapsed=$((SECONDS - start))
+check "a title-less session whose prompt is a long CRLF log is indexed quickly" \
+    '((elapsed < 8)) && [[ $out == *"INFO worker processed batch 0"* ]]' \
+    "${elapsed}s"$'\n'"${out:0:2000}"
+cr=$'\r' start=$SECONDS
+out=$(lp show "$X6" 2>&1)
+elapsed=$((SECONDS - start))
+check "... and shown quickly, without its carriage returns" \
+    '((elapsed < 8)) && [[ $out == *"batch 7999 status=ok"* && $out != *"$cr"* ]]' "${elapsed}s"$'\n'"${out:0:2000}"
+
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))
