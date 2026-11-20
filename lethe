@@ -2921,6 +2921,18 @@ codex_open_descendants() {
         SELECT DISTINCT id FROM tree;"
 }
 
+# stop_open_trees — marks in tree_stop (run_action's) the subagent tree of every
+# planned session that is open, or spawned by a session that is open.
+stop_open_trees() {
+    local id open_ids=("${!OPEN[@]}")
+    for id in "${open_ids[@]}"; do
+        [[ -z ${PLAN_OP[$id]+x} ]] || tree_stop[${PLAN_ROOT[$id]}]=1
+    done
+    while IFS= read -r id; do
+        [[ -z $id || -z ${PLAN_OP[$id]+x} ]] || tree_stop[${PLAN_ROOT[$id]}]=1
+    done < <(codex_open_descendants "${open_ids[@]}")
+}
+
 # Is this session protected? Sets REPLY to the reason.
 protected() {
     local id=$1
@@ -3113,8 +3125,17 @@ run_action() {
     # Execute, deepest subagents first. Running agents are checked again right
     # before acting, in case a session was opened during the confirmation.
     local total i=0 failed=0 freed=0 trashed=0 trashed_bytes=0 out run_cmd checked skipped_now=0 stamp already=0
-    declare -A done_count=()
+    declare -A done_count=() tree_stop=() plan_before=()
+    # A subagent tree is kept whole: one of its sessions opened or written to
+    # since the plan was shown leaves the whole tree alone.
+    for id in "${!PLAN_STAMP[@]}"; do plan_before[$id]=${PLAN_STAMP[$id]}; done
+    plan_stamps
+    for id in "${!PLAN_OP[@]}"; do
+        [[ ${PLAN_STAMP[$id]} == "${plan_before[$id]}" ]] || tree_stop[${PLAN_ROOT[$id]}]=1
+    done
+    for id in "${!plan_before[@]}"; do PLAN_STAMP[$id]=${plan_before[$id]}; done
     detect_open full
+    stop_open_trees
     checked=$SECONDS
     mapfile -t order < <(for id in "${!PLAN_OP[@]}"; do printf '%s\t%s\n' "${PLAN_DEPTH[$id]}" "$id"; done |
         sort -t $'\t' -k1,1nr -k2,2 | cut -f 2)
@@ -3126,10 +3147,12 @@ run_action() {
         # since the plan was shown means the session is left alone.
         if ((SECONDS - checked >= 5)); then
             detect_open full
+            stop_open_trees
             checked=$SECONDS
         fi
         if [[ -n ${OPEN[$id]+x} || -n $OPEN_WARNING ]]; then
             printf '%s◉ %s was opened meanwhile, skipped%s\n' "$C_GREEN" "$id" "$C_RESET" >&2
+            tree_stop[${PLAN_ROOT[$id]}]=1
             skipped_now=$((skipped_now + 1))
             continue
         fi
@@ -3141,6 +3164,13 @@ run_action() {
         stamp=$(session_stamp "${PLAN_AGENT[$id]}" "${PLAN_PATH[$id]}")
         if [[ $stamp != "${PLAN_STAMP[$id]}" ]]; then
             printf '%s◔ %s changed since the plan was shown, skipped%s\n' "$C_GREEN" "$id" "$C_RESET" >&2
+            tree_stop[${PLAN_ROOT[$id]}]=1
+            skipped_now=$((skipped_now + 1))
+            continue
+        fi
+        if [[ -n ${tree_stop[${PLAN_ROOT[$id]}]+x} ]]; then
+            printf '%s◉ %s skipped: its subagent tree has a session in use since the plan was shown%s\n' \
+                "$C_GREEN" "$id" "$C_RESET" >&2
             skipped_now=$((skipped_now + 1))
             continue
         fi

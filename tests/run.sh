@@ -501,6 +501,81 @@ out=$("$LETHE" delete -y "$A" "$B" 2>&1) || true
 check "a session written to after the plan is left alone" \
     '[[ $out == *"changed since the plan"* ]] && codex_exists "$B" && ! codex_exists "$A"' "$out"
 
+# pty_answer open|append FILE ARGS... — runs `lethe ARGS` on a terminal and, at
+# the [y/N] question, opens FILE (held until lethe exits, like a Codex resuming
+# the session) or appends a line to it, then answers y.
+pty_answer() {
+    python3 - "$LETHE" "$@" <<'PTY' 2>&1
+import os, pty, select, sys
+lethe, action, path = sys.argv[1:4]
+pid, fd = pty.fork()
+if pid == 0:
+    os.execv(lethe, [lethe] + sys.argv[4:])
+buf, held, sent = b"", None, False
+while select.select([fd], [], [], 30)[0]:
+    try:
+        data = os.read(fd, 4096)
+    except OSError:
+        break
+    if not data:
+        break
+    buf += data
+    if not sent and b"[y/N]" in buf:
+        if action == "open":
+            held = open(path)
+        else:
+            with open(path, "a") as f:
+                f.write("{}\n")
+        os.write(fd, b"y\n")
+        sent = True
+if os.waitpid(pid, os.WNOHANG)[0] == 0:
+    os.kill(pid, 9)
+    os.waitpid(pid, 0)
+print(buf.decode(errors="replace"))
+PTY
+}
+if command -v python3 >/dev/null 2>&1; then
+    reset_fixture
+    out=$(pty_answer open "$(codex_file "$B" 0)" delete "$A" "$B")
+    check "a session opened during the confirmation is left alone" \
+        '[[ $out == *"$B was opened meanwhile"* ]] && codex_exists "$B" && ! codex_exists "$A"' "$out"
+    reset_fixture
+    out=$(pty_answer open "$(codex_file "$A" 0)" delete "$A")
+    check "... and so is its subagent tree" \
+        'codex_exists "$A" && codex_exists "$C" && [[ ! -s $WORK/codex.log ]]' "$out"
+    reset_fixture
+    out=$(pty_answer open "$(codex_file "$C" 0)" delete "$A")
+    check "... whichever session of the tree is opened" \
+        'codex_exists "$A" && codex_exists "$C" && [[ $out == *"$A skipped: its subagent tree"* ]]' "$out"
+    reset_fixture
+    out=$(pty_answer open "$(codex_file "$A" 0)" delete "$C")
+    check "... and a subagent alone, when its parent is opened" 'codex_exists "$C"' "$out"
+    reset_fixture
+    out=$(pty_answer append "$(codex_file "$A" 0)" delete "$A")
+    check "a subagent tree written to during the confirmation is left alone" \
+        'codex_exists "$A" && codex_exists "$C" && [[ ! -s $WORK/codex.log ]]' "$out"
+    reset_fixture
+    out=$(pty_answer append "$(codex_file "$C" 0)" delete "$A")
+    check "... whichever session of the tree is written to" 'codex_exists "$A" && codex_exists "$C"' "$out"
+fi
+
+reset_fixture
+cat >"$WORK/bin/codex" <<EOF
+#!/usr/bin/env bash
+# Deleting B takes 6 s (past the 5 s between checks), and meanwhile a Codex opens D.
+if [[ \$* == "delete --force $B" ]]; then
+    sleep 30 <"$(codex_file "$D" 1)" >/dev/null 2>&1 &
+    echo \$! >"$WORK/holder.pid"
+    sleep 6
+fi
+exec "$WORK/codex.fake" "\$@"
+EOF
+chmod +x "$WORK/bin/codex"
+out=$("$LETHE" delete -y "$B" "$D" 2>&1) || true
+kill "$(cat "$WORK/holder.pid")" 2>/dev/null || true
+check "a session opened during a long deletion is left alone" \
+    '[[ $out == *"$D was opened meanwhile"* ]] && codex_exists "$D" && ! codex_exists "$B"' "$out"
+
 reset_fixture
 chmod a-w "$CLAUDE_CONFIG_DIR/session-env"
 out=$("$LETHE" delete -y "$G" 2>&1) || true
