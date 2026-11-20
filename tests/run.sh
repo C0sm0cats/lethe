@@ -1405,6 +1405,8 @@ check "debug and todo files go with their session" '[[ ! -e $CLAUDE_CONFIG_DIR/d
 "$LETHE" delete -y "$A" >/dev/null 2>&1
 "$LETHE" trash empty -n >/dev/null
 check "trash empty --dry-run removes nothing" '[[ -n $(ls -A "$TRASH") ]]'
+out=$("$LETHE" trash empty -n -y 2>&1)
+check "trash empty: --dry-run wins over --yes" '[[ -n $(ls -A "$TRASH") && $out == "Would permanently delete"* ]]' "$out"
 expect_status "trash empty without a terminal needs --yes" 1 trash empty
 check "... and removes nothing" '[[ -n $(ls -A "$TRASH") ]]'
 "$LETHE" trash empty -y --older-than 1d >/dev/null
