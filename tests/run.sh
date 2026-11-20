@@ -559,6 +559,28 @@ if command -v python3 >/dev/null 2>&1; then
     check "... whichever session of the tree is written to" 'codex_exists "$A" && codex_exists "$C"' "$out"
 fi
 
+# An agent process of ours whose /proc/PID/fd cannot be read (not dumpable, as
+# in a sandbox) may hold any session open: nothing is changed.
+if [[ $(uname -s) == Linux ]] && command -v python3 >/dev/null 2>&1; then
+    reset_fixture
+    python3 - "$(codex_file "$A" 0)" "$WORK/blind.ready" <<'BLIND' &
+import ctypes, sys, time
+keep = open(sys.argv[1])
+libc = ctypes.CDLL(None)
+libc.prctl(15, b"codex", 0, 0, 0)  # PR_SET_NAME
+libc.prctl(4, 0, 0, 0, 0)  # PR_SET_DUMPABLE 0: /proc/PID/fd becomes unreadable
+open(sys.argv[2], "w").close()
+time.sleep(30)
+BLIND
+    blind=$!
+    for _ in $(seq 100); do [[ ! -e $WORK/blind.ready ]] || break; sleep 0.05; done
+    out=$("$LETHE" delete -y "$B" 2>&1) || true
+    kill "$blind" 2>/dev/null || true
+    wait "$blind" 2>/dev/null || true
+    check "an agent whose open files cannot be listed: nothing changes" \
+        '[[ $out == *"cannot list the open files of agent process(es) $blind"*"nothing changed"* ]] && codex_exists "$B" && codex_exists "$A"' "$out"
+fi
+
 reset_fixture
 cat >"$WORK/bin/codex" <<EOF
 #!/usr/bin/env bash
