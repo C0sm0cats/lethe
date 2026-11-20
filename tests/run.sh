@@ -1421,6 +1421,14 @@ set_mtime "$(($(date +%s) - 60 * 86400))" "$CPROJ/$G.jsonl"
 check "a custom title wins over the automatic one" '[[ $("$LETHE" list --claude) == *"My own title"* ]]'
 expect_ids "m means months in durations" "$A $C" --older-than 3m
 reset_fixture
+ts=$(($(date +%s) - 3600))
+set_mtime "$ts" "$(codex_file "$B" 0)"
+sqlite3 "$DB" "UPDATE threads SET updated_at = $ts, recency_at = $ts WHERE id = '$B';"
+out=$("$LETHE" list --ids --older-than 12h)
+check "h means hours: an hour-old session is not older than 12h" '[[ $out != *"$B"* && $out == *"$A"* ]]' "$out"
+out=$("$LETHE" list --ids --newer-than 12h)
+check "... and is newer than 12h" '[[ $out == *"$B"* && $out != *"$A"* ]]' "$out"
+reset_fixture
 mkdir -p "$CLAUDE_CONFIG_DIR/jobs/j1"
 printf '{"state":"running","sessionId":"%s"}\n' "$G" >"$CLAUDE_CONFIG_DIR/jobs/j1/state.json"
 out=$("$LETHE" delete -n "$G")
