@@ -1962,6 +1962,34 @@ out=$(lx export "$X3" 2>&1)
 check "... and export" '[[ $out == *"answer"* && $out != *"too long"* ]]' "${out:0:300}"
 out=$(FZF_PREVIEW_COLUMNS=60 lx show --preview "$X3" 2>&1)
 check "... and the preview" '[[ $out == *"answer"* ]]' "${out:0:300}"
+# Indexing a session does not start processes per subagent: count the jq calls
+# for 2 subagents, then for 60 (half of them without a meta file).
+TJ=$WORK/jqcount
+mkdir -p "$TJ/bin"
+printf '#!/bin/sh\nprintf x >>"%s"\nexec %s "$@"\n' "$TJ/calls" "$(command -v jq)" >"$TJ/bin/jq"
+chmod +x "$TJ/bin/jq"
+X6=86000000-0000-4000-8000-000000000006
+jq_calls() { # jq_calls N: jq processes started to index a session with N subagents
+    rm -rf "$TJ/claude" "$TJ/cache"
+    TX=$TJ tx_session "$X6" "many subagents" "$TJ"
+    mkdir -p "$TJ/claude/projects/-p/$X6/subagents"
+    perl -e 'my ($d, $f, $n) = @ARGV; open my $p, ">>", $f or die;
+        for my $i (1 .. $n) {
+            open my $o, ">", "$d/agent-a$i.jsonl" or die;
+            print $o qq({"type":"user","uuid":"s$i","timestamp":"2026-01-01T00:00:01.000Z","isSidechain":true,"message":{"role":"user","content":"go"}}\n); close $o;
+            if ($i % 2) { open my $m, ">", "$d/agent-a$i.meta.json" or die; print $m qq({"description":"task $i","toolUseId":"toolu_m$i"}); close $m; }
+            else { print $p qq({"type":"user","uuid":"r$i","parentUuid":"a1","timestamp":"2026-01-01T00:00:02.000Z","toolUseResult":{"agentId":"a$i"},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_p$i"}]}}\n); } }' \
+        "$TJ/claude/projects/-p/$X6/subagents" "$TJ/claude/projects/-p/$X6.jsonl" "$1"
+    : >"$TJ/calls"
+    PATH=$TJ/bin:$PATH CLAUDE_CONFIG_DIR=$TJ/claude CODEX_HOME=$TJ/codex XDG_CACHE_HOME=$TJ/cache XDG_DATA_HOME=$TJ/data "$LETHE" list --ids >/dev/null
+    wc -c <"$TJ/calls"
+}
+few=$(jq_calls 2)
+many=$(jq_calls 60)
+check "indexing 60 subagents starts no more jq than indexing 2" '((many - few < 5))' "2 subagents: $few, 60 subagents: $many"
+out=$(sqlite3 "$TJ"/cache/lethe/claude-v9-*.sqlite "SELECT count(*), count(DISTINCT tooluse), min(started) > 0 FROM claude_sub
+    WHERE tooluse = 'toolu_' || CASE WHEN CAST(substr(agent, 2) AS INTEGER) % 2 THEN 'm' ELSE 'p' END || substr(agent, 2);")
+check "... each with its tool call, from its meta file or its session, and its start" '[[ $out == "60|60|1" ]]' "$out"
 
 X4=84000000-0000-4000-8000-000000000004
 tx_session "$X4" "été chaud" "$TX/live"

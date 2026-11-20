@@ -504,33 +504,77 @@ readonly CLAUDE_SUMMARY='
 # files only, with what their .meta.json says. One line each:
 #   agent file size started type description model effort tool_use_id
 claude_subagent_fields() {
-    local path=$2 file agent meta kind description model effort tool started size
-    [[ -d ${path%.jsonl}/subagents && ! -L ${path%.jsonl} && ! -L ${path%.jsonl}/subagents ]] || return 0
-    for file in "${path%.jsonl}"/subagents/agent-*.jsonl; do
+    local path=$2 dir=${2%.jsonl}/subagents file agent meta kind description model effort tool started size i line
+    local -a files=() agents=() starts=() kinds=() descriptions=() models=() efforts=() tools=()
+    local -A sizes=() parent_tools=()
+    [[ -d $dir && ! -L ${path%.jsonl} && ! -L $dir ]] || return 0
+    for file in "$dir"/agent-*.jsonl; do
         [[ -f $file && ! -L $file ]] || continue
         agent=${file##*/agent-}
         agent=${agent%.jsonl}
         [[ $agent =~ ^[A-Za-z0-9_-]+$ ]] || continue
-        kind="" description="" model="" effort="" tool=""
-        meta=${file%.jsonl}.meta.json
-        if [[ -f $meta && ! -L $meta ]]; then
-            IFS=$US read -r kind description model effort tool < <(jq -r --arg us "$US" '
-                [.agentType, .description, .model, .effort, .toolUseId]
-                | map(if type == "string" then gsub("[\\x{0}-\\x{1f}\\x{7f}-\\x{9f}]"; " ") else "" end)
-                | join($us)' -- "$meta" 2>/dev/null) || true
-        fi
-        # Without a meta file, the parent's tool result names the agent.
-        if [[ -z $tool ]]; then
-            tool=$({ grep -aF -- "\"agentId\":\"$agent\"" "$path" 2>/dev/null || true; } | jq -r '
-                .message.content[]? | select(.type? == "tool_result") | .tool_use_id // empty' 2>/dev/null |
-                head -n 1) || true
-        fi
+        files+=("$file") agents+=("$agent")
+    done
+    ((${#files[@]})) || return 0
+    # A session can have hundreds: a fixed number of processes for all of them.
+    # Sizes: an unreadable transcript gets none, and is left out of the index.
+    while IFS= read -r line; do
+        size=${line#*$'\t'}
+        file=${size#*$'\t'}
+        sizes[$file]=${size%%$'\t'*}
+    done < <(file_stats "$dir" -mindepth 1 -maxdepth 1 -type f -name 'agent-*.jsonl')
+    # One jq for all: three lines each (index, first transcript line, meta file
+    # on one line), so a file that is not JSON spoils only its own fields.
+    while IFS=$US read -r i started kind description model effort tool; do
+        [[ $i =~ ^[0-9]+$ && -n ${files[i]+x} ]] || continue
+        starts[i]=$started kinds[i]=$kind descriptions[i]=$description models[i]=$model efforts[i]=$effort tools[i]=$tool
+    done < <(
+        for i in "${!files[@]}"; do
+            line="" meta=()
+            [[ -r ${files[i]} ]] && { IFS= read -r line || true; } 2>/dev/null <"${files[i]}"
+            file=${files[i]%.jsonl}.meta.json
+            if [[ -f $file && ! -L $file && -r $file ]]; then
+                mapfile -t meta 2>/dev/null <"$file" || meta=()
+            fi
+            printf '%s\n%s\n' "$i" "$line"
+            printf '%s ' "${meta[@]}"
+            printf '\n'
+        done | jq -rR --arg us "$US" '
+            def clean: if type == "string" then gsub("[\\x{0}-\\x{1f}\\x{7f}-\\x{9f}]"; " ") else "" end;
+            . as $i | input as $first | input as $meta
+            | ($first | try fromjson catch null | try .timestamp catch null
+               | if type == "number" then tostring else . end | clean) as $started
+            | ($meta | try fromjson catch null)
+            | (if type == "object" then [.agentType, .description, .model, .effort, .toolUseId] | map(clean)
+               else ["", "", "", "", ""] end) as $m
+            | [$i, $started] + $m | join($us)' 2>/dev/null
+    )
+    # Without a meta file, the parent's tool result names the agent: one pass
+    # over the parent for all of them.
+    for i in "${!files[@]}"; do
+        [[ -z ${tools[i]:-} ]] || continue
+        while IFS=$US read -r agent tool; do
+            [[ -n ${parent_tools[$agent]+x} ]] || parent_tools[$agent]=$tool
+        done < <({ grep -aF -- '"agentId":"' "$path" 2>/dev/null || true; } | jq -rR --arg us "$US" '
+            [scan("\"agentId\":\"([A-Za-z0-9_-]+)\"") | .[0]] as $agents
+            | (try fromjson catch null
+               | try first(.message.content[]? | select(.type? == "tool_result") | .tool_use_id // empty) catch empty
+               | if type == "string" then gsub("[\\x{0}-\\x{1f}\\x{7f}-\\x{9f}]"; " ") else tostring end) as $tool
+            | $agents[] | . + $us + $tool' 2>/dev/null)
+        break
+    done
+    for i in "${!files[@]}"; do
+        file=${files[i]} agent=${agents[i]}
+        tool=${tools[i]:-}
+        [[ -n $tool ]] || tool=${parent_tools[$agent]:-}
         [[ $tool =~ ^[A-Za-z0-9_-]*$ ]] || tool=""
-        started=$(head -n 1 -- "$file" | jq -r '.timestamp // empty' 2>/dev/null) || started=""
+        started=${starts[i]:-}
         # This value ends up in an SQL script: a date, or nothing.
         [[ $started =~ ^[0-9][0-9TZ:.+-]*$ ]] || started=""
-        size=$(wc -c <"$file")
-        printf '%s\n' "$agent$US$file$US${size//[[:space:]]/}$US${started//$US/}$US$kind$US${description:0:200}$US$model$US$effort$US$tool"
+        size=""
+        [[ -r $file ]] && size=${sizes[$file]:-$(wc -c <"$file")}
+        description=${descriptions[i]:-}
+        printf '%s\n' "$agent$US$file$US${size//[[:space:]]/}$US$started$US${kinds[i]:-}$US${description:0:200}$US${models[i]:-}$US${efforts[i]:-}$US$tool"
     done
 }
 
