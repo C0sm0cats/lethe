@@ -1426,6 +1426,12 @@ for size in "200 50" "80 24" "50 18"; do
     check "lethe pick starts fzf with the rows, panel layout, at $size" 'grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.in" 2>/dev/null)"
 done
 check "F1 redraws: fzf leaves old borders when the footer changes height" 'grep -q "^--bind=f1:.*+clear-screen$" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+# bound KEY ACTION: fzf runs ACTION on KEY.
+bound() { grep -- "^--bind=$1:" "$WORK/fzf.args" | grep -qF -- " $2"; }
+check "picker: Ctrl-D deletes the marked sessions" 'bound ctrl-d "__action delete --from {+f1})"' "$(cat "$WORK/fzf.args")"
+check "picker: Ctrl-X archives or unarchives them" 'bound ctrl-x "__action toggle --from {+f1})"'
+check "picker: Ctrl-R resumes, Ctrl-K forks" 'bound ctrl-r "__resume {1})" && bound ctrl-k "__resume {1} fork)"'
+check "picker: Ctrl-E exports" 'bound ctrl-e "__export {1})"'
 # (tput reads these two variables, where it exists)
 if [[ $(LINES=24 tput lines 2>/dev/null) == 24 ]]; then
     COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
