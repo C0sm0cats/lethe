@@ -1406,6 +1406,31 @@ if [[ $(LINES=24 tput lines 2>/dev/null) == 24 ]]; then
     check "on a short terminal the preview and the full key list take turns" \
         'grep -q "f1:.*hide-preview" "$WORK/fzf.args" && grep -q "ctrl-p:toggle-preview+execute-silent(.*__state keys short)" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
 fi
+# fzf 0.63 to 0.71 know --footer and --list-border, not every option of the
+# panel layout (--header-lines-border=inline is 0.72): they get the plain one.
+for v in 0.60.3 0.63.0 0.71.0 0.72.0; do
+    printf '#!/bin/sh\ncase "$1" in --version) echo "%s (release)"; exit 0 ;; --help) echo "--footer=X --list-border --id-nth --gutter"; exit 0 ;; esac\ncat >"%s/fzf.in"\nprintf "%%s\\n" "$@" >"%s/fzf.args"\n' "$v" "$WORK" "$WORK" >"$WORK/bin/fzf"
+    rm -f "$WORK/fzf.in" "$WORK/fzf.args"
+    COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
+    if [[ $v == 0.72.0 ]]; then
+        check "fzf $v gets the panel layout" 'grep -q "^--footer=" "$WORK/fzf.args" && grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.args" 2>/dev/null)"
+    else
+        check "fzf $v gets the plain layout, with no footer action" \
+            '! grep -q -e "--footer" -e "transform-footer" -e "--preview-wrap-sign" -e "--header-lines-border" "$WORK/fzf.args" && grep -q "^--header=" "$WORK/fzf.args" && grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.args" 2>/dev/null)"
+    fi
+done
+printf '#!/bin/sh\ncase "$1" in --version) echo "0.60.3 (release)"; exit 0 ;; esac\nprintf "%%s\\n" "$@" >"%s/fzf.args"\n' "$WORK" >"$WORK/bin/fzf"
+"$LETHE" pick </dev/null >/dev/null 2>&1 || true
+check "the plain layout follows the terminal's text color, readable on a light background" \
+    'grep -qx -e "--color=prompt:-1:bold,header:-1,info:8,label:-1" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+NO_COLOR=1 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
+check "... and NO_COLOR still wins over it" '[[ $(grep -e "^--color" "$WORK/fzf.args" | tail -1) == --color=bw ]]' "$(cat "$WORK/fzf.args")"
+printf '#!/bin/sh\ncase "$1" in --version) echo "0.72.0 (release)"; exit 0 ;; --help) exit 0 ;; esac\necho "unknown option: --x" >&2\nexit 2\n' >"$WORK/bin/fzf"
+out=$("$LETHE" pick </dev/null 2>&1) && rc=0 || rc=$?
+check "the picker fails when fzf refuses its options" '[[ $rc == 2 && $out == *"unknown option"* ]]' "rc=$rc $out"
+printf '#!/bin/sh\ncase "$1" in --version) echo "0.72.0 (release)"; exit 0 ;; --help) exit 0 ;; esac\nexit 130\n' >"$WORK/bin/fzf"
+"$LETHE" pick </dev/null >/dev/null 2>&1 && rc=0 || rc=$?
+check "... not when Esc closes it" '[[ $rc == 0 ]]' "rc=$rc"
 rm -f "$WORK/bin/fzf"
 printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"assistant says hello"}]}}' \
     '{"type":"realtime_item","payload":{"type":"transcript_segment","role":"user","text":"spoken words"}}' >>"$(codex_file "$B" 0)"

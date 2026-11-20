@@ -83,7 +83,7 @@ Dependencies:
 | Arch, Manjaro | `sudo pacman -S fzf jq sqlite zstd` |
 | Alpine | `sudo apk add bash fzf jq sqlite zstd` |
 
-Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.63+ for the panel layout; Debian 12 ships 0.38, so take a [release](https://github.com/junegunn/fzf/releases) there). `zstd` is only needed to read the old transcripts that Codex 0.163+ compresses; without it they are still listed, protected and deletable, just not readable or searchable. lethe works with whichever agents you have; you don't need both.
+Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.72+ for the panel layout; Debian 12 ships 0.38, so take a [release](https://github.com/junegunn/fzf/releases) there). `zstd` is only needed to read the old transcripts that Codex 0.163+ compresses; without it they are still listed, protected and deletable, just not readable or searchable. lethe works with whichever agents you have; you don't need both.
 
 Tab completion: add `source <(lethe completion zsh)` to `~/.zshrc`, or `source <(lethe completion bash)` to `~/.bashrc`.
 

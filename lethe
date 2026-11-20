@@ -3320,10 +3320,21 @@ cmd_pick() {
         # footer no row would be left, so these two take turns.
         (($(tput cols 2>/dev/null || echo 120) >= 112)) || tight=1
     fi
+    # The panel layout needs fzf 0.72 (--header-lines-border=inline, and before
+    # it --preview-wrap-sign, --gutter): decide on the version, and on --help
+    # only when the version cannot be read.
+    local panels=0
+    if [[ $fzf_version =~ ^0\.([0-9]+) ]]; then
+        ((BASH_REMATCH[1] < 72)) || panels=1
+    elif [[ $features == *--footer=* && $features == *--list-border* ]]; then
+        panels=1
+    fi
+    # Without panels there is no footer to take turns with the preview.
+    ((panels)) || tight=0
     local f1_extra=""
     ((!tight)) || f1_extra=+hide-preview
-    if [[ $features == *--footer=* && $features == *--list-border* ]]; then
-        # fzf >= 0.63: separate panels, keys in a footer.
+    if ((panels)); then
+        # fzf >= 0.72: separate panels, keys in a footer.
         LETHE_COLUMNS=1
         layout=(
             --input-border=rounded --input-label=" lethe " --input-label-pos=2
@@ -3345,6 +3356,9 @@ cmd_pick() {
         layout=(
             --border=rounded --border-label-pos=3 --header="$("$SELF" __state header)"
             --preview-window='right,50%,wrap,<70(down,50%,wrap)'
+            # fzf's default colors are for a dark background: follow the
+            # terminal's text color instead, readable on light ones too.
+            --color='prompt:-1:bold,header:-1,info:8,label:-1'
             --bind="load:transform-border-label(cat $label)"
         )
         refresh="+transform-prompt($me __state prompt)+transform-header($me __state header)+reload($me __rows)"
@@ -3382,7 +3396,7 @@ cmd_pick() {
         --bind="ctrl-p:$toggle" \
         --bind="ctrl-y:execute-silent($me __copy {1})" \
         --bind="enter:execute($me __page {1})" ||
-        true
+        (($? != 2)) || exit 2 # 2: fzf refused an option (1 and 130 are no match and Esc)
 }
 
 # picker_setup [nofilter | nodir] — the filters of the command line, then the
