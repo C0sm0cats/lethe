@@ -993,6 +993,29 @@ session_gone() {
     [[ -z ${2:-} || $2 == "$1" ]] || dir_gone "$2"
 }
 
+# codex_origin VAR PATH — where a Codex session started: the cwd of the
+# session_meta line that opens its rollout, or "". Codex sets threads.cwd to
+# where it was last resumed, so a resumed session's project is only there.
+codex_origin() {
+    local -n origin_out=$1
+    origin_out=""
+    [[ -f $2 ]] || return 0
+    [[ $2 != *.zst ]] || command -v zstd >/dev/null 2>&1 || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    origin_out=$({ transcript_cat "$2" | head -n 1 |
+        jq -r 'select(.type == "session_meta") | .payload.cwd // empty | strings'; } 2>/dev/null || true)
+    origin_out=${origin_out//[$'\t\n\r\x1f']/ }
+}
+
+# session_origin ID AGENT PATH — where a session started, from the index, or from
+# its rollout for Codex (see codex_origin).
+session_origin() {
+    local origin
+    origin=$(query "SELECT $(flat origin) FROM sessions WHERE id = '$1';")
+    [[ $2 != codex || -n $origin ]] || codex_origin origin "$(codex_path codex "$1" "$3")"
+    printf '%s' "$origin"
+}
+
 # parse_args ALLOWED ARGS... — ALLOWED lists the extra flags a command accepts
 # (ids yes dry all json sort force).
 parse_args() {
@@ -1427,6 +1450,8 @@ fetch_rows() {
             size=-1
         fi
         ((!F_MISSING || size < 0)) || continue
+        # Read only when needed: where it is now is gone.
+        if [[ $agent == codex && -z $origin ]] && dir_gone "$cwd"; then codex_origin origin "$path"; fi
         ((!F_ORPHANS)) || session_gone "$cwd" "$origin" || continue
         # Searched below, all at once.
         [[ -z $F_GREP ]] || ((size >= 0)) || continue
@@ -2555,15 +2580,15 @@ cmd_resume() {
     parse_args "ids" "$@"
     ((${#F_IDS[@]} == 1)) || usage_error "$verb takes exactly one session id"
     prepare
-    local id=${F_IDS[0]} agent mode cwd
-    IFS=$US read -r agent _ mode _ cwd _ < <(session_info "$id")
+    local id=${F_IDS[0]} agent mode cwd path
+    IFS=$US read -r agent _ mode _ cwd _ _ _ path _ < <(session_info "$id")
     [[ $mode != subagent ]] || die "$id is a subagent session; resume the session that started it"
     # Two agents writing the same transcript would interleave it.
     ((fork)) || [[ -z ${OPEN[$id]+x} ]] ||
         die "$id is already open in a running agent; switch to it, or use '$PROG fork $id' for a copy"
     # Where it went may be gone while its project is not.
-    local origin
-    origin=$(query "SELECT $(flat origin) FROM sessions WHERE id = '$id';")
+    local origin=""
+    [[ -d $cwd ]] || origin=$(session_origin "$id" "$agent" "$path")
     if [[ -d $cwd ]]; then
         cd -- "$cwd"
     elif [[ -n $origin && -d $origin ]]; then
@@ -4048,16 +4073,16 @@ internal_marked() {
 # WezTerm, iTerm2, tmux with set-clipboard, ...) and any local clipboard tool.
 internal_copy() {
     [[ $1 != trash:* ]] || return 0
-    local agent cwd command rc=0
+    local agent cwd path command rc=0
     # A subagent: the command that resumes its session.
     picker_id "$1" || rc=$?
     ((rc != 1)) || return 0
     set -- "$REPLY"
     REINDEX=0
     init
-    IFS=$US read -r agent _ _ _ cwd _ < <(session_info "$1")
+    IFS=$US read -r agent _ _ _ cwd _ _ _ path _ < <(session_info "$1")
     [[ -n $agent ]] || return 0
-    [[ -d $cwd ]] || cwd=$(query "SELECT $(flat origin) FROM sessions WHERE id = '$1';")
+    [[ -d $cwd ]] || cwd=$(session_origin "$1" "$agent" "$path")
     if [[ $agent == claude ]]; then command="claude --resume $1"; else command="codex resume $1"; fi
     [[ ! -d $cwd ]] || command="cd $(printf '%q' "$cwd") && $command"
     { printf '\e]52;c;%s\a' "$(printf '%s' "$command" | base64 | tr -d '\n')" >/dev/tty; } 2>/dev/null || true

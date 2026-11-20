@@ -1796,6 +1796,37 @@ if LC_ALL=C.UTF-8 grep -qiF 'É' <<<'é' 2>/dev/null; then
     check "--grep ignores the case of accents in the C locale" '[[ $expect_x == "$X4" ]]' "$expect_x"
 fi
 
+# Codex sets threads.cwd to where a session was last resumed; where it started
+# is only in the session_meta line of its rollout.
+TC=$WORK/resumed
+lc() { CLAUDE_CONFIG_DIR=$TC/none CODEX_HOME=$TC/codex XDG_CACHE_HOME=$TC/cache XDG_DATA_HOME=$TC/data "$LETHE" "$@"; }
+X5=85000000-0000-4000-8000-000000000005
+mkdir -p "$TC/codex/sessions" "$TC/start" "$TC/later"
+sqlite3 "$TC/codex/state_5.sqlite" "$(sqlite3 "$DB" .schema)"
+{
+    printf '{"type":"session_meta","payload":{"id":"%s","cwd":"%s"}}\n' "$X5" "$TC/start"
+    printf '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"first prompt"}]}}\n'
+} >"$TC/codex/sessions/rollout-$X5.jsonl"
+sqlite3 "$TC/codex/state_5.sqlite" "INSERT INTO threads (id, rollout_path, created_at, updated_at, source, model_provider, cwd, title, recency_at)
+    VALUES ('$X5', '$TC/codex/sessions/rollout-$X5.jsonl', 1700000000, 1700000000, 'exec', 'openai', '$TC/later', 'resumed elsewhere', 1700000000);"
+set_mtime 1700000000 "$TC/codex/sessions/rollout-$X5.jsonl"
+rm -rf "$TC/later"
+expect_x=$(lc list --orphans --ids)
+out=$(lc stats)
+check "a Codex session resumed in a directory since removed is not an orphan while it started in a live one, in stats too" \
+    '[[ -z $expect_x && $out != *"whose project directory is gone"* ]]' "$expect_x"$'\n'"$out"
+printf '#!/bin/sh\necho "in $PWD: $*"\n' >"$WORK/bin/codex" && chmod +x "$WORK/bin/codex"
+out=$(cd / && lc resume "$X5" 2>&1)
+check "... resume starts it where it started" '[[ $out == *"in $TC/start: resume $X5"* && $out == *"no longer exists"* ]]' "$out"
+cp "$WORK/codex.fake" "$WORK/bin/codex"
+printf '#!/bin/sh\ncat >"%s/clipboard"\n' "$WORK" >"$WORK/bin/pbcopy" && chmod +x "$WORK/bin/pbcopy"
+WAYLAND_DISPLAY="" DISPLAY="" lc __copy "$X5" </dev/null
+check "... and Ctrl-Y copies a command that goes there" \
+    '[[ $(<"$WORK/clipboard") == "cd $TC/start && codex resume $X5" ]]' "$(cat "$WORK/clipboard" 2>/dev/null)"
+rm -rf "$TC/start"
+expect_x=$(lc list --orphans --ids)
+check "... it is an orphan once both are gone" '[[ $expect_x == "$X5" ]]' "$expect_x"
+
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))
