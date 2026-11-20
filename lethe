@@ -2738,17 +2738,6 @@ history_take() {
     printf 'their prompts stay in %s: the file changed or could not be rewritten\n' "$file" >&2
 }
 
-# trash_fields ENTRY — id, title, cwd and trashed (in the caller's variables). One
-# unreadable manifest must not hide the rest of the trash.
-trash_fields() {
-    IFS=$US read -r id title cwd trashed < <(jq -r --arg us "$US" \
-        '[.id, (.title // ""), (.cwd // ""), (.trashed_at // 0 | tostring)] | join($us)' "$1/manifest.json" 2>/dev/null) || true
-    if [[ -z ${id:-} ]]; then
-        id="" title="(unreadable manifest: ${1##*/})" cwd="" trashed=0
-    fi
-    [[ ${trashed:-} =~ ^[0-9]+$ ]] || trashed=0
-}
-
 trash_entries() {
     [[ -d $TRASH_DIR ]] || return 0
     local entry
@@ -2757,16 +2746,64 @@ trash_entries() {
     done
 }
 
-# trash_find PREFIX — trash entry of the session whose id starts with PREFIX.
+# trash_load [SIZES] — every trash entry and its manifest, in the T_* arrays (and
+# its size in bytes, in T_SIZE, when SIZES is 1). One jq and one du for the whole
+# trash: a process per entry costs seconds once the trash holds thousands of
+# sessions. One unreadable manifest must not hide the rest of the trash.
+declare -a T_ENTRY=() T_ID=() T_TITLE=() T_CWD=() T_TRASHED=() T_SIZE=()
+trash_load() {
+    local sizes=${1:-0} i id title cwd trashed kb path lines=()
+    local -A kbs=()
+    T_ID=() T_TITLE=() T_CWD=() T_TRASHED=() T_SIZE=()
+    mapfile -t T_ENTRY < <(trash_entries)
+    ((${#T_ENTRY[@]})) || return 0
+    # Each manifest goes to jq on one line, after its index (a JSON string never
+    # holds a raw newline): jq reading the files themselves would glue a manifest
+    # without a final newline to the next one, and lose both.
+    while IFS=$US read -r i id title cwd trashed; do
+        if [[ -z $id ]]; then
+            title="(unreadable manifest: ${T_ENTRY[i]##*/})" cwd=""
+        fi
+        [[ $trashed =~ ^[0-9]+$ ]] || trashed=0
+        T_ID[i]=$id T_TITLE[i]=$title T_CWD[i]=$cwd T_TRASHED[i]=$trashed
+    done < <(for i in "${!T_ENTRY[@]}"; do
+        lines=()
+        { mapfile -t lines <"${T_ENTRY[i]}/manifest.json"; } 2>/dev/null || true
+        printf '%d%s%s\n' "$i" "$US" "${lines[*]}"
+    done | jq -rR --arg us "$US" '
+        split($us) as $p | ($p[1:] | join($us) | fromjson? // null) as $m
+        | (if ($m | type) == "object" then $m else {} end)
+        | [$p[0], (.id // "" | tostring), (.title // "" | tostring), (.cwd // "" | tostring), (.trashed_at // 0 | tostring)]
+        | map(gsub("[\n\r\u001f]"; " ")) | join($us)')
+    if ((sizes)); then
+        while IFS=$'\t' read -r kb path; do
+            [[ -z $path ]] || kbs[$path]=$kb
+        done < <(printf '%s\0' "${T_ENTRY[@]}" | xargs -0 du -sk -- 2>/dev/null)
+        for i in "${!T_ENTRY[@]}"; do
+            kb=${kbs[${T_ENTRY[i]}]:-0}
+            T_SIZE[i]=$((kb * 1024))
+        done
+    fi
+}
+
+# trash_fields I — entry, id, title, cwd, trashed and size of the I-th entry of
+# trash_load, in the caller's variables.
+trash_fields() {
+    entry=${T_ENTRY[$1]} id=${T_ID[$1]:-} title=${T_TITLE[$1]:-} cwd=${T_CWD[$1]:-}
+    trashed=${T_TRASHED[$1]:-0} size=${T_SIZE[$1]:-0}
+}
+
+# trash_find PREFIX — index, in REPLY, of the trash_load entry whose session id
+# starts with PREFIX.
 trash_find() {
-    local prefix=${1,,} entry matches=()
+    local prefix=${1,,} i matches=()
     [[ $prefix =~ ^[0-9a-f-]{4,36}$ ]] || usage_error "not a session id: $1"
-    while IFS= read -r entry; do
-        [[ $(jq -r .id "$entry/manifest.json" 2>/dev/null) == "$prefix"* ]] && matches+=("$entry")
-    done < <(trash_entries)
+    for i in "${!T_ENTRY[@]}"; do
+        [[ ${T_ID[i]:-} != "$prefix"* ]] || matches+=("$i")
+    done
     case ${#matches[@]} in
         0) die "no session in the trash matches '$1'" ;;
-        1) printf '%s' "${matches[0]}" ;;
+        1) REPLY=${matches[0]} ;;
         *) die "ambiguous id prefix '$1' (several trashed copies)" ;;
     esac
 }
@@ -2839,7 +2876,8 @@ show_trash() {
 }
 
 cmd_trash() {
-    local sub=${1:-list} entry id title cwd trashed size hsize age count=0 total=0 entries=()
+    local sub=${1:-list} entry id title cwd trashed size hsize age count=0 total=0 entries=() i limit picks=()
+    local -A picked=()
     case " $* " in
         *" -h "* | *" --help "*)
             usage
@@ -2851,13 +2889,14 @@ cmd_trash() {
     case $sub in
         list | ls)
             if [[ ${1:-} == --ids ]]; then
-                while IFS= read -r entry; do jq -r .id "$entry/manifest.json" 2>/dev/null || true; done < <(trash_entries)
+                trash_load
+                for id in "${T_ID[@]}"; do [[ -z $id ]] || printf '%s\n' "$id"; done
                 return
             fi
             (($# == 0)) || usage_error "trash list takes no arguments"
-            while IFS= read -r entry; do
-                trash_fields "$entry"
-                size=$(($(du -sk -- "$entry" | cut -f 1) * 1024))
+            trash_load 1
+            for i in "${!T_ENTRY[@]}"; do
+                trash_fields "$i"
                 human_size hsize "$size"
                 human_age age "$trashed"
                 clean title
@@ -2868,15 +2907,26 @@ cmd_trash() {
                     "$C_MAGENTA" "${id:0:8}" "$C_RESET" "$C_BLUE" "$cwd" "$C_RESET" "${title:-(empty)}"
                 count=$((count + 1))
                 total=$((total + size))
-            done < <(trash_entries)
+            done
             human_size hsize "$total"
             printf '%s%d session(s) in the trash · %s · %s%s\n' "$C_DIM" "$count" "$hsize" "$TRASH_DIR" "$C_RESET"
             ;;
         restore)
             (($#)) || usage_error "trash restore takes session ids"
             for id; do
-                entry=$(trash_find "$id")
-                title=$(jq -r '(.title // "") | if . == "" then "session" else . end' "$entry/manifest.json" 2>/dev/null) || title=session
+                [[ $id != -* ]] || usage_error "option '$id' is not valid for this command"
+            done
+            # Every id is found before anything is restored: an unknown or ambiguous
+            # one leaves the whole trash as it was.
+            trash_load
+            for id; do
+                trash_find "$id"
+                [[ -n ${picked[$REPLY]:-} ]] || picks+=("$REPLY")
+                picked[$REPLY]=1
+            done
+            for i in "${picks[@]}"; do
+                trash_fields "$i"
+                [[ -n $title ]] || title=session
                 clean title
                 trash_restore "$entry"
                 printf '%s✓ restored: %s%s\n' "$C_GREEN" "$title" "$C_RESET"
@@ -2887,15 +2937,16 @@ cmd_trash() {
             # Only --older-than applies to the trash: any other filter would be ignored.
             has_selector_besides_older &&
                 usage_error "trash empty only takes --older-than (and -n, -y)"
-            while IFS= read -r entry; do
+            [[ -z $F_OLDER ]] || limit=$(cutoff "$F_OLDER")
+            trash_load 1
+            for i in "${!T_ENTRY[@]}"; do
+                trash_fields "$i"
                 count=$((count + 1))
                 # An unreadable entry counts as the oldest: it can still be emptied.
-                trashed=$(jq -r '.trashed_at // 0' "$entry/manifest.json" 2>/dev/null) || trashed=0
-                [[ $trashed =~ ^[0-9]+$ ]] || trashed=0
-                if [[ -n $F_OLDER ]] && ((trashed >= $(cutoff "$F_OLDER"))); then continue; fi
+                if [[ -n $F_OLDER ]] && ((trashed >= limit)); then continue; fi
                 entries+=("$entry")
-                total=$((total + $(du -sk -- "$entry" | cut -f 1) * 1024))
-            done < <(trash_entries)
+                total=$((total + size))
+            done
             human_size hsize "$total"
             if ((count == 0)); then
                 printf 'The trash is empty.\n'
@@ -3550,11 +3601,12 @@ choose_lines() {
     # Column titles: the first line (--header-lines=1), so they sit above the columns.
     printf '\t%-*s %8s  %7s\n' "$menu_w" "" "sessions" "size"
     if [[ $kind == filter ]]; then
-        local key label entry tn=0 tb=0
-        while IFS= read -r entry; do
+        local key label tsize tn=0 tb=0
+        trash_load 1
+        for tsize in "${T_SIZE[@]}"; do
             tn=$((tn + 1))
-            tb=$((tb + $(du -sk -- "$entry" | cut -f 1) * 1024))
-        done < <(trash_entries)
+            tb=$((tb + tsize))
+        done
         while IFS=: read -r key label; do
             fit label "$label" "$menu_w"
             printf '%s\t%s %s\n' "$key" "$label" "$(count "${n[$key]:-0}" "${b[$key]:-0}")"
@@ -3682,17 +3734,17 @@ internal_rows() {
 
 # Picker rows for the trash; ids are "trash:<entry>".
 trash_rows() {
-    local entry id title cwd trashed size count=0 bytes=0 hbytes
+    local entry id title cwd trashed size count=0 bytes=0 hbytes i
     : >"$LETHE_STATE/sizes"
-    while IFS= read -r entry; do
-        trash_fields "$entry"
-        size=$(($(du -sk -- "$entry" | cut -f 1) * 1024))
+    trash_load 1
+    for i in "${!T_ENTRY[@]}"; do
+        trash_fields "$i"
         format_row claude 0 "$trashed" "" trashed "$size" "$cwd" "$title" trash
         printf 'trash:%s\t%s\n' "${entry##*/}" "$REPLY"
         printf 'trash:%s\t%s\n' "${entry##*/}" "$size" >>"$LETHE_STATE/sizes"
         count=$((count + 1))
         bytes=$((bytes + size))
-    done < <(trash_entries)
+    done
     : >"$LETHE_STATE/open"
     human_size hbytes "$bytes"
     printf ' trash · %d session(s) · %s ' "$count" "$hbytes" >"$LETHE_STATE/label"
@@ -3991,9 +4043,10 @@ trash_action() {
         entry=$TRASH_DIR/${arg#trash:}
         [[ ${arg#trash:} != */* && -f $entry/manifest.json ]] || continue
         entries+=("$entry")
-        bytes=$((bytes + $(du -sk -- "$entry" | cut -f 1) * 1024))
     done
     ((${#entries[@]})) || return 0
+    # One du for all of them: thousands of marked entries must not wait seconds.
+    bytes=$(($(printf '%s\0' "${entries[@]}" | xargs -0 du -sk -- 2>/dev/null | awk '{ s += $1 } END { print s + 0 }') * 1024))
     human_size hsize "$bytes"
     case $action in
         restore)

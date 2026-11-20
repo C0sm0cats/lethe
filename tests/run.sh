@@ -1448,6 +1448,16 @@ reset_fixture
 cp -a "$(echo "$TRASH"/*)" "$TRASH/claude-$G.copy"
 expect_status "several trashed copies of a session are ambiguous" 1 trash restore "$G"
 rm -rf "$TRASH/claude-$G.copy"
+for opt in -n -y --dry-run; do
+    out=$("$LETHE" trash restore "$G" "$opt" 2>&1) && status=0 || status=$?
+    check "trash restore ID $opt is refused before anything is restored" \
+        '((status == 2)) && [[ ! -e $CPROJ/$G.jsonl && $out == *"option"*"$opt"*"is not valid"* && $out != *restored:* ]]' "$out"
+done
+out=$("$LETHE" trash restore "$G" 99999999 2>&1) && status=0 || status=$?
+check "... and so is an unknown id after a good one" '((status == 1)) && [[ ! -e $CPROJ/$G.jsonl && $out != *restored:* ]]' "$out"
+out=$("$LETHE" trash restore "${G:0:8}" "$G" 2>&1) && status=0 || status=$?
+check "the same session given twice is restored once" '((status == 0)) && [[ -f $CPROJ/$G.jsonl && $(grep -c restored: <<<"$out") == 1 ]]' "$out"
+"$LETHE" delete -y "$G" >/dev/null 2>&1
 manifest=$(echo "$TRASH"/*/manifest.json)
 jq '.root = "relative" | .items = ["relative/x"]' "$manifest" >"$manifest.new" && mv "$manifest.new" "$manifest"
 mkdir -p "$(echo "$TRASH"/*)/files" && echo x >"$(echo "$TRASH"/*)/files/x"
