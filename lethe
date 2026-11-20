@@ -79,10 +79,13 @@ ROW_NODATE=0 ROW_ID_WIDTH=0
 
 setup_colors() {
     if [[ -z ${NO_COLOR:-} && (${1:-} == always || -t 1) ]]; then
-        C_RESET=$'\e[0m' C_BOLD=$'\e[1m' C_DIM=$'\e[90m'
-        C_RED=$'\e[31m' C_GREEN=$'\e[32m' C_YELLOW=$'\e[33m'
-        C_BLUE=$'\e[34m' C_MAGENTA=$'\e[35m' C_CYAN=$'\e[36m'
-        C_CLAUDE=$'\e[38;5;166m' C_CODEX=$'\e[38;5;32m' # readable on dark and light
+        # Fixed 256-color shades, readable on dark and light: the terminal's
+        # own blue and gray fade into dark backgrounds, and its cyan, yellow
+        # and green into light ones (about 2:1 with the default palettes).
+        C_RESET=$'\e[0m' C_BOLD=$'\e[1m' C_DIM=$'\e[38;5;244m'
+        C_RED=$'\e[31m' C_GREEN=$'\e[38;5;64m' C_YELLOW=$'\e[38;5;136m'
+        C_BLUE=$'\e[38;5;68m' C_MAGENTA=$'\e[35m' C_CYAN=$'\e[38;5;30m'
+        C_CLAUDE=$'\e[38;5;166m' C_CODEX=$'\e[38;5;32m'
     else
         C_RESET="" C_BOLD="" C_DIM="" C_RED="" C_GREEN="" C_YELLOW=""
         C_BLUE="" C_MAGENTA="" C_CYAN="" C_CLAUDE="" C_CODEX=""
@@ -3471,9 +3474,10 @@ cmd_pick() {
             --preview-wrap-sign='  ' --ghost='type to filter'
             --footer="$(FZF_COLUMNS=$(tput cols 2>/dev/null || echo 80) "$SELF" __state footer)" --highlight-line --gutter=' '
             --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
-            --color='border:8,label:-1,input-label:6:bold,list-label:-1,preview-label:-1,footer:-1'
-            --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:bold,info:8,ghost:8'
-            --color='scrollbar:8,separator:8,spinner:6'
+            # Same shades as setup_colors for cyan (30), yellow (136), green (64).
+            --color='border:8,label:-1,input-label:30:bold,list-label:-1,preview-label:-1,footer:-1'
+            --color='prompt:30,pointer:5,marker:64,hl:136:bold,hl+:136:bold,fg+:bold,info:8,ghost:8'
+            --color='scrollbar:8,separator:8,spinner:30'
             --bind="load:transform-list-label(cat $label)"
             --bind="multi:transform-list-label($me __marked --from {+f1})"
             --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$f1_extra+clear-screen"
@@ -3671,7 +3675,7 @@ internal_choose() {
     choice=$(printf '%s\n' "$lines" | fzf --ansi --layout=reverse --height=100% \
         --border=rounded --border-label=" $([[ $kind == filter ]] && echo "cleanup filter" || echo "project · by size") " \
         --delimiter=$'\t' --with-nth=2 --no-sort --no-hscroll --pointer='▶' --prompt='❯ ' --info=inline-right \
-        --color="${LETHE_FZF_COLORS:-border:8,label:6:bold,pointer:5,prompt:6,info:8,header:8}" \
+        --color="${LETHE_FZF_COLORS:-border:8,label:30:bold,pointer:5,prompt:30,info:8,header:8}" \
         "${gutter[@]}" \
         --header-lines=1 --bind="load:pos($pos)") || return 0
     if [[ $kind == filter ]]; then

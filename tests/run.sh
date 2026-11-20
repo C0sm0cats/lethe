@@ -1158,6 +1158,12 @@ out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); NO_COLOR=1; setup_color
     for t in "│  │  └─ " "" ; do format_row codex 0 0 "2026-01-01 00:00" subagent 1000 /x "A very long subagent title that goes on" "" 20 0 0 "$t$US" child; echo "$REPLY"; done
     format_row codex 0 0 "2026-01-01 00:00" subagent 1000 /x "A very long title" "" 20 0 0 "" gone; echo "$REPLY"' _ "$LETHE" | perl -CSD -ne 'print if length > 81')
 check "tree rows fit 80 columns" '[[ -z $out ]]' "$out"
+# The terminal's base blue and gray fade into dark backgrounds, its cyan,
+# yellow and green into light ones: these use fixed 256-color shades.
+out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); NO_COLOR=""; setup_colors always
+    printf "%q\n" "$C_DIM" "$C_BLUE" "$C_CYAN" "$C_YELLOW" "$C_GREEN"' _ "$LETHE")
+check "project, dimmed text, ages, matches and results stay readable on dark and light" \
+    '[[ $(grep -c "\[38;5;[0-9]*m" <<<"$out") == 5 ]]' "$out"
 
 # Only the prompts of the deleted session leave the history, not those that name it.
 reset_fixture
@@ -1550,6 +1556,15 @@ for v in 0.60.3 0.63.0 0.71.0 0.72.0; do
         check "the panel layout's current line and labels stay readable on a light background" \
             'grep -q "^--color=.*fg+:bold" "$WORK/fzf.args" && ! grep "^--color=" "$WORK/fzf.args" | grep -q -e "fg+:-1" -e "label:7"' \
             "$(grep "^--color=" "$WORK/fzf.args" 2>/dev/null)"
+        # The terminal's base cyan, yellow and green (6, 3, 2) are about 2:1 on
+        # a light background: the accents use fixed 256-color shades.
+        base='(^|[=,])(label|input-label|prompt|marker|hl\+?|spinner):[0-7](:|,|$)'
+        check "the picker's accents stay readable on a light background" \
+            '! grep "^--color=" "$WORK/fzf.args" | grep -qE "$base"' "$(grep "^--color=" "$WORK/fzf.args" 2>/dev/null)"
+        mkdir -p "$WORK/cst" && echo all >"$WORK/cst/filter"
+        LETHE_STATE=$WORK/cst "$LETHE" __choose dir </dev/null >/dev/null 2>&1 || true
+        check "... and the Ctrl-F and Ctrl-W menus' too" \
+            'grep -q "^--color=.*prompt:" "$WORK/fzf.args" && ! grep "^--color=" "$WORK/fzf.args" | grep -qE "$base"' "$(grep "^--color=" "$WORK/fzf.args" 2>/dev/null)"
     else
         check "fzf $v gets the plain layout, with no footer action" \
             '! grep -q -e "--footer" -e "transform-footer" -e "--preview-wrap-sign" -e "--header-lines-border" "$WORK/fzf.args" && grep -q "^--header=" "$WORK/fzf.args" && grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.args" 2>/dev/null)"
