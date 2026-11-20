@@ -442,11 +442,17 @@ readonly JQ_INJECTED='def injected:
 # CLAUDE_SUMMARY: the metadata of one transcript in a single pass (one jq per
 # file: indexing thousands of sessions is dominated by process starts). The
 # state is updated without `//`, which would make jq copy it on every line.
+# The entries ($quiet) are not kept in that state: the `if … else . end` steps
+# hold a reference to it, so jq would copy the whole array on every line
+# (quadratic on long sessions). foreach emits them, and [...] collects them in
+# place; the null sentinel after the last line emits the final state.
 readonly CLAUDE_SUMMARY='
     def text_of: if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end;
-    reduce inputs as $line ({e: [], meta: null, cwd: null, custom: null, ai: null, summary: null, prompt: null,
-                             sub: false, model: null, last: null};
-        ($line | fromjson? | select(type == "object")) as $o
+    [foreach ((inputs | fromjson? | select(type == "object") | [.]), null) as $it
+        ({meta: null, cwd: null, custom: null, ai: null, summary: null, prompt: null,
+          sub: false, model: null, last: null};
+        if $it == null then . else
+        $it[0] as $o
         | (if .meta == null and $o.cwd != null and $o.timestamp != null then
                .meta = [$o.cwd, (if $o.entrypoint == null then "" else $o.entrypoint end), $o.timestamp]
            else . end)
@@ -473,7 +479,9 @@ readonly CLAUDE_SUMMARY='
                       | (if .prompt == null and ($texts | length) > 0 then .prompt = ($texts | join(" ")) else . end)
                   end)
            else . end)
-        | if $quiet then .e += [$o | entry] else . end)
+        end;
+        if $it == null then {state: .} elif $quiet then ($it[0] | entry) else empty end)]
+    | (.[-1].state + {e: .[:-1]})
     | ((.meta // [""])[0]) as $origin
     | (if .cwd != null and .meta != null then .meta[0] = .cwd else . end)
     | [(.meta // ["", "", ""])[],

@@ -714,6 +714,13 @@ check "picker: a long preview keeps the abandoned messages" \
     '[[ $out == *"abandoned prompt"* && $out == *"more messages"* && $out == *"more 30"* ]]' "$out"
 check "list --json counts abandoned branches" \
     '"$LETHE" list --json --claude | jq -e "map(select(.id == \"$G\"))[0].abandoned_branches == 1" >/dev/null'
+# A last line cut short (a write interrupted) is skipped: it does not reset what
+# the lines before it said. The entries are kept outside the per-line state
+# (the index was quadratic in the number of lines).
+printf '{"type":"user","uuid":"cut","parentUuid":"m30","message":{"role":"us' >>"$CPROJ/$G.jsonl"
+set_mtime "$(($(date +%s) - 3600))" "$CPROJ/$G.jsonl"
+out=$("$LETHE" list --json --claude | jq -c "map(select(.id == \"$G\"))[0] | [.title, .abandoned_branches]")
+check "a cut last line keeps the title and branches of an old session" '[[ $out == '"'"'["Branchy",1]'"'"' ]]' "$out"
 
 reset_fixture
 out=$("$LETHE" resume "$I" 2>&1) || true
