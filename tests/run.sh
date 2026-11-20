@@ -608,6 +608,10 @@ if command -v python3 >/dev/null 2>&1; then
     out=$(pty_answer reply yes delete "$A")
     check "... while yes deletes" '! codex_exists "$A"' "$out"
     reset_fixture
+    out=$(LETHE_STATE=$WORK/st pty_answer reply y __action toggle "$B" "$D")
+    check "picker: Ctrl-X archives an active session and unarchives an archived one" \
+        'archived "$B" && codex_exists "$B" && codex_exists "$D" && ! archived "$D"' "$out"
+    reset_fixture
     "$LETHE" delete -y "$G" >/dev/null 2>&1
     entry=$(echo "$TRASH"/*)
     out=$(LETHE_STATE=$WORK/st pty_answer reply "" __action delete "trash:${entry##*/}")
