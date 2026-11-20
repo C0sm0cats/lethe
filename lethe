@@ -2664,22 +2664,28 @@ claude_trash() {
         fi
         moved+=("$item")
     done
-    history_take "$id" "$entry"
+    # The prompt history is rewritten once for all the sessions (run_action).
+    if [[ -z ${HISTORY_LIST:-} ]] || ! printf '%s\t%s\n' "$id" "$entry" >>"$HISTORY_LIST"; then
+        history_take <(printf '%s\t%s\n' "$id" "$entry")
+    fi
     trap - INT TERM HUP
 }
 
-# history_take ID ENTRY — move the prompts of session ID out of Claude Code's
-# prompt history (history.jsonl, where ↑ finds them) into the trash entry.
+# history_take LIST — move the prompts of the sessions in LIST ("ID<TAB>ENTRY"
+# lines: sessions just moved to the trash) out of Claude Code's prompt history
+# (history.jsonl, where ↑ finds them) into their trash entries, in one rewrite.
 # Claude Code appends to that file at any time: the new version replaces it only
 # if the file did not change while it was written.
 history_take() {
-    local id=$1 entry=$2 file=$CLAUDE_DIR/history.jsonl key tmp before nul=0 target
-    key="\"sessionId\":\"$id\""
-    [[ -f $file ]] || return 0
+    local file=$CLAUDE_DIR/history.jsonl keys tmp taken before nul=0 target id entry i n lines=0 ids=() entries=()
+    while IFS=$'\t' read -r id entry; do
+        [[ -z $id || -z $entry ]] || { ids+=("$id") entries+=("$entry"); }
+    done <"$1"
+    ((${#ids[@]})) && [[ -f $file ]] || return 0
     # A symbolic link (dotfiles): the file it points to is the history.
     if [[ -L $file ]]; then
         target=$(readlink -f -- "$file" 2>/dev/null) && [[ -f $target ]] || {
-            printf 'its prompts stay in %s: cannot resolve this link\n' "$file" >&2
+            printf 'their prompts stay in %s: cannot resolve this link\n' "$file" >&2
             return 0
         }
         file=$target
@@ -2687,29 +2693,49 @@ history_take() {
     # Busybox grep cuts lines at a NUL byte (a pasted log): it travels as \002.
     if (($(LC_ALL=C tr -dc '\000' <"$file" | wc -c) > 0)); then
         if (($(LC_ALL=C tr -dc '\002' <"$file" | wc -c) > 0)); then
-            printf 'its prompts stay in %s: unexpected control bytes in it\n' "$file" >&2
+            printf 'their prompts stay in %s: unexpected control bytes in it\n' "$file" >&2
             return 0
         fi
         nul=1
     fi
     history_read() { if ((nul)); then LC_ALL=C tr '\000' '\002' <"$file"; else cat -- "$file"; fi; }
     history_back() { if ((nul)); then LC_ALL=C tr '\002' '\000'; else cat; fi; }
-    { history_read | grep -aF -- "$key" >/dev/null; } 2>/dev/null || return 0
-    before=$(file_stats "$file" -maxdepth 0)
-    tmp=$(mktemp "${file%/*}/.lethe-history.XXXXXX") || {
-        printf 'its prompts stay in %s: cannot write next to it\n' "$file" >&2
+    keys=$(mktemp "${TMPDIR:-/tmp}/lethe-keys.XXXXXX") || {
+        printf 'their prompts stay in %s: cannot write a temporary file\n' "$file" >&2
         return 0
     }
-    { history_read | grep -aF -- "$key" || true; } | history_back >"$entry/history.jsonl"
-    { history_read | grep -avF -- "$key" || true; } | history_back >"$tmp"
-    # Every line is either taken out or kept: anything else, and the history is
-    # left as it was.
-    if (($(LC_ALL=C tr -cd '\n' <"$tmp" | wc -c) + $(LC_ALL=C tr -cd '\n' <"$entry/history.jsonl" | wc -c) == $(LC_ALL=C tr -cd '\n' <"$file" | wc -c))) &&
-        [[ $(file_stats "$file" -maxdepth 0) == "$before" ]] && mv -f -- "$tmp" "$file"; then
+    printf '"sessionId":"%s"\n' "${ids[@]}" >"$keys"
+    if ! { history_read | grep -aF -f "$keys" >/dev/null; } 2>/dev/null; then
+        rm -f -- "$keys"
         return 0
     fi
-    rm -f -- "$tmp" "$entry/history.jsonl"
-    printf 'its prompts stay in %s: the file changed or could not be rewritten\n' "$file" >&2
+    before=$(file_stats "$file" -maxdepth 0)
+    tmp=$(mktemp "${file%/*}/.lethe-history.XXXXXX") || {
+        rm -f -- "$keys"
+        printf 'their prompts stay in %s: cannot write next to it\n' "$file" >&2
+        return 0
+    }
+    taken=$keys.taken
+    { history_read | grep -aF -f "$keys" || true; } >"$taken"
+    { history_read | grep -avF -f "$keys" || true; } | history_back >"$tmp"
+    # Each entry gets the lines of its session, from the small file of taken lines.
+    for i in "${!ids[@]}"; do
+        entry=${entries[i]}/history.jsonl
+        n=$(grep -acF -- "\"sessionId\":\"${ids[i]}\"" "$taken") || continue
+        { grep -aF -- "\"sessionId\":\"${ids[i]}\"" "$taken" | history_back >"$entry"; } 2>/dev/null
+        lines=$((lines + $(LC_ALL=C tr -cd '\n' 2>/dev/null <"$entry" | wc -c)))
+    done
+    # Every line is either taken out, once, or kept: anything else, and the
+    # history is left as it was.
+    n=$(LC_ALL=C tr -cd '\n' <"$taken" | wc -c)
+    if ((lines == n && $(LC_ALL=C tr -cd '\n' <"$tmp" | wc -c) + n == $(LC_ALL=C tr -cd '\n' <"$file" | wc -c))) &&
+        [[ $(file_stats "$file" -maxdepth 0) == "$before" ]] && mv -f -- "$tmp" "$file"; then
+        rm -f -- "$keys" "$taken"
+        return 0
+    fi
+    for entry in "${entries[@]}"; do rm -f -- "$entry/history.jsonl"; done
+    rm -f -- "$tmp" "$keys" "$taken"
+    printf 'their prompts stay in %s: the file changed or could not be rewritten\n' "$file" >&2
 }
 
 # trash_fields ENTRY — id, title, cwd and trashed (in the caller's variables). One
@@ -3194,6 +3220,13 @@ run_action() {
     mapfile -t order < <(for id in "${!PLAN_OP[@]}"; do printf '%s\t%s\n' "${PLAN_DEPTH[$id]}" "$id"; done |
         sort -t $'\t' -k1,1nr -k2,2 | cut -f 2)
     total=${#order[@]}
+    # Claude Code sessions moved to the trash, whose prompts leave the history in
+    # one rewrite after the loop (or on Ctrl-C), not one rewrite per session.
+    local HISTORY_LIST=""
+    if [[ $action == delete ]]; then
+        HISTORY_LIST=$(mktemp "${TMPDIR:-/tmp}/lethe-history.XXXXXX" 2>/dev/null) || HISTORY_LIST=""
+        trap 'trap "" INT TERM HUP; history_take "$HISTORY_LIST" || true; rm -f -- "$HISTORY_LIST"; exit 130' INT TERM HUP
+    fi
     for id in "${order[@]}"; do
         i=$((i + 1))
         op=${PLAN_OP[$id]}
@@ -3259,6 +3292,11 @@ run_action() {
         fi
     done
     [[ ! -t 2 ]] || printf '\r\e[K' >&2
+    if [[ $action == delete ]]; then
+        trap '' INT TERM HUP
+        [[ -z $HISTORY_LIST ]] || { history_take "$HISTORY_LIST" || true; rm -f -- "$HISTORY_LIST"; }
+        trap - INT TERM HUP
+    fi
 
     local summary=()
     if ((${done_count[delete]:-0} > trashed)); then

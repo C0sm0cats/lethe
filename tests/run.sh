@@ -1102,6 +1102,26 @@ out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); NO_COLOR=1; setup_color
     format_row codex 0 0 "2026-01-01 00:00" subagent 1000 /x "A very long title" "" 20 0 0 "" gone; echo "$REPLY"' _ "$LETHE" | perl -CSD -ne 'print if length > 81')
 check "tree rows fit 80 columns" '[[ -z $out ]]' "$out"
 
+# Only the prompts of the deleted session leave the history, not those that name it.
+reset_fixture
+printf '{"display":"of G","sessionId":"%s"}\n{"display":"look at session %s","sessionId":"%s"}\n' "$G" "$G" "$H" \
+    >"$CLAUDE_CONFIG_DIR/history.jsonl"
+"$LETHE" delete -y "$G" >/dev/null 2>&1
+check "a prompt of another session that names the deleted one stays in the history" \
+    'grep -q "look at session" "$CLAUDE_CONFIG_DIR/history.jsonl" && ! grep -q "of G" "$CLAUDE_CONFIG_DIR/history.jsonl"'
+
+# A rewrite cut short (disk full): the history stays whole, and no copy of its
+# prompts goes to the trash.
+reset_fixture
+printf '{"display":"of G","sessionId":"%s"}\n' "$G" >"$CLAUDE_CONFIG_DIR/history.jsonl"
+for n in 1 2 3; do printf '{"display":"keep %d","sessionId":"x"}\n' "$n"; done >>"$CLAUDE_CONFIG_DIR/history.jsonl"
+mkdir -p "$WORK/shortgrep"
+printf '#!/bin/sh\nif [ "$1" = -avF ]; then %s "$@" | head -n 1; exit 0; fi\nexec %s "$@"\n' \
+    "$(command -v grep)" "$(command -v grep)" >"$WORK/shortgrep/grep" && chmod +x "$WORK/shortgrep/grep"
+out=$(PATH=$WORK/shortgrep:$PATH "$LETHE" delete -y "$G" 2>&1) || true
+check "a history rewrite cut short leaves the history whole" \
+    '[[ ! -e $CPROJ/$G.jsonl && $(wc -l <"$CLAUDE_CONFIG_DIR/history.jsonl") -eq 4 && -z $(find "$TRASH" -name history.jsonl) ]] && grep -q "keep 3" "$CLAUDE_CONFIG_DIR/history.jsonl"' "$out"
+
 # A NUL byte (a pasted log) must not make grep take a file for binary.
 reset_fixture
 { printf '{"display":"keep me","sessionId":"other"}\n'; printf '{"display":"pasted \000 log","sessionId":"other2"}\n'
