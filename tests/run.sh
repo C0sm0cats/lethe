@@ -1523,6 +1523,11 @@ for v in 0.60.3 0.63.0 0.71.0 0.72.0; do
     COLUMNS=80 LINES=24 "$LETHE" pick </dev/null >/dev/null 2>&1 || true
     if [[ $v == 0.72.0 ]]; then
         check "fzf $v gets the panel layout" 'grep -q "^--footer=" "$WORK/fzf.args" && grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.args" 2>/dev/null)"
+        # fzf's current-line bar (bg+) stays dark on a light terminal: its text
+        # keeps fzf's own fg+, and the labels follow the terminal's text color.
+        check "the panel layout's current line and labels stay readable on a light background" \
+            'grep -q "^--color=.*fg+:bold" "$WORK/fzf.args" && ! grep "^--color=" "$WORK/fzf.args" | grep -q -e "fg+:-1" -e "label:7"' \
+            "$(grep "^--color=" "$WORK/fzf.args" 2>/dev/null)"
     else
         check "fzf $v gets the plain layout, with no footer action" \
             '! grep -q -e "--footer" -e "transform-footer" -e "--preview-wrap-sign" -e "--header-lines-border" "$WORK/fzf.args" && grep -q "^--header=" "$WORK/fzf.args" && grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.args" 2>/dev/null)"

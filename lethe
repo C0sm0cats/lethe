@@ -3471,8 +3471,8 @@ cmd_pick() {
             --preview-wrap-sign='  ' --ghost='type to filter'
             --footer="$("$SELF" __state footer)" --highlight-line --gutter=' '
             --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
-            --color='border:8,label:7,input-label:6:bold,list-label:7,preview-label:7,footer:-1'
-            --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:-1:bold,info:8,ghost:8'
+            --color='border:8,label:-1,input-label:6:bold,list-label:-1,preview-label:-1,footer:-1'
+            --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:bold,info:8,ghost:8'
             --color='scrollbar:8,separator:8,spinner:6'
             --bind="load:transform-list-label(cat $label)"
             --bind="multi:transform-list-label($me __marked --from {+f1})"
