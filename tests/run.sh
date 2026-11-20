@@ -501,9 +501,10 @@ out=$("$LETHE" delete -y "$A" "$B" 2>&1) || true
 check "a session written to after the plan is left alone" \
     '[[ $out == *"changed since the plan"* ]] && codex_exists "$B" && ! codex_exists "$A"' "$out"
 
-# pty_answer open|append FILE ARGS... — runs `lethe ARGS` on a terminal and, at
-# the [y/N] question, opens FILE (held until lethe exits, like a Codex resuming
-# the session) or appends a line to it, then answers y.
+# pty_answer open|append|reply ARG ARGS... — runs `lethe ARGS` on a terminal and,
+# at the [y/N] question, opens the file ARG (held until lethe exits, like a Codex
+# resuming the session) or appends a line to it, then answers y; with reply, it
+# answers ARG instead. A "Press Enter to return" prompt is answered with Enter.
 pty_answer() {
     python3 - "$LETHE" "$@" <<'PTY' 2>&1
 import os, pty, select, sys
@@ -511,7 +512,7 @@ lethe, action, path = sys.argv[1:4]
 pid, fd = pty.fork()
 if pid == 0:
     os.execv(lethe, [lethe] + sys.argv[4:])
-buf, held, sent = b"", None, False
+buf, held, sent, back = b"", None, False, False
 while select.select([fd], [], [], 30)[0]:
     try:
         data = os.read(fd, 4096)
@@ -523,11 +524,14 @@ while select.select([fd], [], [], 30)[0]:
     if not sent and b"[y/N]" in buf:
         if action == "open":
             held = open(path)
-        else:
+        elif action == "append":
             with open(path, "a") as f:
                 f.write("{}\n")
-        os.write(fd, b"y\n")
+        os.write(fd, (path if action == "reply" else "y").encode() + b"\n")
         sent = True
+    if sent and not back and b"Press Enter to return" in buf:
+        os.write(fd, b"\n")
+        back = True
 if os.waitpid(pid, os.WNOHANG)[0] == 0:
     os.kill(pid, 9)
     os.waitpid(pid, 0)
@@ -557,6 +561,23 @@ if command -v python3 >/dev/null 2>&1; then
     reset_fixture
     out=$(pty_answer append "$(codex_file "$C" 0)" delete "$A")
     check "... whichever session of the tree is written to" 'codex_exists "$A" && codex_exists "$C"' "$out"
+
+    # Only y or yes confirms; Enter (the default N) and anything else cancel.
+    reset_fixture
+    out=$(pty_answer reply "" delete "$A")
+    check "Enter at the confirmation cancels" '[[ $out == *Cancelled* ]] && codex_exists "$A"' "$out"
+    reset_fixture
+    out=$(pty_answer reply no delete "$A")
+    check "... and so does no" '[[ $out == *Cancelled* ]] && codex_exists "$A"' "$out"
+    reset_fixture
+    out=$(pty_answer reply yes delete "$A")
+    check "... while yes deletes" '! codex_exists "$A"' "$out"
+    reset_fixture
+    "$LETHE" delete -y "$G" >/dev/null 2>&1
+    entry=$(echo "$TRASH"/*)
+    out=$(LETHE_STATE=$WORK/st pty_answer reply "" __action delete "trash:${entry##*/}")
+    check "picker: Ctrl-D in the trash asks before deleting for good" \
+        '[[ $out == *"Delete them permanently?"*Cancelled* && -d $entry ]]' "$out"
 fi
 
 # An agent process of ours whose /proc/PID/fd cannot be read (not dumpable, as
