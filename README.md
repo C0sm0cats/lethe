@@ -116,7 +116,7 @@ Everything the command line can do, the picker can do too.
 | `Ctrl‑K` | fork: continue in a copy of the session |
 | `Ctrl‑E` | export the conversation to `./lethe-ID.md` |
 | `Enter` | read the whole conversation in your pager |
-| `Ctrl‑Y` | copy the command that resumes the session |
+| `Ctrl‑Y` | copy the command that resumes the session (shown to copy by hand when no clipboard tool takes it) |
 | `Ctrl‑T` | agent: all, Claude Code or Codex |
 | `Ctrl‑S` | status: all, running, recent, idle or archived |
 | `Ctrl‑F` | cleanup filter menu, with counts and sizes |

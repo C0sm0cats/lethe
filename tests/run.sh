@@ -430,9 +430,13 @@ printf 'full\n' >"$LETHE_STATE/keys"
 check "picker: F1 switches to the short key list" '[[ $(<"$LETHE_STATE/keys") == short && $("$LETHE" __state footer) == *"F1 all keys"* ]]'
 "$LETHE" __state keys
 printf '#!/bin/sh\ncat >"%s/clipboard"\n' "$WORK" >"$WORK/bin/pbcopy" && chmod +x "$WORK/bin/pbcopy"
-WAYLAND_DISPLAY="" DISPLAY="" "$LETHE" __copy "$A" </dev/null
+out=$(WAYLAND_DISPLAY="" DISPLAY="" "$LETHE" __copy "$A" </dev/null 2>&1)
 check "picker: Ctrl-Y copies the command that resumes the session" \
-    '[[ $(<"$WORK/clipboard") == "cd $PROJ && codex resume $A" ]]' "$(cat "$WORK/clipboard" 2>/dev/null)"
+    '[[ $(<"$WORK/clipboard") == "cd $PROJ && codex resume $A" && -z $out ]]' "$(cat "$WORK/clipboard" 2>/dev/null)"$'\n'"$out"
+rm -f "$WORK/bin/pbcopy"
+out=$(WAYLAND_DISPLAY="" DISPLAY="" "$LETHE" __copy "$A" </dev/null 2>&1)
+check "picker: without a clipboard tool, Ctrl-Y says so and shows the command to copy by hand" \
+    '[[ $out == *"cd $PROJ && codex resume $A"* && $out == *"copy it from here"* && $out == *"Press Enter to return"* ]]' "$out"
 "$LETHE" __state filter
 check "picker: Ctrl-F shows empty sessions" '[[ $(picker_ids) == "$H $E " ]]' "$(picker_ids)"
 check "picker: prompt names the filter" '[[ $("$LETHE" __state prompt) == "all agents · empty ❯ " ]]'

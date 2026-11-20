@@ -3457,7 +3457,7 @@ cmd_pick() {
         --bind="ctrl-b:execute-silent($me __state panel)$show_first+show-preview+refresh-preview${refresh%+reload*}" \
         --bind='ctrl-a:toggle-all' \
         --bind="ctrl-p:$toggle" \
-        --bind="ctrl-y:execute-silent($me __copy {1})" \
+        --bind="ctrl-y:execute($me __copy {1})" \
         --bind="enter:execute($me __page {1})" ||
         (($? != 2)) || exit 2 # 2: fzf refused an option (1 and 130 are no match and Esc)
 }
@@ -4124,13 +4124,24 @@ internal_copy() {
     if [[ $agent == claude ]]; then command="claude --resume $1"; else command="codex resume $1"; fi
     [[ ! -d $cwd ]] || command="cd $(printf '%q' "$cwd") && $command"
     { printf '\e]52;c;%s\a' "$(printf '%s' "$command" | base64 | tr -d '\n')" >/dev/tty; } 2>/dev/null || true
+    local copied=0
     if command -v wl-copy >/dev/null 2>&1 && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
-        printf '%s' "$command" | wl-copy 2>/dev/null || true
+        printf '%s' "$command" | wl-copy 2>/dev/null && copied=1
     elif command -v xclip >/dev/null 2>&1 && [[ -n ${DISPLAY:-} ]]; then
-        printf '%s' "$command" | xclip -selection clipboard 2>/dev/null || true
+        printf '%s' "$command" | xclip -selection clipboard 2>/dev/null && copied=1
     elif command -v pbcopy >/dev/null 2>&1; then
-        printf '%s' "$command" | pbcopy || true
+        printf '%s' "$command" | pbcopy 2>/dev/null && copied=1
     fi
+    ((copied == 0)) || return 0
+    # Many terminals (GNOME Terminal, xterm) ignore OSC 52: without a local tool
+    # nothing may have been copied, and fzf would show nothing either.
+    printf '\e[H\e[2J'
+    printf 'No clipboard tool (wl-copy, xclip, pbcopy) took the command. It was sent\n'
+    printf 'to the terminal (OSC 52), which copies it only if it supports that;\n'
+    printf 'otherwise copy it from here:\n\n'
+    printf '  %s\n' "$command"
+    printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
+    read -r </dev/tty || true
 }
 
 internal_page() {
