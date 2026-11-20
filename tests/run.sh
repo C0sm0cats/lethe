@@ -1387,6 +1387,27 @@ out=$(<"$WORK/nt/label")
 check "the picker label counts sessions and subagents apart" '[[ $out == *"7 session(s) + 1 subagent(s)"* ]]' "$out"
 out=$(FZF_COLUMNS=50 LETHE_STATE=$WORK/nt "$LETHE" __state footer)
 check "at 50 columns the footer keeps Esc and F1" '[[ $(wc -l <<<"$out") -eq 2 && $out == *"Esc quit"* && $out == *"F1 all keys"* ]]' "$out"
+# fzf puts the footer under the list only (55% of the width once the preview
+# makes 50 columns on the right) and cuts what goes past it, less 6 columns.
+long=""
+for cols in 60 80 111 112 120 150 200; do
+    list=$cols
+    ((cols * 45 / 100 < 50)) || list=$((cols - cols * 45 / 100))
+    for view in all trash; do
+        printf '%s\n' "$view" >"$WORK/nt/filter"
+        for keys in short full; do
+            printf '%s\n' "$keys" >"$WORK/nt/keys"
+            out=$(FZF_COLUMNS=$cols LETHE_STATE=$WORK/nt "$LETHE" __state footer)
+            last=F1\ all\ keys
+            [[ $keys == short ]] || last=""
+            if perl -CSD -lne "exit 1 if length > $list - 6" <<<"$out" && [[ $out == *"$last" ]]; then :; else
+                long+="$cols $view $keys:"$'\n'"$out"$'\n'
+            fi
+        done
+    done
+done
+printf 'all\n' >"$WORK/nt/filter" && printf 'short\n' >"$WORK/nt/keys"
+check "the footer lines fit under the list, F1 last in the short view" '[[ -z $long ]]' "$long"
 out=$(FZF_COLUMNS=50 LETHE_STATE=$WORK/nt REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines filter' _ "$LETHE" | cut -f 2 | perl -CSD -pe 's/\e\[[0-9;]*m//g' | perl -CSD -ne 'print if length > 47')
 check "at 50 columns the menus keep their counts" '[[ -z $out ]]' "$out"
 out=$(FZF_COLUMNS=50 FZF_SELECT_COUNT=1 LETHE_STATE=$WORK/nt "$LETHE" __marked "$A")
@@ -1503,6 +1524,7 @@ for size in "200 50" "80 24" "50 18"; do
     check "lethe pick starts fzf with the rows, panel layout, at $size" 'grep -q "Refactor parser" "$WORK/fzf.in"' "$(cat "$WORK/fzf.in" 2>/dev/null)"
 done
 check "F1 redraws: fzf leaves old borders when the footer changes height" 'grep -q "^--bind=f1:.*+clear-screen$" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
+check "a resized terminal refills the footer to the new width" 'grep -q "^--bind=resize:transform-footer(.*__state footer)+clear-screen$" "$WORK/fzf.args"' "$(cat "$WORK/fzf.args")"
 # bound KEY ACTION: fzf runs ACTION on KEY.
 bound() { grep -- "^--bind=$1:" "$WORK/fzf.args" | grep -qF -- " $2"; }
 check "picker: Ctrl-D deletes the marked sessions" 'bound ctrl-d "__action delete --from {+f1})"' "$(cat "$WORK/fzf.args")"

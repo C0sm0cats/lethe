@@ -3469,7 +3469,7 @@ cmd_pick() {
             --list-border=rounded --list-label-pos=2
             --preview-window="right,45%,wrap,border-rounded,<50(${narrow_preview})"
             --preview-wrap-sign='  ' --ghost='type to filter'
-            --footer="$("$SELF" __state footer)" --highlight-line --gutter=' '
+            --footer="$(FZF_COLUMNS=$(tput cols 2>/dev/null || echo 80) "$SELF" __state footer)" --highlight-line --gutter=' '
             --info-command='echo "$FZF_MATCH_COUNT/$FZF_TOTAL_COUNT$( ((FZF_SELECT_COUNT)) && echo " · $FZF_SELECT_COUNT marked")"'
             --color='border:8,label:-1,input-label:6:bold,list-label:-1,preview-label:-1,footer:-1'
             --color='prompt:6,pointer:5,marker:2,hl:3:bold,hl+:3:bold,fg+:bold,info:8,ghost:8'
@@ -3477,6 +3477,7 @@ cmd_pick() {
             --bind="load:transform-list-label(cat $label)"
             --bind="multi:transform-list-label($me __marked --from {+f1})"
             --bind="f1:execute-silent($me __state keys)+transform-footer($me __state footer)$f1_extra+clear-screen"
+            --bind="resize:transform-footer($me __state footer)+clear-screen"
             --header-lines=1 --header-lines-border=inline --color='header:8'
         )
         refresh="+transform-prompt($me __state prompt)+transform-footer($me __state footer)+reload($me __rows)"
@@ -3861,12 +3862,17 @@ internal_state() {
             ;;
         footer)
             setup_colors always
-            local keys line out=()
+            local keys line out=() cols width
+            # fzf puts the footer under the list only, and cuts what goes past
+            # it: fill each line up to the list's width, less its margins. As
+            # --preview-window in cmd_pick says, the preview takes 45% on the
+            # right while that makes 50 columns or more, else it goes below.
+            cols=${FZF_COLUMNS:-$(tput cols 2>/dev/null || echo 80)}
+            width=$cols
+            ((cols * 45 / 100 < 50)) || width=$((cols - cols * 45 / 100))
+            width=$((width - 6))
             if [[ $(cat "$dir/keys" 2>/dev/null) == short && $(<"$dir/filter") == trash ]]; then
                 keys=("Ctrl-R:restore Ctrl-D:delete_forever Ctrl-F:leave_the_trash Esc:quit F1:all_keys")
-            elif [[ $(cat "$dir/keys" 2>/dev/null) == short ]] &&
-                ((${FZF_COLUMNS:-$(tput cols 2>/dev/null || echo 80)} < 70)); then
-                keys=("Tab:mark Enter:read Ctrl-D:delete" "Ctrl-R:resume Esc:quit F1:all_keys")
             elif [[ $(cat "$dir/keys" 2>/dev/null) == short ]]; then
                 keys=("Tab:mark Enter:read Ctrl-D:delete Ctrl-R:resume Esc:quit F1:all_keys")
             elif [[ $(<"$dir/filter") == trash ]]; then
@@ -3897,23 +3903,29 @@ internal_state() {
                         [[ $(cat "$dir/panel" 2>/dev/null) == stats ]] && echo on || echo off)] Ctrl-Y:copy F1:fewer_keys"
                     "Alt-S:subagents[$(cat "$dir/subagents" 2>/dev/null || echo hidden)]")
             fi
-            local words
-            for line in "${keys[@]}"; do
-                out=()
-                read -ra words <<<"$line"
-                for value in "${words[@]}"; do
-                    local label=${value#*:} state=""
-                    if [[ $label == *\[*\] ]]; then
-                        state=${label#*\[}
-                        state=${state%\]}
-                        state="$C_DIM:$C_RESET $C_BOLD${state//$US/ }$C_RESET"
-                        label=${label%%\[*}
-                    fi
-                    label=${label//_/ }
-                    out+=("$C_CYAN${value%%:*}$C_RESET $C_DIM$label$C_RESET$state")
-                done
-                printf '%s\n' "$(join_by '  ' "${out[@]}")"
+            local words used=0 shown
+            read -ra words <<<"${keys[*]}"
+            for value in "${words[@]}"; do
+                local label=${value#*:} state="" plain=""
+                if [[ $label == *\[*\] ]]; then
+                    state=${label#*\[}
+                    state=${state%\]}
+                    plain=": ${state//$US/ }"
+                    state="$C_DIM:$C_RESET $C_BOLD${state//$US/ }$C_RESET"
+                    label=${label%%\[*}
+                fi
+                label=${label//_/ }
+                shown="${value%%:*} $label$plain"
+                # A new line when this key would go past the width.
+                if ((used && used + 2 + ${#shown} > width)); then
+                    printf '%s\n' "$(join_by '  ' "${out[@]}")"
+                    out=() used=0
+                fi
+                ((used == 0)) || used=$((used + 2))
+                used=$((used + ${#shown}))
+                out+=("$C_CYAN${value%%:*}$C_RESET $C_DIM$label$C_RESET$state")
             done
+            printf '%s\n' "$(join_by '  ' "${out[@]}")"
             ;;
         header)
             if [[ $(<"$dir/filter") == trash ]]; then
