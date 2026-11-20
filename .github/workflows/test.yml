@@ -19,6 +19,27 @@ jobs:
           grep -q 'added to your PATH' out
           env -i HOME="$HOME" TERM=dumb PATH=/usr/bin:/bin bash -ic 'lethe --version'
 
+  # The README promises bash 4.4+, but both other jobs run bash 5: run the suite
+  # on the oldest supported bash too, first in the PATH so the #!/usr/bin/env bash
+  # of lethe and tests/run.sh picks it.
+  bash44:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y sqlite3 jq zstd
+      - name: build bash 4.4.18
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSLO https://ftp.gnu.org/gnu/bash/bash-4.4.18.tar.gz
+          echo '604d9eec5e4ed5fd2180ee44dd756ddca92e0b6aa4217bbab2b6227380317f23  bash-4.4.18.tar.gz' | sha256sum -c -
+          tar -xzf bash-4.4.18.tar.gz
+          cd bash-4.4.18
+          # Old C that recent compilers reject by default.
+          ./configure --without-bash-malloc --disable-nls CFLAGS='-O2 -std=gnu17 -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=incompatible-pointer-types -Wno-error=int-conversion' >/dev/null
+          make -j4 >/dev/null
+          mkdir -p "$RUNNER_TEMP/bin" && cp bash "$RUNNER_TEMP/bin/"
+      - run: PATH="$RUNNER_TEMP/bin:$PATH" bash -c 'echo "$BASH_VERSION"; [[ $BASH_VERSION == 4.4.18* ]] && tests/run.sh'
+
   macos:
     runs-on: macos-latest
     steps:
