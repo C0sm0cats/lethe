@@ -321,6 +321,12 @@ out=$("$LETHE" delete -y "$A" 2>&1)
 check "an open Codex session and its subagents are protected" 'codex_exists "$A" && codex_exists "$C" && [[ ! -s $WORK/codex.log ]]' "$out"
 exec 9<&-
 
+reset_fixture
+set_mtime "$(date +%s)" "$(codex_file "$C" 0)" # C just finished: recent, so protected
+out=$("$LETHE" delete -y "$A" 2>&1) || true
+check "a session whose subagent is protected is left alone" \
+    '[[ $out == *"part of a subagent tree with a protected session"* ]] && codex_exists "$A" && codex_exists "$C" && [[ ! -s $WORK/codex.log ]]' "$out"
+
 echo "actions"
 reset_fixture
 "$LETHE" delete -y "$A" >"$WORK/out" 2>&1
