@@ -56,9 +56,11 @@ physical() {
 }
 CODEX_REAL=$(physical "$CODEX_DIR")
 CLAUDE_REAL=$(physical "$CLAUDE_DIR")
-# sessions and archived_sessions may themselves be links (moved to another disk).
+# sessions, archived_sessions and projects may themselves be links (moved to
+# another disk).
 CODEX_SESS_REAL=$(physical "$CODEX_DIR/sessions")
 CODEX_ARCH_REAL=$(physical "$CODEX_DIR/archived_sessions")
+CLAUDE_PROJ_REAL=$(physical "$CLAUDE_DIR/projects")
 printf -v NOW '%(%s)T' -1
 # Project column: wider when the list has room (fzf gives its width to reloads).
 PROJECT_WIDTH=16
@@ -264,12 +266,14 @@ else
     STAT_KIND=bsd
 fi
 
-# "mtime<TAB>size<TAB>path" for the files found by `find ARGS...`.
+# "mtime<TAB>size<TAB>path" for the files found by `find ARGS...`. Starting
+# points that are links are followed (-H): ~/.claude/projects moved to another
+# disk and linked back, say.
 file_stats() {
     case $STAT_KIND in
-        find) find "$@" -printf '%T@\t%s\t%p\n' 2>/dev/null ;;
-        gnu) find "$@" -exec stat -c $'%Y\t%s\t%n' {} + 2>/dev/null ;;
-        *) find "$@" -exec stat -f '%m%t%z%t%N' {} + 2>/dev/null ;;
+        find) find -H "$@" -printf '%T@\t%s\t%p\n' 2>/dev/null ;;
+        gnu) find -H "$@" -exec stat -c $'%Y\t%s\t%n' {} + 2>/dev/null ;;
+        *) find -H "$@" -exec stat -f '%m%t%z%t%N' {} + 2>/dev/null ;;
     esac
 }
 
@@ -788,6 +792,7 @@ pid_alive() {
 
 mark_open_path() {
     local path=$1 rest
+    [[ $path != "$CLAUDE_PROJ_REAL"/* ]] || path=$CLAUDE_REAL/projects/${path#"$CLAUDE_PROJ_REAL"/}
     if [[ $path == "$CLAUDE_REAL"/projects/* ]]; then
         rest=${path#"$CLAUDE_REAL"/projects/*/}
         rest=${rest%%/*}
@@ -826,10 +831,10 @@ detect_open() {
                 [[ $target == "$CODEX_REAL"/*rollout-*.jsonl || $target == "$CODEX_REAL"/*rollout-*.jsonl.zst ||
                     $target == "$CODEX_SESS_REAL"/*rollout-*.jsonl || $target == "$CODEX_SESS_REAL"/*rollout-*.jsonl.zst ||
                     $target == "$CODEX_ARCH_REAL"/*rollout-*.jsonl || $target == "$CODEX_ARCH_REAL"/*rollout-*.jsonl.zst ||
-                    $target == "$CLAUDE_REAL"/projects/* ]] || continue
+                    $target == "$CLAUDE_REAL"/projects/* || $target == "$CLAUDE_PROJ_REAL"/* ]] || continue
                 mark_open_path "$target"
             done < <(fd_targets "${fds[@]}" |
-                grep -F -e "$CODEX_REAL/" -e "$CODEX_SESS_REAL/" -e "$CODEX_ARCH_REAL/" -e "$CLAUDE_REAL/projects/" || true)
+                grep -F -e "$CODEX_REAL/" -e "$CODEX_SESS_REAL/" -e "$CODEX_ARCH_REAL/" -e "$CLAUDE_REAL/projects/" -e "$CLAUDE_PROJ_REAL/" || true)
         fi
     elif command -v lsof >/dev/null 2>&1; then
         while IFS= read -r target; do

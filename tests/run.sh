@@ -461,6 +461,17 @@ check "open sessions are seen through symlinked sessions and archived_sessions" 
 rm -rf "$WORK/moved-sessions" "$WORK/moved-archived"
 reset_fixture
 
+mv "$CLAUDE_CONFIG_DIR/projects" "$WORK/moved-projects"
+ln -s "$WORK/moved-projects" "$CLAUDE_CONFIG_DIR/projects"
+expect_ids "Claude sessions are seen through a symlinked projects directory" "$G $H $I" --claude
+exec 9<"$CPROJ/$G.jsonl" # G is held open by a running agent
+out=$("$LETHE" delete -y "$G" "$H" 2>&1) || true
+exec 9<&-
+check "open Claude sessions are seen through a symlinked projects directory" \
+    '[[ $out == *"open in a running agent"* && -f $CPROJ/$G.jsonl && ! -e $CPROJ/$H.jsonl ]]' "$out"
+rm -rf "$WORK/moved-projects"
+reset_fixture
+
 sqlite3 "$DB" "UPDATE threads SET has_user_event = 1 WHERE id = '$E';"
 expect_ids "a Codex session with a user event is not empty" "$H" --empty
 sqlite3 "$DB" "UPDATE threads SET first_user_message = 'continue the migration' WHERE id = '$E';"
