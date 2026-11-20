@@ -1679,6 +1679,14 @@ expect_x=$(lx list --orphans --ids)
 check "a removed build directory does not make an orphan; a removed project does" '[[ $expect_x == "$X2" ]]' "$expect_x"
 out=$(lx stats)
 check "... stats counts the same" '[[ $out == *"1 session(s) whose project directory is gone"* ]]' "$out"
+X3=83000000-0000-4000-8000-000000000003
+mkdir -p "$TX/nas"
+tx_session "$X3" "on a share that is not mounted" "$TX/nas/project"
+expect_x=$(lx list --orphans --ids)
+out=$(lx stats)
+check "a project under an empty mount point (share not mounted) is not an orphan, in stats too" \
+    '[[ $expect_x == "$X2" && $out == *"1 session(s) whose project directory is gone"* ]]' "$expect_x"$'\n'"$out"
+rm -f "$TX/claude/projects/-p/$X3.jsonl"
 printf '#!/bin/sh\necho "in $PWD: $*"\n' >"$WORK/bin/claude" && chmod +x "$WORK/bin/claude"
 out=$(cd "$WORK" && lx resume "$X1" 2>&1)
 check "resume falls back to where the session started" '[[ $out == *"in $TX/live: --resume $X1"* && $out == *"no longer exists"* ]]' "$out"

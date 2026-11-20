@@ -946,7 +946,8 @@ add_dir() {
 }
 
 # dir_gone PATH — is this project directory really gone? An unreadable parent,
-# or an unmounted volume (/media, /mnt, /Volumes…), is not "gone".
+# or an unmounted volume (/media, /mnt, /Volumes…, or any empty directory: the
+# mount point of a disk or share that is not mounted, like ~/nas), is not "gone".
 declare -A GONE=()
 dir_gone() {
     local dir=$1 up
@@ -958,7 +959,8 @@ dir_gone() {
             while [[ $up == /*/* && ! -e $up ]]; do up=${up%/*}; done
             [[ -e $up ]] || up=/
             if [[ -d $up && -x $up && -r $up ]] &&
-                [[ ! $up =~ ^/(media|mnt|Volumes|run/media|net|nfs)(/[^/]+)?(/[^/]+)?$ ]]; then
+                [[ ! $up =~ ^/(media|mnt|Volumes|run/media|net|nfs)(/[^/]+)?(/[^/]+)?$ ]] &&
+                [[ -n $(find "$up" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ]]; then
                 GONE[$dir]=1
             fi
         fi
