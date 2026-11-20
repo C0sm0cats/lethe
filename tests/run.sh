@@ -339,6 +339,8 @@ reset_fixture
 exec 9<"$(codex_file "$A" 0)" # A is now open, like a running Codex holds its rollout
 out=$("$LETHE" delete -y "$C" 2>&1)
 check "a subagent of an open Codex session is protected" '[[ $out == *"spawned by a session that is open"* ]] && codex_exists "$C"' "$out"
+out=$("$LETHE" delete -y --force "$C" 2>&1)
+check "... even with --force" '[[ $out == *"spawned by a session that is open"* ]] && codex_exists "$C"' "$out"
 out=$("$LETHE" delete -y "$A" 2>&1)
 check "an open Codex session and its subagents are protected" 'codex_exists "$A" && codex_exists "$C" && [[ ! -s $WORK/codex.log ]]' "$out"
 exec 9<&-
@@ -890,6 +892,14 @@ check "pinned Codex sessions are kept by cleanups" '[[ $out == *"pinned in Codex
 out=$("$LETHE" delete -n "$D")
 check "... and changed when named" '[[ $(sed -n "/^Delete/,/^$/p" <<<"$out") == *"Old idea"* ]]' "$out"
 check "... and shown" '"$LETHE" list --json | jq -e "map(select(.id == \"$D\"))[0].pinned" >/dev/null && [[ $("$LETHE" list --archived) == *"pinned · "* ]]'
+out=$("$LETHE" delete -n --force --older-than 1d --codex)
+check "--force lifts only the 10-minute rule: pinned Codex sessions are kept" \
+    '[[ $out == *"pinned in Codex"* && $(sed -n "/^Delete/,/^Skipped/p" <<<"$out") != *"Old idea"* ]]' "$out"
+sqlite3 "$DB" "UPDATE threads SET is_pinned = 1 WHERE id = '$C';"
+out=$("$LETHE" delete -n --force --older-than 1d --codex)
+sqlite3 "$DB" "UPDATE threads SET is_pinned = 0 WHERE id = '$C';"
+check "... nor the tree of a pinned subagent" \
+    '[[ $out == *"part of a subagent tree with a protected session"* && $(sed -n "/^Delete/,/^Skipped/p" <<<"$out") != *"Refactor parser"* ]]' "$out"
 out=$("$LETHE" delete -n --all)
 check "--all names nothing: pinned Codex sessions are kept" \
     '[[ $out == *"pinned in Codex"* && $(sed -n "/^Delete/,/^Skipped/p" <<<"$out") != *"Old idea"* ]]' "$out"
