@@ -890,6 +890,9 @@ check "pinned Codex sessions are kept by cleanups" '[[ $out == *"pinned in Codex
 out=$("$LETHE" delete -n "$D")
 check "... and changed when named" '[[ $(sed -n "/^Delete/,/^$/p" <<<"$out") == *"Old idea"* ]]' "$out"
 check "... and shown" '"$LETHE" list --json | jq -e "map(select(.id == \"$D\"))[0].pinned" >/dev/null && [[ $("$LETHE" list --archived) == *"pinned · "* ]]'
+out=$("$LETHE" delete -n --all)
+check "--all names nothing: pinned Codex sessions are kept" \
+    '[[ $out == *"pinned in Codex"* && $(sed -n "/^Delete/,/^Skipped/p" <<<"$out") != *"Old idea"* ]]' "$out"
 
 sqlite3 "$DB" "UPDATE threads SET cwd = '/' WHERE id = '$D';"
 out=$("$LETHE" list --archived | sed -n 2p)
