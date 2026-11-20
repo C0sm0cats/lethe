@@ -2707,14 +2707,19 @@ cmd_resume() {
     # Where it went may be gone while its project is not.
     local origin=""
     [[ -d $cwd ]] || origin=$(session_origin "$id" "$agent" "$path")
+    # A directory name can hold escape sequences: show cleaned copies, cd to the real one.
+    local shown_cwd=$cwd shown_origin=$origin shown_pwd=$PWD
+    clean shown_cwd
+    clean shown_origin
+    clean shown_pwd
     if [[ -d $cwd ]]; then
         cd -- "$cwd"
     elif [[ -n $origin && -d $origin ]]; then
-        printf '%s: %s no longer exists, starting from %s\n' "$PROG" "$cwd" "$origin" >&2
+        printf '%s: %s no longer exists, starting from %s\n' "$PROG" "$shown_cwd" "$shown_origin" >&2
         cd -- "$origin"
     else
         printf '%s: %s, starting from %s\n' "$PROG" \
-            "$([[ -n $cwd ]] && echo "$cwd no longer exists" || echo "no project directory is recorded")" "$PWD" >&2
+            "$([[ -n $cwd ]] && echo "$shown_cwd no longer exists" || echo "no project directory is recorded")" "$shown_pwd" >&2
     fi
     if [[ $agent == claude ]]; then
         need claude

@@ -1910,7 +1910,21 @@ rm -f "$TX/claude/projects/-p/$X3.jsonl"
 printf '#!/bin/sh\necho "in $PWD: $*"\n' >"$WORK/bin/claude" && chmod +x "$WORK/bin/claude"
 out=$(cd "$WORK" && lx resume "$X1" 2>&1)
 check "resume falls back to where the session started" '[[ $out == *"in $TX/live: --resume $X1"* && $out == *"no longer exists"* ]]' "$out"
-rm -f "$WORK/bin/claude"
+# sqlite3 before 3.50 prints control characters raw; 3.50+ does with -escape off.
+real_sqlite=$(command -v sqlite3)
+if "$real_sqlite" -escape off :memory: 'SELECT 1;' >/dev/null 2>&1; then
+    printf '#!/bin/sh\nexec "%s" -escape off "$@"\n' "$real_sqlite" >"$WORK/bin/sqlite3" && chmod +x "$WORK/bin/sqlite3"
+fi
+X4=84000000-0000-4000-8000-000000000004 X5=85000000-0000-4000-8000-000000000005
+x_origin=$TX/orig$'\e]0;ORIGIN\a' x_dead=$TX/gone$'\e]0;DEAD\a'
+mkdir -p "$x_origin"
+tx_session "$X4" "hostile directory names" "$x_origin" "$x_origin/sub"$'\e]52;c;cHduZWQ=\a'
+tx_session "$X5" "hostile and gone" "$x_dead" "$x_dead/sub"$'\e]0;SUB\a'
+out=$(cd "$WORK" && lx resume "$X4" 2>&1 >/dev/null; lx fork "$X4" 2>&1 >/dev/null; lx resume "$X5" 2>&1 >/dev/null)
+pwd_x=$(cd "$WORK" && lx resume "$X4" 2>/dev/null)
+check "resume does not send the escape sequences of a gone directory to the terminal, and still starts there" \
+    '[[ $out != *[$'"'"'\e\a'"'"']* && $(grep -c "no longer exists" <<<"$out") == 3 && $pwd_x == "in $x_origin: --resume $X4" ]]' "$(od -c <<<"$out")"
+rm -f "$WORK/bin/claude" "$WORK/bin/sqlite3" "$TX/claude/projects/-p/$X4.jsonl" "$TX/claude/projects/-p/$X5.jsonl"
 
 mkdir -p "$TX/st"
 for f in agent status sort filter; do : >"$TX/st/$f"; done
