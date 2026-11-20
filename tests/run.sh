@@ -1126,6 +1126,15 @@ check "picker: Ctrl-D on a context row changes nothing" '[[ $out == *"Nothing to
 out=$("$LETHE" delete -n "$C2")
 check "a Codex subagent can be deleted alone" '[[ $(sed -n "/^Delete/,/^$/p" <<<"$out") == *Noether* && $(sed -n "/^Delete/,/^$/p" <<<"$out") != *"Refactor parser"* ]]' "$out"
 expect_status "a Codex subagent cannot be resumed" 1 resume "$C2"
+# Grandchildren: D2 (spawned by C, spawned by A), last written 100 days ago so
+# that the 10-minute rule does not protect it. Dry runs: D2 is used below.
+set_mtime "$(($(date +%s) - 100 * 86400))" "$(codex_file "$D2" 0)"
+out=$("$LETHE" delete -n "$A")
+check "deleting a session plans its grandchild subagents too" '[[ $(sed -n "/^Delete/,/^$/p" <<<"$out") == *Hume* ]]' "$out"
+exec 9<"$(codex_file "$A" 0)"
+out=$("$LETHE" delete -n "$D2" 2>&1) || true
+exec 9<&-
+check "a grandchild of an open Codex session is protected" '[[ $out == *"spawned by a session that is open"* && $out != *"Delete 1"* ]]' "$out"
 # Parent gone, and a cycle of edges.
 sqlite3 "$DB" "DELETE FROM threads WHERE id = '$A';"
 out=$("$LETHE" list --codex)
