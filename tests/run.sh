@@ -985,6 +985,10 @@ check "the picker says unarchived, not active" '[[ $(st prompt) == *unarchived* 
 printf 'all\n' >"$WORK/st/status"
 out=$(st prompt "--dir $(printf %q "$PROJ") --older-than 1y")
 check "the prompt shows the filters of the command line" '[[ $out == *proj* && $out == *"idle 1y+"* ]]' "$out"
+printf 'all\n' >"$WORK/st/status"; printf 'idle30\n' >"$WORK/st/filter"
+check "picker: Ctrl-F idle 30 days leaves out a session idle for 20 days" '[[ $(rows) == *"$A"* && $(rows) != *"$I"* ]]' "$(rows)"
+printf 'idle90\n' >"$WORK/st/filter"
+check "... and idle 90 days one idle for 60 days" '[[ $(rows) == *"$A"* && $(rows) != *"$G"* ]]' "$(rows)"
 printf 'idle30\n' >"$WORK/st/filter"
 check "Ctrl-F narrows the command line's --older-than" '[[ $(rows "--older-than 1y") == "" ]]' "$(rows "--older-than 1y")"
 out=$(LETHE_STATE=$WORK/st LETHE_FILTERS="--older-than 1y" REINDEX=0 bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); choose_lines filter' _ "$LETHE" | perl -pe 's/\e\[[0-9;]*m//g')
