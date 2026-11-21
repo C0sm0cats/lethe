@@ -1069,8 +1069,8 @@ check "installer: a download cut short keeps the installed lethe" \
 
 H2=$WORK/home-zdot
 mkdir -p "$H2/.config/zsh" "$WORK/fakecurl"
-printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in -o) out=$2; shift;; esac; shift; done\necho "#!/bin/sh" > "$out"\n' \
-    >"$WORK/fakecurl/curl" && chmod +x "$WORK/fakecurl/curl"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in -o) out=$2; shift;; https:*) echo "$1" >"%s/curl.url";; esac; shift; done\necho "#!/bin/sh" > "$out"\n' \
+    "$WORK" >"$WORK/fakecurl/curl" && chmod +x "$WORK/fakecurl/curl"
 rc=$H2/.bashrc
 [[ $(uname -s) != Darwin ]] || rc=$H2/.bash_profile
 printf '# tools in %s/.local/bin/old\n' "$H2" >"$rc"
@@ -1082,6 +1082,13 @@ if command -v zsh >/dev/null 2>&1; then
     env -i HOME="$H2" PATH="$WORK/fakecurl:/usr/bin:/bin" SHELL=/bin/zsh sh "$ROOT/install.sh" >/dev/null 2>&1
     check "installer: zsh with ZDOTDIR" 'grep -qF "$H2/.local/bin" "$H2/.config/zsh/.zshrc"'
 fi
+H4=$WORK/home-opts
+mkdir -p "$H4"
+rm -f "$WORK/curl.url"
+env -i HOME="$H4" PATH="$WORK/fakecurl:/usr/bin:/bin" SHELL=/bin/bash LETHE_VERSION=v0.7.7 LETHE_BIN="$H4/tools" \
+    sh "$ROOT/install.sh" >/dev/null 2>&1 || true
+check "installer: LETHE_VERSION and LETHE_BIN are honoured" \
+    '[[ $(<"$WORK/curl.url") == */lethe/v0.7.7/lethe && -x $H4/tools/lethe && ! -e $H4/.local/bin/lethe ]]' "$(cat "$WORK/curl.url" 2>&1)"
 
 # A subagent of Codex's multi-agent mode: encrypted messages, readable actions.
 SA=01a12160-0000-7000-8000-0000000000ee
