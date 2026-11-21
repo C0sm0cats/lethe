@@ -668,23 +668,29 @@ init_claude() {
     local -a stale=()
     # Subagent transcripts grow, or appear, without the session's own transcript
     # changing: their count, newest date and total size are part of the key.
-    local dir
+    # Lists are taken whole: read takes a pipe one byte at a time.
+    local dir list
     declare -A sub_count=() sub_newest=() sub_total=()
+    list=$(file_stats "$CLAUDE_DIR/projects" -mindepth 4 -maxdepth 4 -type f -path '*/subagents/agent-*.jsonl') || true
     while IFS=$'\t' read -r mtime fsize path; do
+        [[ -n $path ]] || continue
         mtime=${mtime%.*}
         dir=${path%/subagents/*}
         sub_count[$dir]=$((${sub_count[$dir]:-0} + 1))
         sub_total[$dir]=$((${sub_total[$dir]:-0} + fsize))
         ((mtime <= ${sub_newest[$dir]:-0})) || sub_newest[$dir]=$mtime
-    done < <(file_stats "$CLAUDE_DIR/projects" -mindepth 4 -maxdepth 4 -type f -path '*/subagents/agent-*.jsonl')
+    done <<<"$list"
     for dir in "${!sub_count[@]}"; do subkeys[$dir.jsonl]="${sub_count[$dir]}:${sub_newest[$dir]}:${sub_total[$dir]}"; done
+    list=$(sqlite3 -cmd '.timeout 5000' -separator "$US" "$CLAUDE_CACHE" \
+        "SELECT path, mtime, fsize, CASE WHEN rewinds IS NULL THEN 1 ELSE '' END, subkey FROM claude;") || true
     while IFS=$US read -r path mtime fsize pending subkey; do
+        [[ -n $path ]] || continue
         known[$path]="$mtime $fsize $subkey"
         # The badge was left for later: compute it once the session is quiet.
         if [[ -n $pending ]] && ((NOW - mtime >= RECENT_SECONDS)); then known[$path]=pending; fi
-    done < <(sqlite3 -cmd '.timeout 5000' -separator "$US" "$CLAUDE_CACHE" \
-        "SELECT path, mtime, fsize, CASE WHEN rewinds IS NULL THEN 1 ELSE '' END, subkey FROM claude;")
+    done <<<"$list"
 
+    list=$(file_stats "$CLAUDE_DIR/projects" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl') || true
     script=$(mktemp "$CACHE_DIR/update.XXXXXX")
     {
         printf 'BEGIN;\nCREATE TEMP TABLE seen (path TEXT PRIMARY KEY);\n'
@@ -696,7 +702,7 @@ init_claude() {
             subkey=${subkeys[$path]:-0:0:0}
             [[ ${known[$path]:-} == "$mtime $fsize $subkey" ]] ||
                 stale+=("$mtime"$'\t'"$fsize"$'\t'"$subkey"$'\t'"$path")
-        done < <(file_stats "$CLAUDE_DIR/projects" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl')
+        done <<<"$list"
         count=${#stale[@]}
         # Transcripts are parsed in parallel, one job per CPU, each into its own file.
         local jobs running=0 parts i=0
@@ -806,12 +812,15 @@ init() {
 # Codex transcript sizes and dates, gathered in one pass instead of one stat
 # per session; ROLLOUTS finds a transcript by session id wherever it is.
 load_sizes() {
-    local dir mtime size path
+    local dir mtime size path list
     [[ -n $CODEX_DB && $SIZES_LOADED == 0 ]] || return 0
     SIZES_LOADED=1
     for dir in "$CODEX_DIR/sessions" "$CODEX_DIR/archived_sessions"; do
         [[ -d $dir ]] || continue
+        # Taken whole: read takes a pipe one byte at a time.
+        list=$(file_stats "$dir" -type f \( -name 'rollout-*.jsonl' -o -name 'rollout-*.jsonl.zst' \)) || true
         while IFS=$'\t' read -r mtime size path; do
+            [[ -n $path ]] || continue
             SIZES[$path]=$size
             MTIMES[$path]=${mtime%.*}
             # A plain transcript wins over a compressed copy of the same session.
@@ -819,7 +828,7 @@ load_sizes() {
                 [[ -z ${ROLLOUTS[${BASH_REMATCH[1]}]+x} || $path == *.jsonl ]]; then
                 ROLLOUTS[${BASH_REMATCH[1]}]=$path
             fi
-        done < <(file_stats "$dir" -type f \( -name 'rollout-*.jsonl' -o -name 'rollout-*.jsonl.zst' \))
+        done <<<"$list"
     done
 }
 
@@ -1508,8 +1517,20 @@ fetch_rows() {
     where=$(build_where)
     load_sizes
     [[ -z $F_GREP ]] || F_GREP_RAW=$(jq -rn --arg text "$F_GREP" '$text | tojson | .[1:-1]')
+    # Taken whole, then read from a here-string: read takes a pipe one byte at a
+    # time, a system call per byte of every row.
+    local rows
+    rows=$(query "
+        SELECT agent, id, archived, recency,
+               strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
+               $(flat mode), $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds, pinned,
+               $(flat parent), kids, kidsize, created, touched, $(flat origin)
+          FROM ranked
+         WHERE $where
+         ORDER BY recency DESC, id DESC;") || true
     while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds pinned \
         parent kids kidsize created touched origin; do
+        [[ -n $agent ]] || continue
         # These reach shell arithmetic, which evaluates any text it is given.
         if [[ ! $archived$recency$empty$rewinds$pinned$kids$kidsize$created$touched =~ ^[0-9]*$ || ! $size =~ ^-?[0-9]*$ ]]; then
             printf '%s: skipping a malformed session row (%s)\n' "$PROG" "${id//[^0-9a-f-]/}" >&2
@@ -1556,14 +1577,7 @@ fetch_rows() {
         else
             printf '%s\n' "$line"
         fi
-    done < <(query "
-        SELECT agent, id, archived, recency,
-               strftime('%Y-%m-%d %H:%M', recency, 'unixepoch', 'localtime'),
-               $(flat mode), $(flat provider), empty, $(flat cwd), $(flat title), path, size, rewinds, pinned,
-               $(flat parent), kids, kidsize, created, touched, $(flat origin)
-          FROM ranked
-         WHERE $where
-         ORDER BY recency DESC, id DESC;")
+    done <<<"$rows"
     ((${#pending[@]})) || return 0
     # --grep: transcripts are searched in parallel, one job per CPU.
     local found jobs running=0 i
@@ -1664,11 +1678,14 @@ fetch_sorted() {
 tree_rows() {
     local -a order=()
     local -A t_line=() t_parent=() t_rec=() t_size=() t_created=() t_agent=() t_kids=() t_children=() t_cwd=()
-    local row id p f
+    local row id p f input
     # No process and no temporary input per row: this runs for every session.
+    # Taken whole: read takes a pipe one byte at a time.
+    input=$(cat)
     local saved_ifs=$IFS
     set -f
     while IFS= read -r row; do
+        [[ -n $row ]] || continue
         IFS=$US
         # shellcheck disable=SC2206 # split on $US, with globbing off
         f=($row)
@@ -1678,7 +1695,7 @@ tree_rows() {
         t_line[$id]=$row t_agent[$id]=${f[0]} t_rec[$id]=${f[3]} t_size[$id]=${f[8]} t_cwd[$id]=${f[9]}
         t_parent[$id]=${f[15]:-} t_kids[$id]=${f[16]:-0} t_created[$id]=${f[18]:-0}
         ((t_size[$id] >= 0)) || t_size[$id]=0
-    done
+    done <<<"$input"
     set +f
     ((${#order[@]})) || return 0
 
@@ -1720,11 +1737,13 @@ tree_rows() {
             [[ ${t_agent[$id]} != claude ]] || ((${t_kids[$id]} == 0)) || ids+=("'$id'")
         done
         if ((${#ids[@]})); then
+            input=$(query "SELECT session, agent, size, started, $(flat type), $(flat description), $(flat model),
+                                  $(flat effort) FROM cl.claude_sub WHERE session IN ($(join_by , "${ids[@]}"))
+                            ORDER BY session, started, agent;") || true
             while IFS=$US read -r session agentid sz started kind desc model effort; do
+                [[ -n $session ]] || continue
                 subs[$session]+="$agentid$US$sz$US$started$US$kind$US$desc$US$model$US$effort"$'\n'
-            done < <(query "SELECT session, agent, size, started, $(flat type), $(flat description), $(flat model),
-                                   $(flat effort) FROM cl.claude_sub WHERE session IN ($(join_by , "${ids[@]}"))
-                             ORDER BY session, started, agent;")
+            done <<<"$input"
         fi
     fi
 
@@ -1820,10 +1839,11 @@ tree_rows() {
         # Claude Code subagents.
         if [[ -n ${subs[$id]:-} ]]; then
             local -a sublines=()
-            mapfile -t sublines < <(printf '%s' "${subs[$id]}")
+            mapfile -t sublines <<<"${subs[$id]%$'\n'}"
             for c in "${sublines[@]}"; do
                 i=$((i + 1))
-                last=$([[ $i == "${#sublines[@]}" && ${#kidlist[@]} == 0 ]] && echo 1 || echo 0)
+                last=0
+                [[ $i != "${#sublines[@]}" || ${#kidlist[@]} != 0 ]] || last=1
                 IFS=$US read -r agentid sz started skind desc model effort <<<"$c"
                 local branch="├─ " title
                 ((!last)) || branch="└─ "
@@ -1955,7 +1975,7 @@ format_row() {
     [[ -z $tag ]] || tag="$C_DIM$tag$C_RESET"
     if [[ $style == sub ]]; then
         agent="" age="" agent_color=$C_DIM size_color=$C_DIM title_color=$C_DIM
-        [[ -z $date ]] || date="$(printf '%16s' '')  "
+        [[ -z $date ]] || printf -v date '%18s' ''
     fi
     local sizecol=""
     if ((ROW_NOSIZE)) && [[ -z ${4:-} ]]; then
@@ -2028,8 +2048,10 @@ cmd_list() {
 
     local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local count=0 bytes=0 missing=0 open=0 title_width=50 hbytes cols
-    local kind before after style shown line lines=()
-    mapfile -t lines < <(fetch_sorted | tree_rows)
+    local kind before after style shown line lines=() data
+    # Taken whole: read takes a pipe one byte at a time.
+    data=$(fetch_sorted | tree_rows) || true
+    [[ -z $data ]] || mapfile -t lines <<<"$data"
     # The id column: 8 characters, more when ids share them (Codex ids start with
     # a timestamp), as commands take any unique prefix. Sessions a filter hides
     # count too: a prefix one of them shares would be refused as ambiguous.
@@ -2062,7 +2084,7 @@ cmd_list() {
         count=$((count + 1))
         if ((size >= 0)); then bytes=$((bytes + size)); else missing=$((missing + 1)); fi
         [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
-    done < <(printf '%s\n' "${lines[@]}")
+    done <<<"$data"
 
     human_size hbytes "$bytes"
     printf '\n%s%d session(s) · %s' "$C_DIM" "$count" "$hbytes"
@@ -3871,8 +3893,11 @@ internal_rows() {
     local agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created
     local count=0 bytes=0 open=0 hbytes subs=0 tops=0
     : >"$LETHE_STATE/sizes"
-    local kind before after style shown
+    local kind before after style shown data
+    # Taken whole: read takes a pipe one byte at a time.
+    data=$(fetch_sorted | tree_rows) || true
     while IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
+        [[ -n $kind ]] || continue
         if [[ $kind != hidden ]]; then
             format_row "$agent" "$archived" "$recency" "" "$mode" "${shown:-$size}" "$cwd" "$title" "$state" "" "$rewinds" \
                 "$pinned" "$before$US$after" "$style"
@@ -3891,7 +3916,7 @@ internal_rows() {
         count=$((count + 1))
         ((size < 0)) || bytes=$((bytes + size))
         [[ $state != open ]] || open=$((open + 1)) # running: open in an agent (◉)
-    done < <(fetch_sorted | tree_rows)
+    done <<<"$data"
     : >"$LETHE_STATE/open"
     ((${#OPEN[@]} == 0)) || printf '%s\n' "${!OPEN[@]}" >"$LETHE_STATE/open"
     human_size hbytes "$bytes"
