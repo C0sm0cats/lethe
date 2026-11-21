@@ -1042,6 +1042,12 @@ check "Ctrl-G marks never break color codes" '[[ $out != *$'"'"'\e[1\e'"'"'* && 
 printf '#!/bin/sh\ncat >/dev/null\nprintf "%%s" "$LESS"\n' >"$WORK/bin/lesspager" && chmod +x "$WORK/bin/lesspager"
 out=$(LESS=-i PAGER=lesspager LETHE_STATE=$WORK/st "$LETHE" __page "$A" </dev/null)
 check "Enter keeps colors when LESS is set" '[[ $out == "-i -R" ]]' "$out"
+mkdir -p "$WORK/fakeless"
+printf '#!/bin/sh\ncat >/dev/null\nprintf "%%s|" "$@"\n' >"$WORK/fakeless/less" && chmod +x "$WORK/fakeless/less"
+printf 'needle' >"$WORK/st/grep"
+out=$(PAGER="$WORK/fakeless/less -R" LETHE_STATE=$WORK/st "$LETHE" __page "$A" </dev/null)
+check "Enter after Ctrl-G opens on the word when PAGER is less with options" '[[ $out == "-R|-i|-p|needle|" ]]' "$out"
+: >"$WORK/st/grep"
 
 reset_fixture
 ln -s "$PROJ" "$WORK/link"

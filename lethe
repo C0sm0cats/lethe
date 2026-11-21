@@ -4384,12 +4384,13 @@ internal_page() {
     # Colors need -R, whatever else the user's LESS asks for.
     LESS="${LESS:+$LESS }-R"
     export LESS COLUMNS
-    # Ctrl-G: less opens on the first occurrence of the searched text.
+    # Ctrl-G: less opens on the first occurrence of the searched text, whatever
+    # options the user's PAGER gives it.
     local pager=() focus=""
     read -ra pager <<<"${PAGER:-less}"
     [[ ! -s ${LETHE_STATE:-}/grep ]] || focus=$(<"$LETHE_STATE/grep")
-    if [[ -n $focus && -z ${PAGER:-} ]]; then
-        pager=(less -i -p "$(printf '%s' "$focus" | sed 's/[][\\.*^$+?(){}|/]/\\&/g')")
+    if [[ -n $focus && ${pager[0]:-} =~ (^|/)less$ ]]; then
+        pager+=(-i -p "$(printf '%s' "$focus" | sed 's/[][\\.*^$+?(){}|/]/\\&/g')")
     fi
     setup_colors always
     local rc=0
