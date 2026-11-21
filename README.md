@@ -81,6 +81,7 @@ Dependencies:
 | Debian, Ubuntu | `sudo apt install fzf jq sqlite3 zstd` |
 | Fedora | `sudo dnf install fzf jq sqlite zstd` |
 | Arch, Manjaro | `sudo pacman -S fzf jq sqlite zstd` |
+| openSUSE | `sudo zypper install fzf jq sqlite3 zstd` |
 | Alpine | `sudo apk add bash fzf jq sqlite zstd` |
 
 Versions: bash 4.4+ (macOS ships 3.2, hence `brew install bash`) and fzf 0.45+ (0.72+ for the panel layout; Debian 12 ships 0.38, so take a [release](https://github.com/junegunn/fzf/releases) there). `zstd` is only needed to read the old transcripts that Codex 0.163+ compresses; without it they are still listed, protected and deletable, just not readable or searchable. lethe works with whichever agents you have; you don't need both.
@@ -216,7 +217,7 @@ lethe list --json | jq -r '.[] | select(.subagents) | "\(.id) \(.subagents.count
   Protection is checked when the plan is shown, and again right before each change: a session that was opened, written to or moved in the meantime is left alone. `--force` lifts only the 10-minute rule. If a running agent's open files cannot be listed, lethe changes nothing. Homes reached through symlinks (`~/.codex` in a dotfiles repo, say) are resolved.
 - **Pinned Codex sessions** are skipped by filters (`--older-than`, `--empty`…): only naming them, by id or in the picker, changes them.
 - **Subagents.** Deleting a Codex session also deletes the subagent sessions it spawned, children first. A subagent whose parent is running is protected, and so is the whole tree of any protected session. A Codex subagent can be deleted or archived alone, never resumed or forked (it would leave its team). Claude Code subagents live inside their session: they are read-only rows in the picker and go with their session. Actions apply to what is selected, never to what is folded or unfolded.
-- **Codex** is changed only through its own CLI (`codex delete`, `codex archive`, `codex unarchive`). Every change is checked in its database afterwards.
+- **Codex** is changed only through its own CLI (`codex delete`, `codex archive`, `codex unarchive`). Every change is checked in its database afterwards. `codex delete` is permanent: the confirmation says how many sessions will be deleted for good, and `lethe archive` (`Ctrl‑X`) is the reversible alternative.
 - **Claude Code** has no delete command. lethe moves the transcript and everything Claude Code keeps for that session (subagent transcripts, tool results, file history, session environment, its prompts in the prompt history) to the trash, with a manifest to restore it. A session is moved entirely or not at all, and a restore only writes inside the Claude Code directory.
 - **Resume** refuses a session that is already open in a running agent (two agents writing one transcript would interleave it); fork it instead.
 - **Read-only by default.** Listing, searching and previewing never write to the agents' data. The Claude Code index is a cache in `~/.cache/lethe`.
