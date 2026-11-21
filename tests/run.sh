@@ -274,6 +274,9 @@ echo "output"
 order=$("$LETHE" list --ids --sort size --codex | tr '\n' ' ')
 check "--sort size: biggest first, missing last" '[[ $order == "$A $B "* && $order == *" $F " ]]' "$order"
 check "list --json" '"$LETHE" list --json | jq -e "length == 9 and (map(select(.open)) | map(.id)) == [\"$I\"]" >/dev/null'
+out=$("$LETHE" list --json)
+check "list --json: agent, status and path" \
+    'jq -e --arg d "$D" --arg g "$G" --arg gp "$CPROJ/$G.jsonl" "(map(select(.id == \$d))[0] | .agent == \"codex\" and .status == \"archived\") and (map(select(.id == \$g))[0] | .agent == \"claude\" and .status == \"active\" and .path == \$gp)" <<<"$out" >/dev/null' "$out"
 out=$("$LETHE" list --claude)
 check "Claude titles come from ai-title" '[[ $out == *"Design the cache"* ]]' "$out"
 out=$("$LETHE" list --codex)
