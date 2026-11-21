@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 — 2026-11-21
+
+- lethe starts on macOS again: 0.8.0 stopped at startup there.
+
 ## 0.8.0 — 2026-11-21
 
 - **An open Codex session could be deleted** when `~/.codex/sessions` (or `archived_sessions`) is a
