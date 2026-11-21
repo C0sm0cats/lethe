@@ -1484,6 +1484,10 @@ expect_status "completion --help" 0 completion --help
 expect_ids "durations: mo means months, like the AGE column" "$("$LETHE" list --ids --older-than 2m | tr '\n' ' ')" --older-than 2mo
 out=$("$LETHE" stats --dir "$WORK/other")
 check "stats suggestions keep the filters" '[[ $out == *"delete --empty --dir $WORK/other"* ]]' "$out"
+out=$("$LETHE" stats --codex)
+check "... the agent too" '[[ $out == *"delete --empty --codex"* ]]' "$out"
+out=$("$LETHE" stats --idle)
+check "... and the status" '[[ $out == *"delete --empty --idle"* ]]' "$out"
 out=$("$LETHE" delete --claude -y 2>&1) || true
 check "an agent alone is refused, and the message says so" '[[ $out == *"an agent alone is not enough"* ]]' "$out"
 out=$(bash -c 'source <("$1" completion bash); COMP_WORDS=(lethe stats --s); COMP_CWORD=2; _lethe; echo "${COMPREPLY[*]}"; COMP_WORDS=(lethe list --so); _lethe; echo "${COMPREPLY[*]}"' _ "$LETHE")
