@@ -308,6 +308,9 @@ expect_status "an agent alone is not a filter" 2 delete --claude -y
 expect_status "an empty --dir is refused, not the current directory" 2 delete --dir '' -n
 expect_status "... --dir= too" 2 list --dir=
 expect_status "--yes is not a list option" 2 list --yes
+out=$( { "$LETHE" stats "$A"; "$LETHE" trash empty 30d; "$LETHE" pick -- "$A"; "$LETHE" list --yes; } 2>&1 </dev/null) || true
+check "an id given to a command that takes none is called an argument, not an option" \
+    '[[ $(grep -c "unexpected argument .*: this command takes no session id" <<<"$out") == 3 && $out == *"option '"'"'--yes'"'"' is not valid"* && $out != *"option '"'"'$A"* && $out != *"option '"'"'30d"* ]]' "$out"
 expect_status "unknown id" 1 delete -y 99999999
 expect_status "non-interactive delete needs --yes" 1 delete "$A"
 reset_fixture
