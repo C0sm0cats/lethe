@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 — 2026-11-21
+
+- Faster picker reloads, `list`, delete plans and trash views with thousands of sessions
+  (about twice as fast at 2,300 sessions); the output is unchanged.
+
 ## 0.8.1 — 2026-11-21
 
 - lethe starts on macOS again: 0.8.0 stopped at startup there.
