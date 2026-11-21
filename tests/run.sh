@@ -461,6 +461,11 @@ check "picker: with Ctrl-G the preview shows the messages that mention the text"
     '[[ $out == *"1 of 2 messages mention “parser”"* && $out == *"refactor the Parser"* ]]' "$out"
 out=$("$LETHE" __preview "$A")
 check "picker: an empty open-session list does not break the preview" '[[ $out == *Parser* ]]' "$out"
+: >"$LETHE_STATE/grep" && : >"$LETHE_STATE/dir" && printf '%s\n' trash >"$LETHE_STATE/filter"
+entry=$("$LETHE" __rows | cut -f 1)
+out=$("$LETHE" __resume "$entry" </dev/null 2>&1)
+check "picker: Ctrl-R in the trash restores the session" \
+    '[[ $entry == trash:* && -f $CPROJ/$G.jsonl && ! -e $TRASH/${entry#trash:} && $out == *"restored"* ]]' "$entry"$'\n'"$out"
 unset LETHE_STATE LETHE_FILTERS
 
 reset_fixture
