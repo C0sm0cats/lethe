@@ -1233,6 +1233,8 @@ check "stats: the subagents line" '[[ $out == *"subagents (in "* ]]' "$out"
 # A filter that keeps a child but not its parent: the parent in context.
 out=$("$LETHE" list --codex --grep "second child")
 check "a subagent found alone comes with its parent, dim" '[[ $out == *"▾ Refactor parser · 1 of 2 subagents"*"└─ Noether"* && $out == *"1 session(s)"* ]]' "$out"
+check "... and tagged as context, not only dim (NO_COLOR)" \
+    '[[ $(grep "Refactor parser" <<<"$out") == *"context · ▾ Refactor parser"* && $(grep Noether <<<"$out") != *"context · "* ]]' "$out"
 printf 'second child' >"$WORK/st/grep"; printf 'hidden\n' >"$WORK/st/subagents"
 rows=$(LETHE_STATE=$WORK/st "$LETHE" __rows | cut -f 1 | tr '\n' ' ')
 check "picker: the parent of a subagent found alone is a ctx: row" '[[ $rows == "ctx:$A $C2 " ]]' "$rows"

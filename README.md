@@ -145,6 +145,7 @@ The footer lists the keys and shows where each switch stands (`Ctrl‑T agent: c
 | `⑂N` | N abandoned branches (edited or rewound prompts), hidden |
 | `▸` / `▾` | a session with subagents, folded / unfolded (`Alt‑S`) |
 | `├─` `└─` | a subagent, under the session that started it |
+| `context ·` | a session shown only for the subagent found below it, not part of the list (dim) |
 | `↳` | a Claude Code subagent: part of its session, read-only |
 
 Sizes over 10 MB are yellow, over 50 MB red.

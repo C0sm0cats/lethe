@@ -1926,6 +1926,8 @@ format_row() {
     fit project "$project" "$PROJECT_WIDTH"
     # The tree and the tags are dim, before the title; the title takes what is left.
     tag=$before$tag
+    # A context row says so in words, not only in grey (NO_COLOR, pale themes).
+    [[ $style != context ]] || tag="context · $tag"
     title=$title$after
     if [[ -n $date ]]; then
         # Command-line layout: fixed widths, with the date. The terminal's width
@@ -4171,8 +4173,8 @@ internal_action() {
     set -- "${ids[@]}"
     if ((ignored && $# == 0)); then
         printf '\e[H\e[2J'
-        printf 'Nothing to do: a Claude Code subagent lives inside its session, and a dim row is\n'
-        printf 'only shown for the subagent below it. Act on the session itself.\n'
+        printf 'Nothing to do: a Claude Code subagent lives inside its session, and a context row\n'
+        printf 'is only shown for the subagent below it. Act on the session itself.\n'
         printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
         read -r </dev/tty || true
         return 0
@@ -4190,7 +4192,7 @@ internal_action() {
     detect_open
     F_IDS=("$@")
     printf '\e[H\e[2J'
-    ((ignored == 0)) || printf '%s%d row(s) left out: subagents of Claude Code sessions, or dim context rows.%s\n\n' \
+    ((ignored == 0)) || printf '%s%d row(s) left out: subagents of Claude Code sessions, or context rows.%s\n\n' \
         "$C_DIM" "$ignored" "$C_RESET"
     run_action "$action" || true
     printf '\n%sPress Enter to return…%s' "$C_DIM" "$C_RESET"
