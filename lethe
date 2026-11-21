@@ -642,6 +642,19 @@ claude_extract() {
     claude_subagents "$id" "$path"
 }
 
+# claude_index_stamp — what says the index file has not changed: its path, size
+# and date, and SQLite's change counter (header bytes 24-27), which every write
+# transaction bumps in rollback-journal mode (bytes 18-19: 1 1). Empty when it
+# cannot tell: another journal mode, a write in progress, an unreadable file.
+claude_index_stamp() {
+    local header
+    [[ ! -e $CLAUDE_CACHE-wal && ! -e $CLAUDE_CACHE-journal && -r $CLAUDE_CACHE ]] || return 0
+    header=$(od -An -tu1 -j 18 -N 10 <"$CLAUDE_CACHE" 2>/dev/null) || return 0
+    [[ $header =~ ^[[:space:]]*1[[:space:]]+1[[:space:]] ]] || return 0
+    printf '%s %s ' "$CLAUDE_CACHE" "${header//[[:space:]]/ }"
+    file_stats "$CACHE_DIR" -maxdepth 1 -name "${CLAUDE_CACHE##*/}" -type f
+}
+
 # Bring the cache up to date: only new or modified transcripts are parsed.
 init_claude() {
     [[ -d $CLAUDE_DIR/projects ]] || return 0
@@ -666,12 +679,33 @@ init_claude() {
     local path mtime fsize pending script count=0 done=0 seen=0 subkey
     declare -A known=() subkeys=()
     local -a stale=()
+    # A picker reload (LETHE_STATE) skips the check when nothing it reads has
+    # changed since the last check that found nothing to do: the same transcripts
+    # (paths, dates to the fraction of a second where the system gives one, sizes),
+    # the same index file, and no session whose badge has come due since
+    # (claude_index_stamp).
+    local stamp="" stamp_file=${LETHE_STATE:-}/claude-index saved due=9999999999
+    if [[ -n ${LETHE_STATE:-} && -d $LETHE_STATE ]]; then
+        stamp=$(claude_index_stamp)
+        [[ -n $stamp ]] || rm -f -- "$stamp_file"
+    fi
     # Subagent transcripts grow, or appear, without the session's own transcript
     # changing: their count, newest date and total size are part of the key.
     # Lists are taken whole: read takes a pipe one byte at a time.
-    local dir list
+    local dir list tops
     declare -A sub_count=() sub_newest=() sub_total=()
     list=$(file_stats "$CLAUDE_DIR/projects" -mindepth 4 -maxdepth 4 -type f -path '*/subagents/agent-*.jsonl') || true
+    tops=$(file_stats "$CLAUDE_DIR/projects" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl') || true
+    if [[ -n $stamp ]]; then
+        stamp+=$'\n'$list$'\n\x1e\n'$tops$'\n.'
+        if [[ -f $stamp_file ]]; then
+            saved=$(<"$stamp_file")
+            if [[ ${saved#*$'\n'} == "$stamp" && ${saved%%$'\n'*} =~ ^[0-9]+$ ]] && ((NOW < ${saved%%$'\n'*})); then
+                return 0
+            fi
+        fi
+        rm -f -- "$stamp_file"
+    fi
     while IFS=$'\t' read -r mtime fsize path; do
         [[ -n $path ]] || continue
         mtime=${mtime%.*}
@@ -687,10 +721,16 @@ init_claude() {
         [[ -n $path ]] || continue
         known[$path]="$mtime $fsize $subkey"
         # The badge was left for later: compute it once the session is quiet.
-        if [[ -n $pending ]] && ((NOW - mtime >= RECENT_SECONDS)); then known[$path]=pending; fi
+        if [[ -n $pending ]]; then
+            if ((NOW - mtime >= RECENT_SECONDS)); then
+                known[$path]=pending
+            elif ((mtime + RECENT_SECONDS < due)); then
+                due=$((mtime + RECENT_SECONDS))
+            fi
+        fi
     done <<<"$list"
 
-    list=$(file_stats "$CLAUDE_DIR/projects" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl') || true
+    list=$tops
     script=$(mktemp "$CACHE_DIR/update.XXXXXX")
     {
         printf 'BEGIN;\nCREATE TEMP TABLE seen (path TEXT PRIMARY KEY);\n'
@@ -729,6 +769,12 @@ init_claude() {
     if [[ -t 2 ]] && ((count > 20)); then printf '\r\e[K' >&2; fi
     if ((count == 0 && seen == ${#known[@]})); then
         rm -f -- "$script"
+        # Nothing to do, and no one wrote to the index meanwhile: the next reload
+        # can skip this check while nothing changes.
+        if [[ -n $stamp && ${stamp%%$'\n'*} == "$(claude_index_stamp)" ]]; then
+            { printf '%s\n%s' "$due" "$stamp" >"$stamp_file.$$"; } 2>/dev/null && mv -f -- "$stamp_file.$$" "$stamp_file" ||
+                rm -f -- "$stamp_file.$$"
+        fi
         return 0
     fi
     # What the script holds comes from transcripts: no file access for it.
@@ -753,18 +799,31 @@ init() {
         local uri=${CODEX_DB//%/%25}
         uri=${uri//\?/%3f} uri=${uri//#/%23}
         PRELUDE+="ATTACH 'file:${uri//\'/\'\'}?mode=ro' AS cx;"
-        # Transcript dates, by session id (see CODEX_SELECT).
-        load_sizes
-        local id mt_rows=() n=0
+        # Transcript dates, by session id (see CODEX_SELECT): in one jq, or in bash.
+        local id mt_rows=() n=0 mt=""
         PRELUDE+="CREATE TEMP TABLE mt (id TEXT PRIMARY KEY, mtime INTEGER);"
-        for id in "${!ROLLOUTS[@]}"; do
-            mt_rows+=("('$id', ${MTIMES[${ROLLOUTS[$id]}]:-0})")
-            if ((++n % 400 == 0)); then
-                PRELUDE+="INSERT OR REPLACE INTO mt VALUES $(join_by ', ' "${mt_rows[@]}");"
-                mt_rows=()
-            fi
-        done
-        ((${#mt_rows[@]} == 0)) || PRELUDE+="INSERT OR REPLACE INTO mt VALUES $(join_by ', ' "${mt_rows[@]}");"
+        list_sizes
+        if [[ -n $SIZE_LIST ]] && command -v jq >/dev/null 2>&1; then
+            mt=$(jq -rRs --arg q "'" "$JQ_SIZES"'if test("\\x{fffd}") then "" | halt_error(3) else . end | split("\n") | sizes | .rollouts | to_entries
+                | if any(.[]; .value[1] | test("^[0-9]*$") | not) then "" | halt_error(3) else . end
+                | range(0; length; 400) as $i | .[$i:$i + 400]
+                | "INSERT OR REPLACE INTO mt VALUES "
+                  + (map("(" + $q + .key + $q + ", " + (.value[1] | if . == "" then "0" else . end) + ")")
+                     | join(", ")) + ";"' <<<"$SIZE_LIST" 2>/dev/null) || mt=""
+        fi
+        if [[ -n $mt ]]; then
+            PRELUDE+=$mt
+        else
+            load_sizes
+            for id in "${!ROLLOUTS[@]}"; do
+                mt_rows+=("('$id', ${MTIMES[${ROLLOUTS[$id]}]:-0})")
+                if ((++n % 400 == 0)); then
+                    PRELUDE+="INSERT OR REPLACE INTO mt VALUES $(join_by ', ' "${mt_rows[@]}");"
+                    mt_rows=()
+                fi
+            done
+            ((${#mt_rows[@]} == 0)) || PRELUDE+="INSERT OR REPLACE INTO mt VALUES $(join_by ', ' "${mt_rows[@]}");"
+        fi
         parts+=("$CODEX_SELECT")
     fi
     if [[ -n $CLAUDE_CACHE ]]; then
@@ -809,28 +868,56 @@ init() {
     PRELUDE+="PRAGMA query_only = 1;"
 }
 
-# Codex transcript sizes and dates, gathered in one pass instead of one stat
-# per session; ROLLOUTS finds a transcript by session id wherever it is.
-load_sizes() {
-    local dir mtime size path list
-    [[ -n $CODEX_DB && $SIZES_LOADED == 0 ]] || return 0
-    SIZES_LOADED=1
+# SIZE_LIST: the "mtime<TAB>size<TAB>path" lines of the Codex transcripts, in one
+# pass instead of one stat per session. jq reads it as it is (init, fetch_rows).
+SIZE_LIST="" SIZE_LISTED=0
+list_sizes() {
+    local dir list
+    [[ -n $CODEX_DB && $SIZE_LISTED == 0 ]] || return 0
+    SIZE_LISTED=1
     for dir in "$CODEX_DIR/sessions" "$CODEX_DIR/archived_sessions"; do
         [[ -d $dir ]] || continue
-        # Taken whole: read takes a pipe one byte at a time.
         list=$(file_stats "$dir" -type f \( -name 'rollout-*.jsonl' -o -name 'rollout-*.jsonl.zst' \)) || true
-        while IFS=$'\t' read -r mtime size path; do
-            [[ -n $path ]] || continue
-            SIZES[$path]=$size
-            MTIMES[$path]=${mtime%.*}
-            # A plain transcript wins over a compressed copy of the same session.
-            if [[ $path =~ ($UUID_RE)\.jsonl(\.zst)?$ ]] &&
-                [[ -z ${ROLLOUTS[${BASH_REMATCH[1]}]+x} || $path == *.jsonl ]]; then
-                ROLLOUTS[${BASH_REMATCH[1]}]=$path
-            fi
-        done <<<"$list"
+        [[ -z $list ]] || SIZE_LIST+=$list$'\n'
     done
 }
+
+# load_sizes — SIZE_LIST in arrays, for bash: SIZES and MTIMES by path; ROLLOUTS
+# finds a transcript by session id wherever it is.
+load_sizes() {
+    local mtime size path
+    [[ -n $CODEX_DB && $SIZES_LOADED == 0 ]] || return 0
+    SIZES_LOADED=1
+    list_sizes
+    # Taken whole: read takes a pipe one byte at a time.
+    while IFS=$'\t' read -r mtime size path; do
+        [[ -n $path ]] || continue
+        SIZES[$path]=$size
+        MTIMES[$path]=${mtime%.*}
+        # A plain transcript wins over a compressed copy of the same session.
+        if [[ $path =~ ($UUID_RE)\.jsonl(\.zst)?$ ]] &&
+            [[ -z ${ROLLOUTS[${BASH_REMATCH[1]}]+x} || $path == *.jsonl ]]; then
+            ROLLOUTS[${BASH_REMATCH[1]}]=$path
+        fi
+    done <<<"$SIZE_LIST"
+}
+
+# JQ_SIZES: sizes, load_sizes in jq, on the lines of SIZE_LIST (already checked for
+# bytes that are not UTF-8, which jq would change) — {sizes: SIZES, rollouts:
+# ROLLOUTS with the mtime of each, as [path, mtime]}, or halt_error(3) when a line
+# would not read the same in bash (read splits on runs of tabs, and trims them).
+readonly JQ_SIZES='
+    def sizes:
+        [.[] | select(. != "") | split("\t")
+           | if length != 3 or any(.[]; . == "") then "" | halt_error(3) else . end] as $list
+        | {sizes: (reduce $list[] as $f ({}; .[$f[2]] = $f[1])),
+           rollouts: (reduce $list[] as $f ({};
+               ($f[2] | if endswith(".jsonl") then .[:-6] elif endswith(".jsonl.zst") then .[:-10] else "" end
+                | .[-36:]) as $id
+               | if ($id | test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))
+                    and ((has($id) | not) or ($f[2] | endswith(".jsonl")))
+                 # ${mtime%.*}
+                 then .[$id] = [$f[2], ($f[0] | if rindex(".") == null then . else .[:rindex(".")] end)] else . end))};'
 
 # ── Running sessions ─────────────────────────────────────────────────────────
 
@@ -1503,6 +1590,203 @@ readonly JQ_SEARCH='
 
 # ── Rows ─────────────────────────────────────────────────────────────────────
 
+# The loop of fetch_rows in jq, byte for byte. On stdin, separated by lines holding
+# only \x1e: the rows of the query, SIZE_LIST and the open sessions. $answers: what
+# bash answered so far ("G dir 0|1": is it gone; "Z path size": the size of a
+# transcript SIZE_LIST misses; "O path origin": where a Codex session started;
+# "W row": a malformed row, already reported). Output: "N BYTES", then N questions
+# for bash in BYTES bytes ("W row id", "G dir", "Z path", "O path line": the line
+# its origin ends, without --orphans), then the rows as fetch_rows prints them,
+# each open question taken for its usual answer: not gone, no transcript, no
+# origin. halt_error(3): what only bash can do. jq compiles a regex at each call
+# and copies the string at each step of a join: one regex a row, and no join.
+readonly JQ_FETCH="$JQ_SIZES"'
+    def halt: "" | halt_error(3);
+    def zero: if . == "" then "0" else . end;
+    # Bytes that are not UTF-8 come out changed (bash keeps them).
+    if test("\\x{fffd}") or ($codexdir | test("\\x{fffd}")) then halt else . end
+    | split("\n") as $all
+    | [range(0; $all | length) | select($all[.] == "\u001e")] as $marks
+    | if ($marks | length) != 2 then halt else . end
+    | def section($i):
+        $all[(if $i == 0 then 0 else $marks[$i - 1] + 1 end):($marks[$i] // ($all | length))] | map(select(. != ""));
+      (section(1) | sizes) as $L
+    | if any($L.sizes | keys_unsorted[]; contains($us)) then halt else . end
+    | $L.sizes as $S
+    | $L.rollouts as $R
+    | ([section(2)[] | {(.): true}] | add // {}) as $O
+    | (reduce ($answers | split("\n")[] | select(. != "") | split($us)) as $k ({G: {}, Z: {}, O: {}, W: {}};
+        .[$k[0]][$k[1]] = ($k[2] // ""))) as $K
+    | $K.G as $G | $K.Z as $Z | $K.O as $Or
+    # dir_gone: 1, 0, or 2 when bash has not said (taken as 0, and asked).
+    | def gone($d): if $d == "" then 0 else ($G[$d] // "2" | tonumber) end;
+      def ask($d): if $d != "" and $G[$d] == null then ["G", $d] else empty end;
+      # One row: its line (a string), if kept, and its questions (arrays).
+      def row($i):
+        . as $f
+        # These reach shell arithmetic: digits only, and for touched and size, what
+        # bash and jq read alike (no octal, no overflow). One regex: jq compiles
+        # it at each call.
+        | if ($f[2] + $f[3] + $f[7] + $f[12] + $f[13] + $f[15] + $f[16] + $f[17] + "," + $f[18] + "," + $f[11])
+             | test("^[0-9]*,(0|[1-9][0-9]{0,14})?,(-?(0|[1-9][0-9]{0,14}))?$") | not then
+            ($f[2] + $f[3] + $f[7] + $f[12] + $f[13] + $f[15] + $f[16] + $f[17] + $f[18]) as $nums
+            | if $nums + $f[11] | test("[^\\x{0}-\\x{7f}]") then halt
+              elif ($nums | test("^[0-9]*$")) and ($f[11] | test("^-?[0-9]*$")) then halt
+              elif $K.W[$i | tostring] == null then ["W", ($i | tostring), $f[1]]
+              else empty end
+          else
+            $f[0] as $agent | $f[1] as $id | $f[8] as $cwd
+            | (if $agent == "codex" then
+                   (if $f[10] | startswith("/") then $f[10] else $codexdir + "/" + $f[10] end) as $p
+                   | if $S[$p] != null or $R[$id] == null then $p else $R[$id][0] end
+               else $f[10] end) as $path
+            | (if $f[11] != "" then $f[11] else $S[$path] // $Z[$path] end) as $known_size
+            | ($known_size // "-1") as $size
+            | if $f[11] == "" and ($size | test("^(-?(0|[1-9][0-9]{0,14}))?$") | not) then halt else . end
+            | (if $size == "" then 0 else $size | tonumber end) as $sz
+            | (if $known_size == null then ["Z", $path] else empty end),
+              (if $missing != 0 and $sz >= 0 or $grep and $sz < 0 then empty
+               else
+                 (if $agent == "codex" and $f[19] == "" then gone($cwd) else 0 end) as $g
+                 | (if $g == 1 then $Or[$path] else $f[19] end) as $known_origin
+                 | ($known_origin // "") as $origin
+                 # session_gone
+                 | (if $orphans == 0 then 1
+                    else gone($cwd) as $a
+                      | if $a != 1 then 0 elif $origin == "" or $origin == $cwd then 1 else gone($origin) end
+                    end) as $keep
+                 | (if $keep != 1 then null
+                    else
+                      (if $O[$id] then "open" elif $now - ($f[18] | if . == "" then 0 else tonumber end) < $recent
+                       then "recent" else "" end) as $state
+                      | if ($status == "running" and $state != "open") or ($status == "recent" and $state != "recent")
+                           or ($status == "idle" and $state != "") then null
+                        # Not join: it takes 4 times as long.
+                        else $agent + $us + $id + $us + $f[2] + $us + $f[3] + $us + $f[4] + $us + $f[5] + $us + $f[6]
+                             + $us + $f[7] + $us + $size + $us + $cwd + $us + $f[9] + $us + $path + $us + $state
+                             + $us + ($f[12] | zero) + $us + ($f[13] | zero) + $us + $f[14] + $us + ($f[15] | zero)
+                             + $us + ($f[16] | zero) + $us + ($f[17] | zero) + $us + $origin end
+                    end) as $line
+                 | (if $agent == "codex" and $f[19] == "" then ask($cwd) else empty end),
+                   # Without --orphans the origin only ends the line: asked just
+                   # before it, for bash to add it there.
+                   (if $known_origin == null and ($orphans != 0 or $line != null) then ["O", $path] else empty end),
+                   (if $orphans == 0 then empty
+                    else ask($cwd), (if gone($cwd) == 1 and $origin != "" and $origin != $cwd then ask($origin) else empty end)
+                    end),
+                   ($line | strings)
+               end)
+          end;
+      section(0) as $lines
+    | [range(0; $lines | length) as $i | $lines[$i] | split($us) | select(.[0] != "")
+       | if length != 20 then halt else row($i) end] as $out
+    | [$out[] | arrays] as $asked
+    # O: with the number of its line, without --orphans.
+    | (if any($asked[]; .[0] == "O") | not then []
+       else reduce $out[] as $x ({n: 0, o: []};
+         if ($x | type) == "string" then .n += 1
+         elif $x[0] == "O" then .o += [$x + [if $orphans == 0 then .n | tostring else "" end]]
+         else . end) | .o end) as $origins
+    # W and Z in the order of the rows (bash reports them); G and O once each.
+    | ([$asked[] | select(.[0] == "W" or .[0] == "Z")] + ([$asked[] | select(.[0] == "G")] | unique) + ($origins | unique))
+        as $todo
+    | [$todo[] | join($us)] as $asks
+    # Their number and size in bytes come first: bash cuts them off without
+    # reading the rows.
+    | "\($asks | length) \([$asks[] | utf8bytelength + 1] | add // 0)", $asks[], ($out[] | strings)'
+
+# fetch_split — the output of JQ_FETCH ($out) in tasks and FETCHED. Bytes, not
+# characters: much faster on a long text.
+fetch_split() {
+    local LC_ALL=C head rest asked
+    head=${out%%$'\n'*}
+    if [[ $head == "$out" ]]; then rest=""; else rest=${out#*$'\n'}; fi
+    [[ $head =~ ^([0-9]+)\ ([0-9]+)$ ]] || return 1
+    tasks=()
+    FETCHED=$rest
+    ((BASH_REMATCH[1] > 0)) || return 0
+    asked=${rest:0:BASH_REMATCH[2]} FETCHED=${rest:BASH_REMATCH[2]}
+    mapfile -t tasks <<<"${asked%$'\n'}"
+    ((${#tasks[@]} == BASH_REMATCH[1])) || return 1
+}
+
+# fetch_jq — the rows of fetch_rows ($rows, the query's) in FETCHED, through
+# JQ_FETCH; bash answers its questions, then jq runs again only when an answer is
+# not the usual one. Fails when only the bash loop can do it.
+fetch_jq() {
+    local out tasks=() task kind key value answers="" changed pass open="" grep=false row at=() origins=()
+    FETCHED=""
+    [[ -z ${LETHE_ROWS_IN_BASH:-} ]] && command -v jq >/dev/null 2>&1 || return 1
+    list_sizes
+    ((${#OPEN[@]} == 0)) || open=$(printf '%s\n' "${!OPEN[@]}")
+    [[ -z $F_GREP ]] || grep=true
+    # The project directories jq will ask about, answered first (a pass saved):
+    # one per project, not per row.
+    local dirs dir
+    dirs=$(awk -F "$US" -v all="$F_ORPHANS" '(($1 == "codex" && $20 == "") || all) && $9 != "" && !seen[$9]++ { print $9 }' \
+        <<<"$rows") || dirs=""
+    while IFS= read -r dir; do
+        [[ -n $dir ]] || continue
+        if dir_gone "$dir"; then value=1; else value=0; fi
+        answers+=G$US$dir$US$value$'\n'
+    done <<<"$dirs"
+    for ((pass = 0; pass < 8; pass++)); do
+        # An argument holds 128 KiB at most.
+        ((${#answers} < 100000)) || return 1
+        out=$(printf '%s\n\x1e\n%s\x1e\n%s\n' "$rows" "$SIZE_LIST" "$open" |
+            jq -rRs --arg us "$US" --arg codexdir "$CODEX_DIR" --argjson now "$NOW" --argjson recent "$RECENT_SECONDS" \
+                --argjson missing "$F_MISSING" --argjson orphans "$F_ORPHANS" --argjson grep "$grep" \
+                --arg status "$F_STATUS" --arg answers "$answers" "$JQ_FETCH" 2>/dev/null) || return 1
+        at=() origins=()
+        fetch_split || return 1
+        ((${#tasks[@]})) || break
+        # Few: the rare rows that need bash.
+        changed=0
+        for task in "${tasks[@]}"; do
+            kind=${task%%"$US"*} key=${task#*"$US"} value=""
+            case $kind in
+                W)
+                    value=${key#*"$US"} key=${key%%"$US"*}
+                    printf '%s: skipping a malformed session row (%s)\n' "$PROG" "${value//[^0-9a-f-]/}" >&2
+                    value=""
+                    ;;
+                G) if dir_gone "$key"; then value=1 changed=1; else value=0; fi ;;
+                Z)
+                    if [[ -f $key ]]; then
+                        value=$(wc -c <"$key")
+                        value=${value//[[:space:]]/} changed=1
+                    else
+                        value=-1
+                    fi
+                    ;;
+                O)
+                    row=${key##*"$US"} key=${key%"$US"*}
+                    codex_origin value "$key"
+                    if [[ -z $value ]]; then
+                        :
+                    elif [[ -n $row ]]; then
+                        at+=("$row") origins+=("$value")
+                    else
+                        changed=1
+                    fi
+                    ;;
+                *) return 1 ;;
+            esac
+            answers+=$kind$US$key$US$value$'\n'
+        done
+        ((changed)) || break
+    done
+    ((pass < 8)) || return 1
+    # Origins that only end their line (it was printed with none).
+    if ((${#at[@]})); then
+        local all=() i
+        mapfile -t all <<<"$FETCHED"
+        for i in "${!at[@]}"; do all[at[i]]+=${origins[i]}; done
+        printf -v FETCHED '%s\n' "${all[@]}"
+        FETCHED=${FETCHED%$'\n'}
+    fi
+}
+
 # One line per matching session, most recent first, fields separated by $US:
 #   agent id archived recency date mode provider empty size cwd title path state rewinds pinned
 #   parent kids kidsize created
@@ -1515,7 +1799,6 @@ fetch_rows() {
     local parent kids kidsize created touched origin
     local candidates=() pending=()
     where=$(build_where)
-    load_sizes
     [[ -z $F_GREP ]] || F_GREP_RAW=$(jq -rn --arg text "$F_GREP" '$text | tojson | .[1:-1]')
     # Taken whole, then read from a here-string: read takes a pipe one byte at a
     # time, a system call per byte of every row.
@@ -1528,6 +1811,19 @@ fetch_rows() {
           FROM ranked
          WHERE $where
          ORDER BY recency DESC, id DESC;") || true
+    # The rows in one jq (fetch_jq); the loop below is the same in bash, kept for
+    # what jq cannot pass through byte for byte.
+    if fetch_jq; then
+        if [[ -z $F_GREP ]]; then
+            [[ -z $FETCHED ]] || printf '%s\n' "$FETCHED"
+            return 0
+        fi
+        [[ -n $FETCHED ]] || return 0
+        mapfile -t pending <<<"$FETCHED"
+        mapfile -t candidates < <(cut -d "$US" -f 1,12 <<<"$FETCHED")
+        rows=""
+    fi
+    [[ -z $rows ]] || load_sizes
     while IFS=$US read -r agent id archived recency date mode provider empty cwd title path size rewinds pinned \
         parent kids kidsize created touched origin; do
         [[ -n $agent ]] || continue

@@ -2413,6 +2413,114 @@ tj_trace() { # tj_trace ENV... — lines bash runs in the per-row functions, for
 }
 n_jq=$(tj_trace) n_bash=$(tj_trace LETHE_ROWS_IN_BASH=1)
 check "rows in one jq: no bash function runs per row" '((n_jq == 0 && n_bash > 100))' "jq: $n_jq, bash: $n_bash"
+# fetch_rows too: the lines bash runs to fetch the rows do not grow with them (they
+# grew by about 40 a row, 0.5 s at 2,300 sessions).
+TK=$WORK/rowsjq-more
+cp -a "$TJ" "$TK"
+TKENV=(CLAUDE_CONFIG_DIR="$TK/claude" CODEX_HOME="$TK/codex" XDG_CACHE_HOME="$TK/cache" XDG_DATA_HOME="$TK/data")
+rm -rf "$TK/cache" "$TK/st/claude-index"
+sqlite3 "$TK/codex/state_5.sqlite" "UPDATE threads SET rollout_path = replace(rollout_path, '$TJ/', '$TK/'),
+    cwd = replace(cwd, '$TJ/', '$TK/');"
+tk_fetch() { # tk_fetch ENV... — lines bash runs in fetch_rows and what it calls, for list and a reload
+    printf 'all\n' >"$TK/st/agent"; printf 'all\n' >"$TK/st/status"; printf 'recent\n' >"$TK/st/sort"
+    printf 'all\n' >"$TK/st/filter"; printf 'shown\n' >"$TK/st/subagents"; : >"$TK/st/grep"; : >"$TK/st/dir"
+    {
+        env "${TKENV[@]}" "$@" PS4='+${FUNCNAME[0]:-} ' bash -x "$LETHE" list --subagents 2>&1 >/dev/null
+        env "${TKENV[@]}" "$@" LETHE_STATE="$TK/st" PS4='+${FUNCNAME[0]:-} ' bash -x "$LETHE" __rows 2>&1 >/dev/null
+    } | grep -cE '^\++(fetch_rows|fetch_jq|dir_gone|session_gone|codex_origin) ' || true
+}
+env "${TKENV[@]}" "$LETHE" list >/dev/null 2>&1
+f_jq=$(tk_fetch) f_bash=$(tk_fetch LETHE_ROWS_IN_BASH=1)
+for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    id=96000000-0000-4000-8000-0000000000$((10 + n))
+    sed "s/$J1/$id/g" "$TK/claude/projects/-p/$J1.jsonl" >"$TK/claude/projects/-p/$id.jsonl"
+    id=019a0000-0000-7000-8000-0000000001$((10 + n))
+    cp "$TK/codex/sessions/rollout-$K9.jsonl" "$TK/codex/sessions/rollout-$id.jsonl"
+    sqlite3 "$TK/codex/state_5.sqlite" "INSERT INTO threads SELECT '$id', replace(rollout_path, '$K9', '$id'), created_at,
+        updated_at, source, model_provider, cwd, title || ' $n', archived, recency_at, 0 FROM threads WHERE id = '$K9';"
+done
+env "${TKENV[@]}" "$LETHE" list >/dev/null 2>&1
+f_jq2=$(tk_fetch) f_bash2=$(tk_fetch LETHE_ROWS_IN_BASH=1)
+# (Less than a line per session: the traces of a pipeline can run into each other.)
+check "fetch_rows in one jq: no bash line runs per row" '((f_jq2 - f_jq < 24 && f_jq - f_jq2 < 24 && f_bash2 > f_bash + 24 * 10))' \
+    "jq: $f_jq then $f_jq2 with 24 more sessions; bash: $f_bash then $f_bash2"
+a=$(env "${TKENV[@]}" "$LETHE" list --subagents 2>/dev/null) b=$(env "${TKENV[@]}" LETHE_ROWS_IN_BASH=1 "$LETHE" list --subagents 2>/dev/null)
+check "fetch_rows in one jq: the same rows as in bash" '[[ $a == *"Codex parent"* && $a == "$b" ]]' \
+    "$(diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | head -20)"
+
+echo "picker reloads and the index"
+# Each reload checked every transcript against the index (0.4 s at 2,300
+# sessions). It now skips that check while nothing it reads has changed; what
+# changes on disk, or what lethe itself does, is seen at the next reload.
+reset_fixture
+export LETHE_STATE=$WORK/reloads LETHE_FILTERS=""
+rm -rf "$LETHE_STATE" && mkdir -p "$LETHE_STATE"
+printf 'all\n' >"$LETHE_STATE/agent"; printf 'all\n' >"$LETHE_STATE/status"; printf 'recent\n' >"$LETHE_STATE/sort"
+printf 'all\n' >"$LETHE_STATE/filter"; : >"$LETHE_STATE/grep"; : >"$LETHE_STATE/dir"
+# checks: how many indexed sessions the reload compared with their transcripts.
+reload() { CHECKS=$(PS4='+${FUNCNAME[0]:-} ' bash -x "$LETHE" __rows 2>&1 >"$WORK/reload.out" | grep -c '^+*init_claude known\[') || true; }
+reload_ids() { cut -f 1 "$WORK/reload.out" | sort | tr '\n' ' '; }
+reload
+first=$CHECKS
+reload
+reload
+check "reload: nothing changed, the index is not checked again" '((first > 0 && CHECKS == 0))' "first: $first, then: $CHECKS"
+N1=44444444-0000-4000-8000-000000000010
+claude_session "$N1" 2 "$PROJ" "Added between reloads" "a new one"
+reload
+check "reload: a session added since is listed" '[[ $(reload_ids) == *"$N1"* ]] && grep -q "Added between reloads" "$WORK/reload.out"' \
+    "$(reload_ids)"
+reload
+printf '{"type":"ai-title","aiTitle":"Renamed between reloads","sessionId":"%s"}\n' "$N1" >>"$CPROJ/$N1.jsonl"
+set_mtime "$(($(date +%s) - 86400))" "$CPROJ/$N1.jsonl"
+reload
+check "reload: a session written to since shows what changed" 'grep -q "Renamed between reloads" "$WORK/reload.out"' \
+    "$(grep "$N1" "$WORK/reload.out")"
+reload
+rm -f "$CPROJ/$N1.jsonl"
+reload
+check "reload: a session removed since is gone" '[[ $(reload_ids) != *"$N1"* && $(reload_ids) == *"$G"* ]]' "$(reload_ids)"
+reload
+sqlite3 "$DB" "UPDATE threads SET archived = 1 WHERE id = '$B';"
+printf 'archived\n' >"$LETHE_STATE/status"
+reload
+check "reload: a session archived since is in the archived view" '[[ $(reload_ids) == *"$B"* ]]' "$(reload_ids)"
+printf 'all\n' >"$LETHE_STATE/status"
+reload && reload
+"$LETHE" delete -y "$G" >/dev/null 2>&1
+reload
+check "reload: a session lethe deleted is gone" '[[ ! -e $CPROJ/$G.jsonl && $(reload_ids) != *"$G"* ]]' "$(reload_ids)"
+reload
+"$LETHE" trash restore "$G" >/dev/null 2>&1
+reload
+check "reload: a session lethe restored is back" '[[ -e $CPROJ/$G.jsonl && $(reload_ids) == *"$G"* ]]' "$(reload_ids)"
+reload
+"$LETHE" archive -y "$A" >/dev/null 2>&1
+printf 'archived\n' >"$LETHE_STATE/status"
+reload
+check "reload: a session lethe archived is in the archived view" 'archived "$A" && [[ $(reload_ids) == *"$A"* ]]' "$(reload_ids)"
+printf 'all\n' >"$LETHE_STATE/status"
+# A session written to a moment ago gets its ⑂ count once quiet (10 minutes): a
+# reload after that time indexes it again, though nothing changed on disk.
+N2=44444444-0000-4000-8000-000000000011
+{
+    entry() { printf '{"type":"%s","uuid":"%s","parentUuid":%s,"cwd":"%s","timestamp":"2026-01-01T10:00:00.000Z","message":{"role":"%s","model":"claude-test-1","content":%s}}\n' "$1" "$2" "$3" "$PROJ" "$1" "$4"; }
+    entry user u1 null '"first question"'
+    entry assistant a1 '"u1"' '[{"type":"text","text":"first answer"}]'
+    entry user u2 '"a1"' '"abandoned prompt"'
+    entry user u2b '"a1"' '"kept prompt"'
+    entry assistant a2 '"u2b"' '[{"type":"text","text":"kept reply"}]'
+    printf '{"type":"ai-title","aiTitle":"Quiet now","sessionId":"%s"}\n' "$N2"
+} >"$CPROJ/$N2.jsonl"
+set_mtime "$(($(date +%s) - 597))" "$CPROJ/$N2.jsonl"
+reload
+reload
+before=$(grep -c "⑂1 Quiet now" "$WORK/reload.out" || true)
+sleep 4
+reload
+check "reload: a session that has become quiet gets its ⑂ count" 'grep -q "⑂1 Quiet now" "$WORK/reload.out"' \
+    "before: $before; $(grep "$N2" "$WORK/reload.out")"
+unset LETHE_STATE LETHE_FILTERS
 
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
