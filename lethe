@@ -853,6 +853,25 @@ mark_open_path() {
     fi
 }
 
+# stop_previews — end this picker's previews (LETHE_PREVIEW=$LETHE_STATE in their
+# environment), whose reading of a transcript would make it look open to
+# detect_open full. fzf starts the preview again once the action is done.
+stop_previews() {
+    [[ -n ${LETHE_STATE:-} && -d /proc/self/fd ]] || return 0
+    local pids=() file tries
+    for ((tries = 0; tries < 30; tries++)); do
+        pids=()
+        while IFS= read -r file; do
+            file=${file%/environ}
+            pids+=("${file#/proc/}")
+        done < <(grep -s -l -z -x -F -e "LETHE_PREVIEW=$LETHE_STATE" /proc/[0-9]*/environ || true)
+        # (an ended process reads as an empty environment)
+        ((${#pids[@]})) || return 0
+        ((tries)) || kill -TERM "${pids[@]}" 2>/dev/null || true
+        sleep 0.1
+    done
+}
+
 # detect_open [full] — fill OPEN with the ids of sessions used by a running agent.
 # By default only processes that look like an agent (codex, claude, node, bun)
 # are inspected; "full" inspects every process and is used before any change.
@@ -3633,7 +3652,7 @@ cmd_pick() {
         --ansi --multi --layout=reverse --height=100% --info=inline-right --no-hscroll \
         --delimiter=$'\t' --with-nth=2.. --tiebreak=index "${track[@]}" "${layout[@]}" \
         --prompt="$("$SELF" __state prompt)" --pointer='▌' --marker='✓' \
-        --preview="$me __preview {1}" \
+        --preview="LETHE_PREVIEW=$(printf '%q' "$state") $me __preview {1}" \
         --bind="ctrl-d:execute($me __action delete --from {+f1})+deselect-all+reload($me __rows)" \
         --bind="ctrl-x:execute($me __action toggle --from {+f1})+deselect-all+reload($me __rows)" \
         --bind="ctrl-r:execute($me __resume {1})+reload($me __rows)" \
@@ -4164,6 +4183,7 @@ internal_action() {
         return 0
     fi
     init
+    stop_previews
     detect_open
     F_IDS=("$@")
     printf '\e[H\e[2J'

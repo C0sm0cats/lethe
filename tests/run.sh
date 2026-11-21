@@ -634,6 +634,26 @@ if command -v python3 >/dev/null 2>&1; then
     out=$(LETHE_STATE=$WORK/st pty_answer reply y __action toggle "$B" "$D")
     check "picker: Ctrl-X archives an active session and unarchives an archived one" \
         'archived "$B" && codex_exists "$B" && codex_exists "$D" && ! archived "$D"' "$out"
+    if [[ -d /proc/self/fd ]]; then
+        # The picker's own preview still reading a big transcript (fzf's
+        # --preview tags it with LETHE_PREVIEW) does not make the session open.
+        reset_fixture
+        LETHE_PREVIEW=$WORK/st sleep 30 3<"$CPROJ/$G.jsonl" &
+        preview=$!
+        out=$(LETHE_STATE=$WORK/st pty_answer reply "" __action delete "$G")
+        check "picker: Ctrl-D during the preview of a session stops the preview, not the action" \
+            '[[ $out == *"Delete 1 session(s)"* && $out != *"open in a running agent"* ]] && ! kill -0 "$preview" 2>/dev/null' "$out"
+        kill "$preview" 2>/dev/null || true
+        wait "$preview" 2>/dev/null || true
+        # Another process holding it, even of another picker, still protects it.
+        LETHE_PREVIEW=$WORK/other sleep 30 3<"$CPROJ/$G.jsonl" &
+        preview=$!
+        out=$(LETHE_STATE=$WORK/st "$LETHE" __action delete "$G" </dev/null 2>&1)
+        check "... while another process holding it keeps it protected" \
+            '[[ $out == *"open in a running agent"* ]] && kill -0 "$preview" 2>/dev/null' "$out"
+        kill "$preview" 2>/dev/null || true
+        wait "$preview" 2>/dev/null || true
+    fi
     reset_fixture
     "$LETHE" delete -y "$G" >/dev/null 2>&1
     entry=$(echo "$TRASH"/*)
