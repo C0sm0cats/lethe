@@ -743,6 +743,22 @@ present=0
 for item in "${items[@]}"; do [[ ! -e $item ]] || present=$((present + 1)); done
 check "Ctrl-C during a trash move leaves the session whole" '((present == 0 || present == 4))' "$present of 4 items left"
 
+# The same for a restore: the session comes back whole, or stays in the trash.
+reset_fixture
+"$LETHE" delete -y "$G" >/dev/null 2>&1
+PATH=$WORK/slow:$PATH perl -e 'setpgrp; exec @ARGV' "$LETHE" trash restore "$G" >/dev/null 2>&1 &
+group=$!
+for _ in $(seq 200); do
+    [[ ! -e $CPROJ/$G.jsonl ]] || break # the transcript is back
+    sleep 0.05
+done
+kill -TERM -- "-$group" 2>/dev/null || true
+wait "$group" 2>/dev/null || true
+sleep 1.5
+present=0
+for item in "${items[@]}"; do [[ ! -e $item ]] || present=$((present + 1)); done
+check "Ctrl-C during a restore leaves the session whole" '((present == 0 || present == 4))' "$present of 4 items restored"
+
 echo "branches"
 reset_fixture
 # A rewind (the second prompt was edited), parallel tool results (one with a
