@@ -1042,6 +1042,17 @@ check "... and it can be restored afterwards, prompts included" \
 out=$(bash -c 'source <("$1" completion bash); COMP_WORDS=(lethe export 1234 --all); COMP_CWORD=3; _lethe; echo "${COMPREPLY[*]}"' _ "$LETHE")
 check "completion offers --all-branches" '[[ $out == --all-branches ]]' "$out"
 
+# A download cut short (curl writes part of the file, then fails) must leave
+# the installed lethe as it was.
+H3=$WORK/home-dlfail
+mkdir -p "$H3/.local/bin" "$WORK/cutcurl"
+printf '#!/bin/sh\necho working\n' >"$H3/.local/bin/lethe"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in -o) out=$2; shift;; esac; shift; done\nprintf "#!/bin/sh\\nech" >"$out"\nexit 18\n' \
+    >"$WORK/cutcurl/curl" && chmod +x "$WORK/cutcurl/curl"
+out=$(env -i HOME="$H3" PATH="$WORK/cutcurl:/usr/bin:/bin" SHELL=/bin/bash sh "$ROOT/install.sh" 2>&1) && rc=0 || rc=$?
+check "installer: a download cut short keeps the installed lethe" \
+    '[[ $rc != 0 && $out == *"Could not download"* && $(<"$H3/.local/bin/lethe") == *"echo working" && ! -e $H3/.local/bin/lethe.tmp ]]' "$out"
+
 H2=$WORK/home-zdot
 mkdir -p "$H2/.config/zsh" "$WORK/fakecurl"
 printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in -o) out=$2; shift;; esac; shift; done\necho "#!/bin/sh" > "$out"\n' \
