@@ -1455,8 +1455,11 @@ expect_status "an ambiguous id prefix is refused" 1 delete -y 01a02791
 check "... and deletes nothing" 'codex_exists "$V1" && codex_exists "$V2"'
 out=$(COLUMNS=80 "$LETHE" delete -n "$D" "$A" | perl -CSD -ne 'print if length > 81')
 check "the plan fits 80 columns" '[[ -z $out ]]' "$out"
-out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); fit_mid a "~/clients/acme/workspace/monorepo/packages/shared-component" 40; fit_mid b "~/short" 12; printf "[%s][%s]" "$a" "$b"' _ "$LETHE")
-check "long projects keep both ends in the menu" '[[ $out == "[~/clients/acme/work…ges/shared-component"* && $out == *"][~/short     ]" ]]' "$out"
+# Byte-counted in the C locale (bare containers): see "columns count wide characters twice".
+if [[ $(locale charmap 2>/dev/null) == UTF-8 ]]; then
+    out=$(bash -c 'source <(sed "s/^main \"\$@\"\$//" "$1"); fit_mid a "~/clients/acme/workspace/monorepo/packages/shared-component" 40; fit_mid b "~/short" 12; printf "[%s][%s]" "$a" "$b"' _ "$LETHE")
+    check "long projects keep both ends in the menu" '[[ $out == "[~/clients/acme/work…ges/shared-component"* && $out == *"][~/short     ]" ]]' "$out"
+fi
 
 echo "audit: narrow terminals and labels"
 reset_fixture
@@ -1495,8 +1498,10 @@ out=$(FZF_COLUMNS=50 LETHE_STATE=$WORK/nt REINDEX=0 bash -c 'source <(sed "s/^ma
 check "at 50 columns the menus keep their counts" '[[ -z $out ]]' "$out"
 out=$(FZF_COLUMNS=50 FZF_SELECT_COUNT=1 LETHE_STATE=$WORK/nt "$LETHE" __marked "$A")
 check "at 50 columns the marked size stays" '[[ $out == " 1 marked · "* && $out != *"session(s)"* ]]' "$out"
-out=$(FZF_COLUMNS=50 LETHE_STATE=$WORK/nt "$LETHE" __rows | sed -n 2p | cut -f 2 | perl -pe 's/\e\[[0-9;]*m//g')
-check "at 50 columns the project and the size give way to the title" '[[ $out =~ ^.\ [a-z]+\ +[0-9]+[a-z]+\ \ .{10}\ \ [^\ ] && ${#out} -lt 60 ]]' "$out"
+if [[ $(locale charmap 2>/dev/null) == UTF-8 ]]; then
+    out=$(FZF_COLUMNS=50 LETHE_STATE=$WORK/nt "$LETHE" __rows | sed -n 2p | cut -f 2 | perl -pe 's/\e\[[0-9;]*m//g')
+    check "at 50 columns the project and the size give way to the title" '[[ $out =~ ^.\ [a-z]+\ +[0-9]+[a-z]+\ \ .{10}\ \ [^\ ] && ${#out} -lt 60 ]]' "$out"
+fi
 LETHE_STATE=$WORK/nt "$LETHE" __state keys
 LETHE_STATE=$WORK/nt "$LETHE" __state keys short
 check "the footer can be forced short for the preview" '[[ $(<"$WORK/nt/keys") == short ]]'
