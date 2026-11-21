@@ -2023,12 +2023,15 @@ cmd_list() {
     local kind before after style shown line lines=()
     mapfile -t lines < <(fetch_sorted | tree_rows)
     # The id column: 8 characters, more when ids share them (Codex ids start with
-    # a timestamp), as commands take any unique prefix.
-    local width shared
+    # a timestamp), as commands take any unique prefix. Sessions a filter hides
+    # count too: a prefix one of them shares would be refused as ambiguous.
+    local width shared all_ids=()
+    ((${#lines[@]})) && mapfile -t all_ids < <(query "SELECT id FROM sessions;")
     for width in 8 13 18 23 36; do
         ROW_ID_WIDTH=$width
         ((${#lines[@]})) || break
-        shared=$(printf '%s\n' "${lines[@]}" | cut -d "$US" -f 7 | grep -v '^sub:' | cut -c "1-$width" | sort | uniq -d | wc -l)
+        shared=$(printf '%s\n' "${all_ids[@]}" | cut -c "1-$width" | sort | uniq -d \
+            | grep -cFxf - <(printf '%s\n' "${lines[@]}" | cut -d "$US" -f 7 | grep -v '^sub:' | cut -c "1-$width")) || true
         ((shared)) || break
     done
     if [[ -t 1 ]]; then

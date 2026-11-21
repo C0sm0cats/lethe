@@ -1497,9 +1497,11 @@ check "list shows the ids commands take" '[[ $(head -n 1 <<<"$out") == *" ID "* 
 out=$("$LETHE" list --codex)
 check "... with the length that makes them unique" '[[ $out == *"${A:0:8}"* ]]' "$out"
 codex_session "$V1" 3 0 cli openai "$PROJ" "First twin" "one"
-codex_session "$V2" 3 0 cli openai "$PROJ" "Second twin" "two"
+codex_session "$V2" 3 0 cli openai "$PROJ" "Second twin" "the other twin"
 out=$("$LETHE" list --codex)
 check "... ids sharing 8 characters get a longer column" '[[ $out == *"01a02791-0000"* && $out == *"01a02791-1111"* ]]' "$out"
+out=$("$LETHE" list --codex --grep "other twin")
+check "... even when a filter hides the other one" '[[ $out == *"01a02791-1111"* && $out != *"01a02791-0000"* ]]' "$out"
 expect_status "an ambiguous id prefix is refused" 1 delete -y 01a02791
 check "... and deletes nothing" 'codex_exists "$V1" && codex_exists "$V2"'
 out=$(COLUMNS=80 "$LETHE" delete -n "$D" "$A" | perl -CSD -ne 'print if length > 81')
