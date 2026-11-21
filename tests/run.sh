@@ -454,8 +454,10 @@ printf '#!/bin/sh\ncat >"%s/clipboard"\n' "$WORK" >"$WORK/bin/pbcopy" && chmod +
 out=$(WAYLAND_DISPLAY="" DISPLAY="" "$LETHE" __copy "$A" </dev/null 2>&1)
 check "picker: Ctrl-Y copies the command that resumes the session" \
     '[[ $(<"$WORK/clipboard") == "cd $PROJ && codex resume $A" && -z $out ]]' "$(cat "$WORK/clipboard" 2>/dev/null)"$'\n'"$out"
-rm -f "$WORK/bin/pbcopy"
+# macOS always has /usr/bin/pbcopy: a pbcopy that fails stands for "no clipboard".
+printf '#!/bin/sh\nexit 1\n' >"$WORK/bin/pbcopy"
 out=$(WAYLAND_DISPLAY="" DISPLAY="" "$LETHE" __copy "$A" </dev/null 2>&1)
+rm -f "$WORK/bin/pbcopy"
 check "picker: without a clipboard tool, Ctrl-Y says so and shows the command to copy by hand" \
     '[[ $out == *"cd $PROJ && codex resume $A"* && $out == *"copy it from here"* && $out == *"Press Enter to return"* ]]' "$out"
 "$LETHE" __state filter
