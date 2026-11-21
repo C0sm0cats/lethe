@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3 — 2026-11-21
+
+- Faster picker reloads with thousands of sessions: the index is no longer rechecked when
+  nothing changed on disk, and session rows are read in one pass (about 1.3 s instead of
+  1.5 s at 2,300 sessions). The output is unchanged.
+
 ## 0.8.2 — 2026-11-21
 
 - Faster picker reloads, `list`, delete plans and trash views with thousands of sessions
