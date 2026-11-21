@@ -1842,9 +1842,10 @@ check "an invalid manifest does not hide a running session" '[[ $(lv list --runn
 out=$(lv delete -y "$T1" 2>&1)
 check "... which cannot be deleted" '[[ -f $TW/claude/projects/-p/$T1.jsonl && $out == *"open in a running agent"* ]]' "$out"
 rm -f "$TW/claude/sessions/0bad.json"
-printf '[1]' >"$TW/claude/sessions/2.json"
+# A PID no process has: sessions/2.json would be the suite's own manifest when it runs as PID 2.
+printf '[1]' >"$TW/claude/sessions/999999998.json"
 check "... nor by a manifest that is valid JSON of another shape" '[[ $(lv list --running --ids) == "$T1" ]]'
-rm -f "$TW/claude/sessions/2.json" "$TW/claude/sessions/$$.json"
+rm -f "$TW/claude/sessions/999999998.json" "$TW/claude/sessions/$$.json"
 # The live process's own manifest, cut short.
 printf '{"pid":%d,"sessionId":"%s","pro' "$$" "$T1" >"$TW/claude/sessions/$$.json"
 check "a cut manifest of a live process still protects what it names" '[[ $(lv list --running --ids) == "$T1" ]]'
