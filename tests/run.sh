@@ -832,6 +832,8 @@ reset_fixture
 out=$("$LETHE" resume "$I" 2>&1) || true
 check "resume refuses a session that is already open" '[[ $out == *"already open"* && ! -s $WORK/claude.log ]]' "$out"
 expect_status "resume refuses subagent sessions" 1 resume "$C"
+expect_status "a Codex subagent cannot be forked" 1 fork "$C"
+check "... and codex is not called" '! grep -q "^fork" "$WORK/codex.log"' "$(cat "$WORK/codex.log")"
 "$LETHE" fork "$I" >/dev/null 2>&1
 check "fork opens a copy of a Claude session" '[[ $(cat "$WORK/claude.log") == "--resume $I --fork-session" ]]' \
     "$(cat "$WORK/claude.log")"
