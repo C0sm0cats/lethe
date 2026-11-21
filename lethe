@@ -648,7 +648,7 @@ init_claude() {
     need jq
     # The index copies titles, prompts and project paths that Claude Code keeps
     # private (0700): keep it private too, existing installs included.
-    mkdir -p "$CACHE_DIR" && chmod 700 -- "$CACHE_DIR"
+    mkdir -p "$CACHE_DIR" && chmod 700 "$CACHE_DIR"
     # One index per Claude Code directory: profiles (CLAUDE_CONFIG_DIR) do not
     # wipe each other's.
     CLAUDE_CACHE=$CACHE_DIR/claude-v9-$(printf '%s' "$CLAUDE_REAL" | cksum | cut -d ' ' -f 1).sqlite
@@ -2852,7 +2852,7 @@ claude_trash() {
 # Claude Code appends to that file at any time: the new version replaces it only
 # if the file did not change while it was written.
 history_take() {
-    local file=$CLAUDE_DIR/history.jsonl keys tmp taken before nul=0 target id entry i n lines=0 ids=() entries=()
+    local file=$CLAUDE_DIR/history.jsonl keys tmp taken before nul=0 target id entry i n hist_lines=0 ids=() entries=()
     while IFS=$'\t' read -r id entry; do
         [[ -z $id || -z $entry ]] || { ids+=("$id") entries+=("$entry"); }
     done <"$1"
@@ -2898,12 +2898,12 @@ history_take() {
         entry=${entries[i]}/history.jsonl
         n=$(grep -acF -- "\"sessionId\":\"${ids[i]}\"" "$taken") || continue
         { grep -aF -- "\"sessionId\":\"${ids[i]}\"" "$taken" | history_back >"$entry"; } 2>/dev/null
-        lines=$((lines + $(LC_ALL=C tr -cd '\n' 2>/dev/null <"$entry" | wc -c)))
+        hist_lines=$((hist_lines + $(LC_ALL=C tr -cd '\n' 2>/dev/null <"$entry" | wc -c)))
     done
     # Every line is either taken out, once, or kept: anything else, and the
     # history is left as it was.
     n=$(LC_ALL=C tr -cd '\n' <"$taken" | wc -c)
-    if ((lines == n && $(LC_ALL=C tr -cd '\n' <"$tmp" | wc -c) + n == $(LC_ALL=C tr -cd '\n' <"$file" | wc -c))) &&
+    if ((hist_lines == n && $(LC_ALL=C tr -cd '\n' <"$tmp" | wc -c) + n == $(LC_ALL=C tr -cd '\n' <"$file" | wc -c))) &&
         [[ $(file_stats "$file" -maxdepth 0) == "$before" ]] && mv -f -- "$tmp" "$file"; then
         rm -f -- "$keys" "$taken"
         return 0
@@ -2927,7 +2927,7 @@ trash_entries() {
 # sessions. One unreadable manifest must not hide the rest of the trash.
 declare -a T_ENTRY=() T_ID=() T_TITLE=() T_CWD=() T_TRASHED=() T_SIZE=()
 trash_load() {
-    local sizes=${1:-0} i id title cwd trashed kb path lines=()
+    local want_sizes=${1:-0} i id title cwd trashed kb path lines=()
     local -A kbs=()
     T_ID=() T_TITLE=() T_CWD=() T_TRASHED=() T_SIZE=()
     mapfile -t T_ENTRY < <(trash_entries)
@@ -2950,7 +2950,7 @@ trash_load() {
         | (if ($m | type) == "object" then $m else {} end)
         | [$p[0], (.id // "" | tostring), (.title // "" | tostring), (.cwd // "" | tostring), (.trashed_at // 0 | tostring)]
         | map(gsub("[\n\r\u001f]"; " ")) | join($us)')
-    if ((sizes)); then
+    if ((want_sizes)); then
         while IFS=$'\t' read -r kb path; do
             [[ -z $path ]] || kbs[$path]=$kb
         done < <(printf '%s\0' "${T_ENTRY[@]}" | xargs -0 du -sk -- 2>/dev/null)
@@ -3628,7 +3628,7 @@ cmd_pick() {
     # leave room for two rows only, so it starts hidden (Ctrl-P shows it).
     # The preview wraps between words where fzf knows wrap-word.
     local wrap=wrap
-    [[ $features != *'wrap[-word]'* ]] || wrap=wrap-word
+    [[ $features != *'wrap[-word]'* ]] || wrap='wrap-word'
     local narrow_preview="down,55%,$wrap,border-rounded" tight=0
     if (($(tput lines 2>/dev/null || echo 50) < 32)); then
         narrow_preview="down,35%,$wrap,border-rounded,hidden"

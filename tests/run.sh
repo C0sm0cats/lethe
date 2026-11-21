@@ -1716,6 +1716,7 @@ for v in 0.60.3 0.63.0 0.71.0 0.72.0; do
             "$(grep "^--color=" "$WORK/fzf.args" 2>/dev/null)"
         # The terminal's base cyan, yellow and green (6, 3, 2) are about 2:1 on
         # a light background: the accents use fixed 256-color shades.
+        # shellcheck disable=SC2034 # read in the check below
         base='(^|[=,])(label|input-label|prompt|marker|hl\+?|spinner):[0-7](:|,|$)'
         check "the picker's accents stay readable on a light background" \
             '! grep "^--color=" "$WORK/fzf.args" | grep -qE "$base"' "$(grep "^--color=" "$WORK/fzf.args" 2>/dev/null)"
@@ -2089,6 +2090,7 @@ mkdir -p "$x_origin"
 tx_session "$X4" "hostile directory names" "$x_origin" "$x_origin/sub"$'\e]52;c;cHduZWQ=\a'
 tx_session "$X5" "hostile and gone" "$x_dead" "$x_dead/sub"$'\e]0;SUB\a'
 out=$(cd "$WORK" && lx resume "$X4" 2>&1 >/dev/null; lx fork "$X4" 2>&1 >/dev/null; lx resume "$X5" 2>&1 >/dev/null)
+# shellcheck disable=SC2034 # read in the check below
 pwd_x=$(cd "$WORK" && lx resume "$X4" 2>/dev/null)
 check "resume does not send the escape sequences of a gone directory to the terminal, and still starts there" \
     '[[ $out != *[$'"'"'\e\a'"'"']* && $(grep -c "no longer exists" <<<"$out") == 3 && $pwd_x == "in $x_origin: --resume $X4" ]]' "$(od -c <<<"$out")"
@@ -2243,6 +2245,7 @@ elapsed=$((SECONDS - start))
 check "a title-less session whose prompt is a long CRLF log is indexed quickly" \
     '((elapsed < 8)) && [[ $out == *"INFO worker processed batch 0"* ]]' \
     "${elapsed}s"$'\n'"${out:0:2000}"
+# shellcheck disable=SC2034 # read in the check below
 cr=$'\r' start=$SECONDS
 out=$(lp show "$X6" 2>&1)
 elapsed=$((SECONDS - start))
