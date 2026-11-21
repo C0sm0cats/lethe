@@ -879,6 +879,19 @@ claude_chat "$X" 3 "$PROJ" $'user:fix it \e]0;TITLE\a now' $'assistant:done \e]5
 out=$("$LETHE" list; "$LETHE" show "$X"; "$LETHE" export "$X")
 check "control characters from transcripts never reach the terminal" \
     '[[ $out != *$'"'"'\e'"'"'* && $out != *$'"'"'\a'"'"'* && $out == *"fix it ]0;TITLE now"* ]]' "$(printf '%q' "$out")"
+Y=99999999-0000-4000-8000-0000000000ee
+codex_session "$Y" 5 0 cli openai "$PROJ" 'Esc title' 'fix it \u001b]0;CTITLE\u0007 now \u001b]52;c;cHduZWQ=\u0007'
+out=$("$LETHE" show "$Y"; "$LETHE" export "$Y")
+check "... nor from Codex transcripts" \
+    '[[ $out != *$'"'"'\e'"'"'* && $out != *$'"'"'\a'"'"'* && $out == *"fix it ]0;CTITLE now"* ]]' "$(printf '%q' "$out")"
+"$LETHE" delete -y "$X" >/dev/null 2>&1
+out=$("$LETHE" trash)
+check "... nor from the trash list" '[[ $out != *$'"'"'\e'"'"'* && $out == *"fix it ]0;TITLE now"* ]]' "$(printf '%q' "$out")"
+entry=$(echo "$TRASH"/claude-"$X".*)
+# internal_resume clears the screen (\e[H\e[2J) on purpose: only OSC and BEL are refused.
+out=$("$LETHE" __resume "trash:${entry##*/}" </dev/null 2>&1)
+check "... nor from Ctrl-R in the trash" \
+    '[[ $out != *$'"'"'\e]'"'"'* && $out != *$'"'"'\a'"'"'* && $out == *"restored: fix it ]0;TITLE now"* && -f $CPROJ/$X.jsonl ]]' "$(printf '%q' "$out")"
 
 Z=77777777-0000-4000-8000-0000000000dd
 claude_chat "$Z" 3 "$PROJ" 'user:first prompt' 'assistant:first reply'
