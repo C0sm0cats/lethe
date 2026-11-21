@@ -4592,6 +4592,9 @@ main() {
                     if [[ -t 0 && -t 1 ]] && command -v fzf >/dev/null 2>&1; then
                         cmd_pick "$@"
                     else
+                        # On a terminal, the list is a fallback: say why.
+                        [[ ! -t 0 || ! -t 1 ]] ||
+                            printf '%s: fzf not found, so here is the list; install fzf 0.45+ for the picker\n' "$PROG" >&2
                         cmd_list "$@"
                     fi
                     ;;

@@ -1732,6 +1732,42 @@ printf '#!/bin/sh\ncase "$1" in --version) echo "0.72.0 (release)"; exit 0 ;; --
 "$LETHE" pick </dev/null >/dev/null 2>&1 && rc=0 || rc=$?
 check "... not when Esc closes it" '[[ $rc == 0 ]]' "rc=$rc"
 rm -f "$WORK/bin/fzf"
+# No fzf: plain `lethe` on a terminal shows the list and says why; piped, it stays quiet.
+if command -v python3 >/dev/null 2>&1; then
+    nofzf=""
+    IFS=: read -ra dirs <<<"$PATH"
+    for dir in "${dirs[@]}"; do
+        if [[ -x $dir/fzf ]]; then
+            mkdir -p "$WORK/nofzf$dir"
+            for tool in "$dir"/*; do
+                [[ ${tool##*/} == fzf* ]] || ln -sf "$tool" "$WORK/nofzf$dir/"
+            done
+            dir=$WORK/nofzf$dir
+        fi
+        nofzf+=${nofzf:+:}$dir
+    done
+    out=$(PATH=$nofzf python3 -c '
+import os, pty, sys
+pid, fd = pty.fork()
+if pid == 0:
+    os.execv(sys.argv[1], sys.argv[1:])
+buf = b""
+while True:
+    try:
+        data = os.read(fd, 4096)
+    except OSError:
+        break
+    if not data:
+        break
+    buf += data
+os.waitpid(pid, 0)
+print(buf.decode(errors="replace"))
+' "$LETHE" --codex 2>&1)
+    check "without fzf, lethe on a terminal says the list stands in for the picker" \
+        '[[ $out == *"fzf not found, so here is the list"* && $out == *"session(s)"* ]]' "$out"
+    out=$(PATH=$nofzf "$LETHE" --codex 2>&1 </dev/null)
+    check "... and piped, it shows the list alone" '[[ $out != *"fzf not found"* && $out == *"session(s)"* ]]' "$out"
+fi
 printf '%s\n' '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"assistant says hello"}]}}' \
     '{"type":"realtime_item","payload":{"type":"transcript_segment","role":"user","text":"spoken words"}}' >>"$(codex_file "$B" 0)"
 set_mtime "$(($(date +%s) - 2 * 86400))" "$(codex_file "$B" 0)"
