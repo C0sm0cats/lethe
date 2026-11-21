@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.8.0 — 2026-11-21
+
+- **An open Codex session could be deleted** when `~/.codex/sessions` (or `archived_sessions`) is a
+  symlink: lethe did not see the agent holding it open. Same for Claude Code when `projects` is a
+  symlink, where lethe also listed no session at all.
+- **A subagent tree is left alone as a whole** when one of its sessions is opened or written to
+  while the `[y/N]` question is up, or during a long deletion. Before, only that session was spared.
+- **`--dir ''` is refused**; it meant the current directory and could plan every session without
+  `--all`. A relative `--dir` to a project that is gone (`../foo`) now finds its sessions.
+- A share that is not mounted (empty mount point) no longer counts as an orphan.
+- A Codex session resumed from another directory, later removed, is no longer an orphan while the
+  directory it started in exists; `resume` and Ctrl-Y use that directory.
+- The picker starts with fzf 0.45 to 0.71 again. The panel layout now needs fzf 0.72+; an older
+  fzf gets the classic layout, readable on a light background too. A refused fzf option now exits
+  with code 2.
+- The deletion plan says that Codex sessions are deleted for good, and the question counts them.
+- Ctrl-Y without a clipboard tool shows the command to copy by hand.
+- `trash restore` refuses `-n`/`-y` and checks every id before restoring anything.
+- Colors are readable on light and dark terminals: the current line, labels, projects, dimmed
+  text, ages, matches and results. Context rows are also tagged `context ·`.
+- The footer fits the list width and keeps F1 visible, and refills when the terminal is resized.
+  The Ctrl-B panel no longer cuts its lines. Long titles in `lethe trash` are cut, not wrapped.
+- Ctrl-D and Ctrl-X are no longer refused while the preview is still reading a big session.
+- Ctrl-G then Enter jumps to the word when `PAGER` is `less` with options.
+- `list` widens its ID column when a filter hides a session sharing its prefix.
+- An id given to a command that takes none is called an argument, not an option. Without fzf,
+  `lethe` on a terminal says why it shows the list.
+- The index cache directory is no longer readable by other local accounts (`0700`).
+- A gone directory's name can no longer send escape sequences to the terminal from `resume`.
+- Faster: indexing long sessions (linear instead of quadratic), long pasted messages, `show`,
+  Enter and the Ctrl-G preview, `--grep` in compressed Codex sessions, sessions with hundreds of
+  subagents, a trash of thousands of entries, deleting many sessions with a large history, and
+  reloading the picker.
+- A last transcript line cut short no longer hides the session's title.
+- Tests: many more cases covered (open sessions, confirmations on a terminal, picker keys,
+  installer), the suite passes in the C locale, and CI also runs it on bash 4.4.
+
 ## 0.7.7 — 2026-11-01
 
 - **`--orphans` could select a session of a live project**: a session that went into a build directory
