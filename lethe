@@ -1675,7 +1675,180 @@ fetch_sorted() {
 # fields, and its id is sub:SESSION/AGENT). tree and style are for
 # format_row. Trees are ordered by their most recent member (by date), their
 # total size (by size), or the other way round (oldest first).
+# The work is done by one jq (JQ_TREE); tree_rows_bash, the same in bash, is kept
+# for what jq cannot pass through byte for byte (see rows_jq).
 tree_rows() {
+    local input pre ids="" wanted=() ctx="" keys="" subs="" row id p out
+    local -A context=()
+    # Taken whole: read takes a pipe one byte at a time.
+    input=$(cat)
+    [[ -n $input ]] || return 0
+    if ! rows_jq || ! pre=$(jq -rRs --arg us "$US" --arg q "'" "$JQ_TREE_PRE" <<<"$input"); then
+        tree_rows_bash <<<"$input"
+        return
+    fi
+    # First line: the Claude Code sessions with subagents, quoted for SQL; then the
+    # parents the filters left out, in the order tree_rows_bash meets them.
+    { IFS= read -r ids; mapfile -t wanted; } <<<"$pre"
+    if ((${#wanted[@]})); then
+        # Parents the filters left out: shown as context, if they still exist. The
+        # same steps as tree_rows_bash, so that its trees come out in the same order
+        # (that of the keys of this array).
+        for p in "${wanted[@]}"; do context[$p]=""; done
+        ctx=$(reset_filters && F_IDS=("${wanted[@]}") && fetch_rows) || true
+        while IFS= read -r row; do
+            [[ -n $row ]] || continue
+            id=${row#*"$US"}
+            context[${id%%"$US"*}]=$row
+        done <<<"$ctx"
+        for p in "${wanted[@]}"; do [[ -n ${context[$p]} ]] || unset 'context[$p]'; done
+        ((${#context[@]} == 0)) || keys=$(printf '%s\n' "${!context[@]}")
+    fi
+    # Claude Code subagents, from the index (only when shown).
+    if [[ $O_SUBAGENTS == shown && -n $CLAUDE_CACHE && -n $ids ]]; then
+        subs=$(query "SELECT session, agent, size, started, $(flat type), $(flat description), $(flat model),
+                             $(flat effort) FROM cl.claude_sub WHERE session IN ($ids)
+                       ORDER BY session, started, agent;") || true
+    fi
+    if out=$(printf '%s\n\x1e\n%s\n\x1e\n%s\n\x1e\n%s\n' "$input" "$ctx" "$keys" "$subs" |
+        jq -rRs --arg us "$US" --arg sort "$O_SORT" --arg subs "$O_SUBAGENTS" "$JQ_TREE"); then
+        [[ -z $out ]] || printf '%s\n' "$out"
+    else
+        tree_rows_bash <<<"$input"
+    fi
+}
+
+# The rows of tree_rows, before it: the sessions with subagents as an SQL list,
+# then the parents missing from the rows (one per line).
+readonly JQ_TREE_PRE='
+    def num: tonumber? // 0;
+    if test("\\x{fffd}") then "" | halt_error(3) else . end
+    | [split("\n")[] | select(. != "") | split($us)] as $rows
+    | ([$rows[] | {(.[1] // ""): true}] | add // {}) as $have
+    | ([$rows[] | select((.[0] // "") == "claude" and ((.[16] // "") | num) != 0) | $q + .[1] + $q]
+       | join(",")),
+      (reduce $rows[] as $f ({seen: {}, out: []};
+          ($f[15] // "") as $p
+          | if $p != "" and ($have | has($p) | not) and (.seen | has($p) | not)
+            then setpath(["seen", $p]; true) | setpath(["out"]; .out + [$p]) else . end) | .out[])'
+
+# tree_rows itself. On stdin, separated by lines holding only \x1e: the rows, the
+# context rows (parents the filters left out), the order of the context trees, and
+# the Claude Code subagents. Each step is the one of the same name in
+# tree_rows_bash, which it must match byte for byte.
+readonly JQ_TREE='
+    def num: tonumber? // 0;
+    def zero: if . == "" then "0" else . end;
+    # The fields tree_rows_bash keeps of a row (a context row: no size, no parent).
+    def fields($line; $ctx):
+        split($us)
+        | {id: (.[1] // ""), line: $line, agent: (.[0] // ""), rec: (.[3] // ""),
+           size: (if $ctx then 0 else (.[8] // "") | num | if . < 0 then 0 else . end end),
+           cwd: (.[9] // ""), parent: (if $ctx then "" else .[15] // "" end),
+           kids: (.[16] // "" | zero), created: (.[18] // "" | zero)};
+    # Only top-level updates, in reduce: jq copies a nested object at each update,
+    # which made thousands of rows take seconds. The input comes whole (-s): a
+    # regex is compiled at each call.
+    if test("\\x{fffd}") then "" | halt_error(3) else . end
+    | split("\n") as $all
+    | [range(0; $all | length) | select($all[.] == "\u001e")] as $marks
+    | def section($i):
+        $all[(if $i == 0 then 0 else ($marks[$i - 1] // ($all | length)) + 1 end):($marks[$i] // ($all | length))]
+        | map(select(. != ""));
+      [section(0)[] as $l | $l | fields($l; false)] as $rows
+    | [section(1)[] as $l | $l | fields($l; true)] as $ctxrows
+    | [$rows[].id] as $order
+    | ([$rows[], $ctxrows[] | {(.id): .}] | add // {}) as $M
+    | section(2) as $ctxkeys
+    | ([$ctxkeys[] | {(.): true}] | add // {}) as $ctx
+    # Children, each once (tree_emit and tree_hide skip a repeated one).
+    | (reduce $order[] as $id ({}; $M[$id].parent as $p
+        | if $p != "" and ($M | has($p)) then (getpath([$p]) // []) as $l | setpath([$p]; $l + ([$id] - $l)) else . end)) as $C
+    | (reduce $order[] as $id ({}; $M[$id].parent as $p
+        | if $p != "" and ($M | has($p) | not) then setpath([$id]; true) else . end)) as $gone
+    | (reduce (section(3)[] | split($us)) as $f ({};
+        ($f[0] // "") as $s
+        | if $s == "" then .
+          else setpath([$s]; (getpath([$s]) // []) + [[$f[1] // "", $f[2] // "", $f[3] // "", $f[4] // "", $f[5] // "", $f[6] // "",
+                          ($f[7:] | join($us))]]) end)) as $S
+    # tree_measure: the sessions under ID. A tree under a root has no cycle: a
+    # session has one parent, and a root has none (or a gone one).
+    | def desc($id): $id, (($C[$id] // [])[] | select(. != "") | desc(.));
+      def measure($ids): {rec: ([0, ($ids[] | $M[.].rec | num)] | max), size: ([0, ($ids[] | $M[.].size)] | add)};
+      # tree_measure with its seen sessions (the cycles), in a map of them.
+      def mark($id): setpath([$id]; true) | reduce ($C[$id] // [])[] as $c (.; if $c != "" and (has($c) | not) then mark($c) else . end);
+      [$ctxkeys[], $order[] | . as $id | select(($M[$id].parent // "") == "" or ($gone | has($id)))] as $cand
+    | (reduce range(0; $cand | length) as $i ({}; if has($cand[$i]) then . else setpath([$cand[$i]]; $i) end)) as $first
+    | [range(0; $cand | length) | select($first[$cand[.]] == .) | $cand[.] | {id: .} + measure([desc(.)])] as $roots
+    | ([$roots[].id | desc(.) | {(.): true}] | add // {}) as $reached
+    # What no root reaches (a cycle of edges) is listed at the top level.
+    | (reduce ($order[] | . as $id | select($reached | has($id) | not)) as $id ({seen: {}, roots: []};
+        if .seen | has($id) then .
+        else .seen as $before | ($before | mark($id)) as $after
+          | .seen = $after
+          | .roots += [{id: $id, cycle: true} + measure([$after | keys_unsorted[] | . as $k | select($before | has($k) | not)])]
+        end) | .roots) as $cycles
+    # tree_hide
+    | def hide($x):
+        setpath(["emitted", $x]; true)
+        | reduce ($C[$x] // [])[] as $c (.;
+            if $c != "" and (.emitted | has($c) | not)
+            then setpath(["out"]; .out + ["hidden" + $us + $us + $us + $us + $us + $M[$c].line]) | hide($c)
+            else . end);
+      # The children of ID not shown yet, by start (sort -n of "created TAB id").
+      def kidlist($id):
+        .emitted as $em
+        | [($C[$id] // []) | sort_by([($M[.].created | num), $M[.].created + "\t" + .])[]
+           | . as $c | select($c != "" and ($em | has($c) | not))];
+      # tree_emit ID BEFORE CONTINUATION DEPTH, and the size of the tree for a root.
+      def emit($id; $before; $cont; $depth; $treesize):
+        setpath(["emitted", $id]; true)
+        | kidlist($id) as $kids
+        | $M[$id] as $m
+        | ($ctx | has($id)) as $isctx
+        | (if $isctx then "context" else "row" end) as $kind
+        | (if $depth > 0 then (if $isctx then "context" else "child" end)
+           elif $gone | has($id) then "gone"
+           elif $isctx then "context" else "" end) as $style
+        | (($m.agent == "claude" and ($m.kids | num) != 0) or ($kids | length) > 0) as $has
+        | ($subs == "shown" or $kind == "context") as $open
+        | (if $has and $depth == 0 then (if $open then "▾ " else "▸ " end) else $before end) as $bef
+        | $m.kids as $total
+        | (if $m.agent == "claude" then $total else ($kids | length | tostring) end) as $shown
+        | (if $has and ($total | num) > ($shown | num) then " · " + $shown + " of " + $total + " subagents"
+           elif $has and ($open | not) then " · " + $total + " subagent" + (if ($total | num) == 1 then "" else "s" end)
+           else "" end) as $after
+        | (if ($open | not) and $has and $depth == 0 and $m.agent == "codex" and $kind == "row"
+           then $treesize | tostring else "" end) as $shownsize
+        | setpath(["out"]; .out + ([$kind, $bef, $after, $style, $shownsize, $m.line] | join($us) | [.]))
+        | if ($open | not) then hide($id)
+          else
+            (($S[$id] // []) | length) as $ns
+            | reduce range(0; $ns) as $i (.;
+                $S[$id][$i] as $s
+                | (if $i + 1 == $ns and ($kids | length) == 0 then "└─ " else "├─ " end) as $branch
+                | (($s[3] | if . == "" then "subagent" else . end)
+                   + (if $s[5] != "" then " · " + $s[5] + (if $s[6] != "" then "/" + $s[6] else "" end) else "" end)
+                   + (if $s[4] != "" then " « " + $s[4] + " »" else "" end)) as $title
+                # A row in the layout of fetch_rows, for format_row.
+                | setpath(["out"]; .out + (["sub", $cont + $branch, "", "sub", "", "claude", "sub:" + $id + "/" + $s[0], "0", $m.rec,
+                            "-", "subagent", "", "0", $s[1], $m.cwd, $title, "", "", "0", "0"] | join($us) | [.])))
+            | reduce range(0; $kids | length) as $n (.;
+                if $depth >= 2 then emit($kids[$n]; $cont + "… "; $cont; $depth + 1; 0)
+                elif $n + 1 == ($kids | length) then emit($kids[$n]; $cont + "└─ "; $cont + "   "; $depth + 1; 0)
+                else emit($kids[$n]; $cont + "├─ "; $cont + "│  "; $depth + 1; 0) end)
+          end;
+      # Each tree on its own (they share no session), but the trees of a cycle
+      # share what was shown.
+      foreach ($roots + $cycles | sort_by(if $sort == "size" then -.size elif $sort == "oldest" then .rec else -.rec end))[]
+          as $r ({shown: {}};
+          if $r.cycle then ({emitted: .shown, out: []} | emit($r.id; ""; ""; 0; $r.size)) as $e
+            | {shown: $e.emitted, out: $e.out}
+          else {shown: .shown, out: ({emitted: {}, out: []} | emit($r.id; ""; ""; 0; $r.size) | .out)} end;
+          .out[])'
+
+# tree_rows_bash — tree_rows in bash, for rows jq would not pass through unchanged.
+tree_rows_bash() {
     local -a order=()
     local -A t_line=() t_parent=() t_rec=() t_size=() t_created=() t_agent=() t_kids=() t_children=() t_cwd=()
     local row id p f input
@@ -1993,6 +2166,182 @@ format_row() {
     fi
 }
 
+# rows_jq — whether jq can do the work of tree_rows and format_row: a few
+# milliseconds for thousands of rows, where bash takes seconds. Only in a UTF-8
+# locale, where bash counts characters as jq does (elsewhere it counts bytes).
+# The jq programs leave the rest to bash themselves (exit code 3): bytes that are
+# not UTF-8 (jq would replace them), and the controls clean removes (each libc
+# has its own list: all the control and format characters go to bash).
+# LETHE_ROWS_IN_BASH=1 always takes bash: the tests compare the two.
+rows_jq() {
+    local probe=$'\xc3\xa9'
+    [[ ${#probe} == 1 && -z ${LETHE_ROWS_IN_BASH:-} ]] && command -v jq >/dev/null 2>&1
+}
+
+# render_rows MODE [TITLE_WIDTH] — format_row for every line of stdin, in one jq.
+#   args: format_row's arguments, separated by $US, and a 16th field: the prefix
+#         of the line (before a tab), if any.
+#   list, picker: the lines of tree_rows, for cmd_list (with its footer) and for
+#         internal_rows; picker-stats: internal_rows's counts (tops, subagents,
+#         bytes, running) on the first line, then its sizes file.
+# Exit code 3 when the rows need format_row itself.
+render_rows() {
+    local spaces
+    printf -v spaces '%256s' ''
+    jq -rRs --arg mode "$1" --arg tw "${2:-}" --arg us "$US" --argjson now "$NOW" --arg home "$HOME" \
+        --argjson pw "$PROJECT_WIDTH" --argjson nosize "$ROW_NOSIZE" --argjson nodate "$ROW_NODATE" \
+        --argjson idw "$ROW_ID_WIDTH" --arg sp "$spaces" --arg reset "$C_RESET" --arg bold "$C_BOLD" \
+        --arg dim "$C_DIM" --arg red "$C_RED" --arg green "$C_GREEN" --arg yellow "$C_YELLOW" --arg blue "$C_BLUE" \
+        --arg magenta "$C_MAGENTA" --arg cyan "$C_CYAN" --arg claude "$C_CLAUDE" --arg codex "$C_CODEX" "$JQ_ROWS"
+}
+
+# format_row, fit, char_width, human_size and human_age in jq, byte for byte.
+readonly JQ_ROWS='
+    def num: tonumber? // 0;
+    # %*s of an empty string (a negative width pads too).
+    def spaces($k): (if $k < 0 then -$k else $k end) as $k
+        | if $k <= ($sp | length) then $sp[0:$k] else $sp + spaces($k - ($sp | length)) end;
+    # printf %-Ns and %Ns: the width counts bytes.
+    def pad_right($w): . + spaces([$w - utf8bytelength, 0] | max);
+    def pad_left($w): spaces([$w - utf8bytelength, 0] | max) + .;
+    # Without its trailing spaces (a regex costs a compilation per call).
+    def rtrim: if endswith(" ") | not then . else explode as $c | [first(range(($c | length) - 1; -1; -1) | select($c[.] != 32)) // -1] as [$i]
+        | $c[0:($i + 1)] | implode end;
+    # char_width, as a search through its ranges.
+    def cw:
+        if . < 768 then 1 elif . < 880 then 0 elif . < 4352 then 1
+        elif . < 11904 then (if . <= 4447 then 2 else 1 end)
+        elif . <= 42191 then (if . == 12351 then 1 else 2 end)
+        elif . < 44032 then 1 elif . <= 55203 then 2 elif . < 63744 then 1 elif . <= 64255 then 2
+        elif . < 65072 then 1 elif . <= 65103 then 2 elif . < 65280 then 1 elif . <= 65376 then 2
+        elif . < 65504 then 1 elif . <= 65510 then 2 elif . < 127744 then 1 elif . <= 128591 then 2
+        elif . < 128640 then 1 elif . <= 128767 then 2 elif . < 129280 then 1 elif . <= 129791 then 2
+        elif . < 131072 then 1 elif . <= 262141 then 2
+        else 1 end;
+    # fit, as [the text, the spaces that pad it].
+    def fitted($w; $tail):
+        . as $t | length as $n | explode as $cp
+        # One column per character (bash takes this way for plain ASCII only, and
+        # its other way gives the same then).
+        | if ($cp | max // 0) < 768 then
+            (if $n > $w then (if $tail then "…" + $t[($n - $w + 1):] else $t[0:($w - 1)] + "…" end) else $t end)
+            | [., $w - length]
+          else
+            # The columns taken up to each character, from the end that is kept: fit
+            # stops at the first one past the width, and keeps those that leave a
+            # column for the ellipsis (widths are never negative). Only WIDTH + 1
+            # characters are needed, unless some take no column.
+            def upto: [foreach .[] as $c (0; . + ($c | cw))];
+            (if $tail then $cp | reverse else $cp end) as $seq
+            | ($seq[0:($w + 1)] | upto) as $head
+            | (if ($head[-1] // 0) > $w or $n <= $w + 1 then $head else $seq | upto end) as $upto
+            | (first($upto[] | select(. > $w)) // ($upto[-1] // 0)) as $total
+            | ([$upto[] | select(. <= $w - 1)] | length) as $keep
+            | if $total > $w then
+                [(if $tail then "…" + $t[($n - $keep):] else $t[0:$keep] + "…" end),
+                 $w - (if $keep > 0 then $upto[$keep - 1] else 0 end) - 1]
+              else [$t, $w - $total] end
+          end;
+    def fit($w; $tail): fitted($w; $tail) | .[0] + spaces(.[1]);
+    def hsize($s):
+        ($s | num) as $b
+        | def tenths($t; $u): if $t < 10240 or $u >= 4 then [$t, $u] else tenths(($t / 1024) | floor; $u + 1) end;
+          tenths($b * 10; 0) as [$t, $u]
+        | ["B", "K", "M", "G", "T"][$u] as $unit
+        | if $u == 0 then $s + "B"
+          elif $t < 100 then "\(($t / 10) | floor).\($t % 10)\($unit)"
+          else "\(($t / 10) | floor)\($unit)" end;
+    def hage:
+        ([$now - ., 0] | max) as $d
+        | if $d < 3600 then "\(($d / 60) | floor)m" elif $d < 86400 then "\(($d / 3600) | floor)h"
+          elif $d < 1209600 then "\(($d / 86400) | floor)d" elif $d < 5184000 then "\(($d / 604800) | floor)w"
+          elif $d < 31536000 then "\(($d / 2592000) | floor)mo" else "\(($d / 31536000) | floor)y" end;
+    # Anything clean would remove, or that jq did not read as it is.
+    def bad: test("[\\x{0}-\\x{9}\\x{b}-\\x{1e}\\x{7f}-\\x{9f}\\x{ad}\\x{600}-\\x{605}\\x{61c}\\x{6dd}\\x{70f}\\x{8e2}\\x{180e}\\x{200b}-\\x{200f}\\x{2028}-\\x{202e}\\x{2060}-\\x{2064}\\x{2066}-\\x{206f}\\x{feff}\\x{fff9}-\\x{fffb}\\x{fffd}\\x{110bd}\\x{110cd}\\x{13430}-\\x{1343f}\\x{1bca0}-\\x{1bca3}\\x{1d173}-\\x{1d17a}\\x{e0001}\\x{e0020}-\\x{e007f}]");
+    {reset: $reset, bold: $bold, dim: $dim, red: $red, green: $green, yellow: $yellow, blue: $blue,
+     magenta: $magenta, cyan: $cyan, claude: $claude, codex: $codex} as $C
+    | ($C | map_values("")) as $NC
+    # format_row: $a holds its arguments, the tree split in two (before, after).
+    | def frow($a; $c):
+        ($a[0] // "") as $agent0 | ($a[2] // "" | num) as $rec | ($a[3] // "") as $date0 | ($a[4] // "") as $mode
+        | ($a[5] // "") as $size | ($size | num) as $sz | ($a[6] // "") as $cwd | ($a[7] // "") as $title0
+        | ($a[8] // "") as $state | ($a[10] // "" | if . == "" then "0" else . end) as $rewinds
+        | ($a[11] // "" | if . == "" then "0" else . end) as $pinned
+        | ($a[12] // "") as $before | ($a[13] // "") as $after | ($a[14] // "") as $style | ($a[15] // "") as $rowid
+        | ((if $style == "sub" then $c.dim + "↳" elif $state == "open" then $c.green + "◉"
+            elif $state == "trash" then $c.yellow + "↺" elif $sz < 0 then $c.red + "✗"
+            elif $state == "recent" then $c.cyan + "◔" elif ($a[1] // "" | num) != 0 then $c.yellow + "◌"
+            else $c.dim + "●" end) + $c.reset) as $icon
+        # Size, colored by weight: what is worth cleaning stands out.
+        | (if $sz < 0 then "-" else hsize($size) end) as $hsize
+        | (if $sz < 0 then $c.dim elif $sz >= 52428800 then $c.red + $c.bold elif $sz >= 10485760 then $c.yellow
+           elif $sz < 1048576 then $c.dim else "" end) as $size_color
+        | (if $agent0 == "claude" then $c.claude else $c.codex end) as $agent_color
+        | ($rec | hage) as $age0
+        | ($now - $rec) as $d
+        | (if $d < 3600 then $c.cyan + $c.bold elif $d < 86400 then $c.cyan elif $d < 2592000 then "" else $c.dim end)
+          as $age_color
+        | (if $title0 == "" then ["(empty)", $c.dim] else [$title0, ""] end) as [$title1, $title_color]
+        | (if $style == "gone" then "parent gone · "
+           elif $mode != "cli" and $mode != "unknown" and (($style == "child" and $mode == "subagent") | not)
+                and $style != "sub" then $mode + " · "
+           else "" end) as $tag0
+        | (if ($rewinds | num) == 0 then $tag0 else "⑂" + $rewinds + " " + $tag0 end) as $tag1
+        | (if ($pinned | num) == 0 then $tag1 else "pinned · " + $tag1 end) as $tag2
+        | (if $cwd == "" then "-" elif $cwd == $home then "~" elif $cwd == "/" then "/"
+           else $cwd | split("/") | .[-1] end | fit($pw; false)) as $project
+        | ((if $style == "context" then "context · " else "" end) + $before + $tag2) as $tag3
+        | ($title1 + $after) as $title2
+        | (if $date0 == "" then [$tag3, $title2, "", ""]
+           else
+             ($a[9] // "" | if . == "" then "44" else . end | num) as $tw0
+             | ($tag3 | length) as $taglen
+             | (if $style == "plan" and $tw0 - $taglen < 12 then $taglen + 12 else $tw0 end) as $tw
+             | (($tag3 + $title2) | fitted($tw; false)) as [$text, $pad]
+             # The title without its trailing spaces: those of the padding, and its own.
+             | (if ($text | length) + ([$pad, -$pad] | max) <= $taglen then [$text + spaces($pad), ""]
+                else [$tag3, ($text[$taglen:] | rtrim)] end) as [$tg, $title3]
+             | [$tg, $title3,
+                (if $nodate != 0 then "" else $c.dim + $date0 + $c.reset + "  " end),
+                (if $idw > 0 then $c.magenta + ($rowid[0:$idw] | pad_right($idw)) + $c.reset + "  " else "" end)]
+           end) as [$tag4, $title3, $date1, $idcol]
+        | (if $tag4 == "" then "" else $c.dim + $tag4 + $c.reset end) as $tag
+        | (if $style == "sub" then ["", "", $c.dim, $c.dim, $c.dim, (if $date1 == "" then "" else spaces(18) end)]
+           else [$agent0, $age0, $agent_color, $size_color, $title_color, $date1] end)
+          as [$agent, $age, $acolor, $scolor, $tcolor, $date]
+        | (if $nosize != 0 and $date0 == "" then "" else $scolor + ($hsize | pad_left(6)) + $c.reset + "  " end) as $sizecol
+        | $icon + " " + $acolor + ($agent | pad_right(6)) + $c.reset + " " + $age_color + ($age | pad_left(4)) + $c.reset
+          + "  " + $idcol + $date + $sizecol + $c.blue + $project + $c.reset + "  " + $tag + $tcolor + $title3 + $c.reset;
+      # Context: a session shown only for a subagent below it, all dim.
+      def row($a): if ($a[14] // "") == "context" then $C.dim + frow($a; $NC) + $C.reset else frow($a; $C) end;
+      if bad then "" | halt_error(3) else . end
+    | [split("\n")[] | select(. != "") | split($us)] as $rows
+    | def shown: if (.[4] // "") == "" then .[13] else .[4] end;
+      if $mode == "args" then
+        $rows[] | (.[16] // "") as $p | (if $p == "" then "" else $p + "\t" end) + row(.[0:16])
+      elif $mode == "list" then
+        ($rows[] | select((.[0] // "") != "" and .[0] != "hidden")
+         | row([.[5], .[7], .[8], .[9], .[10], shown, .[14], .[15], .[17], $tw, .[18], .[19], .[1], .[2], .[3],
+                (.[6] // "" | if startswith("sub:") then "" else . end)])),
+        ([$rows[] | select(.[0] == "row" or .[0] == "hidden")] as $counted
+         | [$counted[] | .[13] // "" | num] as $sizes
+         | "", $C.dim + "\($counted | length) session(s) · " + hsize([0, ($sizes[] | select(. >= 0))] | add | tostring)
+           + ([$counted[] | select(.[17] == "open")] | length | if . == 0 then "" else " · \(.) running" end)
+           + ([$sizes[] | select(. < 0)] | length | if . == 0 then "" else " · \(.) without transcript" end) + $C.reset)
+      elif $mode == "picker" then
+        $rows[] | select((.[0] // "") != "" and .[0] != "hidden")
+        | (if .[0] == "context" then "ctx:" else "" end) + (.[6] // "") + "\t"
+          + row([.[5], .[7], .[8], "", .[10], shown, .[14], .[15], .[17], "", .[18], .[19], .[1], .[2], .[3]])
+      else
+        ([$rows[] | select((.[0] // "") != "")] as $all
+         | [$all[] | select(.[0] == "row" or .[0] == "hidden")] as $counted
+         | "\([$all[] | select(.[0] == "row" and .[3] != "child")] | length) "
+           + "\([$all[] | select(.[0] == "sub" or .[0] == "hidden" or .[3] == "child")] | length) "
+           + "\([0, ($counted[] | .[13] // "" | num | select(. >= 0))] | add) "
+           + "\([$counted[] | select(.[17] == "open")] | length)"),
+        ($rows[] | select(.[0] == "row" or .[0] == "hidden") | (.[6] // "") + "\t" + (.[13] // ""))
+      end'
+
 # row_header TITLE_WIDTH
 row_header() {
     local idcol="" date=""
@@ -2073,6 +2422,12 @@ cmd_list() {
         ((title_width <= 80)) || title_width=80
     fi
     row_header "$title_width"
+    # The rows and the footer, in one jq.
+    local out
+    if rows_jq && out=$(render_rows list "$title_width" <<<"$data"); then
+        printf '%s\n' "$out"
+        return 0
+    fi
     while IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
         [[ -n $kind ]] || continue
         if [[ $kind != hidden ]]; then
@@ -3380,10 +3735,24 @@ run_action() {
     ((plan_width <= 70)) || plan_width=70
     mapfile -t order < <(for id in "${!rows[@]}"; do printf '%s\t%s\n' "${recency_of[$id]}" "$id"; done |
         sort -t $'\t' -k1,1nr | cut -f 2)
-    for id in "${order[@]}"; do
-        IFS=$US read -r agent archived recency date mode size cwd title state rewinds pinned <<<"${rows[$id]}"
-        format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$plan_width" "$rewinds" \
-            "$pinned" "" plan
+    # Every row in one jq: format_row's arguments, the width before the last two.
+    local args=() rendered=() k head out
+    if ((${#order[@]})) && rows_jq; then
+        for id in "${order[@]}"; do
+            head=${rows[$id]%"$US"*"$US"*}
+            args+=("$head$US$plan_width${rows[$id]#"$head"}$US$US${US}plan")
+        done
+        if out=$(printf '%s\n' "${args[@]}" | render_rows args); then mapfile -t rendered <<<"$out"; fi
+    fi
+    for k in "${!order[@]}"; do
+        id=${order[k]}
+        if ((${#rendered[@]})); then
+            REPLY=${rendered[k]} recency=${recency_of[$id]}
+        else
+            IFS=$US read -r agent archived recency date mode size cwd title state rewinds pinned <<<"${rows[$id]}"
+            format_row "$agent" "$archived" "$recency" "$date" "$mode" "$size" "$cwd" "$title" "$state" "$plan_width" \
+                "$rewinds" "$pinned" "" plan
+        fi
         line=$REPLY
         if protected "$id" "$recency"; then
             skipped+=("  $line" "      ${C_DIM}↳ $REPLY$C_RESET")
@@ -3896,6 +4265,13 @@ internal_rows() {
     local kind before after style shown data
     # Taken whole: read takes a pipe one byte at a time.
     data=$(fetch_sorted | tree_rows) || true
+    # The rows, then the counts and the sizes, in two jq.
+    local out stats
+    if rows_jq && out=$(render_rows picker <<<"$data") && stats=$(render_rows picker-stats <<<"$data"); then
+        [[ -z $out ]] || printf '%s\n' "$out"
+        { read -r tops subs bytes open; cat >"$LETHE_STATE/sizes"; } <<<"$stats"
+        data=""
+    fi
     while IFS=$US read -r kind before after style shown agent id archived recency date mode provider empty size cwd title path state rewinds pinned parent kids kidsize created; do
         [[ -n $kind ]] || continue
         if [[ $kind != hidden ]]; then
@@ -3927,17 +4303,29 @@ internal_rows() {
 
 # Picker rows for the trash; ids are "trash:<entry>".
 trash_rows() {
-    local entry id title cwd trashed size count=0 bytes=0 hbytes i
+    local entry id title cwd trashed size count=0 bytes=0 hbytes i args=() size_lines=() out
     : >"$LETHE_STATE/sizes"
     trash_load 1
     for i in "${!T_ENTRY[@]}"; do
         trash_fields "$i"
-        format_row claude 0 "$trashed" "" trashed "$size" "$cwd" "$title" trash
-        printf 'trash:%s\t%s\n' "${entry##*/}" "$REPLY"
-        printf 'trash:%s\t%s\n' "${entry##*/}" "$size" >>"$LETHE_STATE/sizes"
+        # format_row's arguments, and the id of the line (render_rows args).
+        args+=("claude${US}0$US$trashed$US${US}trashed$US$size$US$cwd$US$title${US}trash$US$US$US$US$US$US$US${US}trash:${entry##*/}")
+        size_lines+=("trash:${entry##*/}"$'\t'"$size")
         count=$((count + 1))
         bytes=$((bytes + size))
     done
+    if ((count)); then
+        if rows_jq && out=$(printf '%s\n' "${args[@]}" | render_rows args); then
+            printf '%s\n' "$out"
+        else
+            for i in "${!T_ENTRY[@]}"; do
+                trash_fields "$i"
+                format_row claude 0 "$trashed" "" trashed "$size" "$cwd" "$title" trash
+                printf 'trash:%s\t%s\n' "${entry##*/}" "$REPLY"
+            done
+        fi
+        printf '%s\n' "${size_lines[@]}" >>"$LETHE_STATE/sizes"
+    fi
     : >"$LETHE_STATE/open"
     human_size hbytes "$bytes"
     printf ' trash · %d session(s) · %s ' "$count" "$hbytes" >"$LETHE_STATE/label"

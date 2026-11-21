@@ -2268,6 +2268,152 @@ check "a prompt of 32,000 lines is shown quickly" \
     '((elapsed < 5)) && [[ $out == *"line 0 of a long"* && $out == *"line 31999 of a long pasted text, ten words in it"* ]]' \
     "${elapsed}s"$'\n'"${out:0:2000}"
 
+echo "rows in one jq"
+# The picker's reloads, list, the deletion plan and the trash lay out their rows in
+# one jq: bash took about 1.7 ms a row (3 to 4 s per reload at 2,300 sessions). The
+# rows must be those of the bash code (LETHE_ROWS_IN_BASH=1), byte for byte, which
+# still handles what jq cannot pass through unchanged.
+TJ=$WORK/rowsjq
+TJENV=(CLAUDE_CONFIG_DIR="$TJ/claude" CODEX_HOME="$TJ/codex" XDG_CACHE_HOME="$TJ/cache" XDG_DATA_HOME="$TJ/data")
+mkdir -p "$TJ/claude/projects/-p" "$TJ/codex/sessions" "$TJ/st" "$TJ/proj/deep/name"
+# Ages in days and a half: two runs a few seconds apart show the same.
+tj_age() { printf '%d' $(($(date +%s) - $1 * 86400 - 43200)); }
+tj_claude() { # tj_claude ID DAYS CWD TITLE
+    local f=$TJ/claude/projects/-p/$1.jsonl
+    jq -nc --arg c "$3" --arg id "$1" '{type: "user", uuid: "u1", parentUuid: null, cwd: $c, entrypoint: "cli",
+        sessionId: $id, timestamp: "2026-01-01T00:00:00.000Z", message: {role: "user", content: "first prompt"}}' >"$f"
+    jq -nc --arg c "$3" '{type: "assistant", uuid: "a1", parentUuid: "u1", cwd: $c, timestamp: "2026-01-01T00:00:00.000Z",
+        message: {role: "assistant", model: "claude-x", content: [{type: "text", text: "answer"}]}}' >>"$f"
+    [[ -z $4 ]] || jq -nc --arg t "$4" --arg id "$1" '{type: "ai-title", aiTitle: $t, sessionId: $id}' >>"$f"
+    set_mtime "$(tj_age "$2")" "$f"
+}
+J1=91000000-0000-4000-8000-000000000001 J2=92000000-0000-4000-8000-000000000002
+J3=93000000-0000-4000-8000-000000000003 J4=94000000-0000-4000-8000-000000000004
+J5=95000000-0000-4000-8000-000000000005
+tj_claude "$J1" 1 "$TJ/proj/deep/name" "Café ☕ 日本語のテキスト, a title long enough to be cut in any layout at all"
+tj_claude "$J2" 20 / ""
+tj_claude "$J3" 3 "$HOME" "naïve 🎉😀 e$(printf '\xcc\x81')clair"
+tj_claude "$J4" 2 "$TJ/proj/a-project-name-longer-than-the-column" "with subagents"
+tj_claude "$J5" 400 "$TJ/proj" "old enough for the trash"
+mkdir -p "$TJ/claude/projects/-p/$J4/subagents"
+for a in one two; do
+    jq -nc '{type: "user", uuid: "s1", parentUuid: null, isSidechain: true, cwd: "/x", timestamp: "2026-01-01T00:00:00.000Z",
+        message: {role: "user", content: "sub task"}}' >"$TJ/claude/projects/-p/$J4/subagents/agent-$a.jsonl"
+done
+printf '{"agentType":"Explore","description":"Look « around »","model":"opus","effort":"high"}' \
+    >"$TJ/claude/projects/-p/$J4/subagents/agent-one.meta.json"
+sqlite3 "$TJ/codex/state_5.sqlite" "
+    CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL, source TEXT NOT NULL, model_provider TEXT NOT NULL, cwd TEXT NOT NULL,
+        title TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0, recency_at INTEGER NOT NULL DEFAULT 0,
+        is_pinned INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE thread_spawn_edges (parent_thread_id TEXT NOT NULL, child_thread_id TEXT NOT NULL PRIMARY KEY,
+        status TEXT NOT NULL);"
+tj_codex() { # tj_codex ID DAYS ARCHIVED SOURCE TITLE [PARENT] [PINNED] [nofile]
+    local f=$TJ/codex/sessions/rollout-$1.jsonl ts
+    ts=$(tj_age "$2")
+    if [[ ${8:-} != nofile ]]; then
+        printf '{"type":"session_meta","payload":{"id":"%s"}}\n' "$1" >"$f"
+        set_mtime "$ts" "$f"
+    fi
+    sqlite3 "$TJ/codex/state_5.sqlite" "INSERT INTO threads VALUES ('$1', '$f', $ts, $ts, '$4', 'openai',
+        '$TJ/proj', '$5', $3, $ts, ${7:-0});"
+    [[ -z ${6:-} ]] || sqlite3 "$TJ/codex/state_5.sqlite" "INSERT INTO thread_spawn_edges VALUES ('$6', '$1', 'closed');"
+}
+K1=019a0000-0000-7000-8000-000000000001 K2=019a0000-0000-7000-8000-000000000002
+K3=019a0000-0000-7000-8000-000000000003 K4=019a0000-0000-7000-8000-000000000004
+K5=019a0000-0000-7000-8000-000000000005 K6=019a0000-0000-7000-8000-000000000006
+K7=019a0000-0000-7000-8000-000000000007 K8=019a0000-0000-7000-8000-000000000008
+K9=019a0000-0000-7000-8000-000000000009 K10=019a0000-0000-7000-8000-000000000010
+sub='{"subagent":{}}'
+tj_codex "$K1" 6 0 cli "Codex parent with a chain of subagents"
+tj_codex "$K2" 5 0 "$sub" "child" "$K1"
+tj_codex "$K3" 4 0 "$sub" "grandchild" "$K2"
+tj_codex "$K4" 4 0 "$sub" "great-grandchild 深い" "$K3"
+tj_codex "$K5" 5 1 "$sub" "archived child of an active parent" "$K1"
+tj_codex "$K6" 9 0 "$sub" "its parent is gone" 019a0000-0000-7000-8000-0000000000ff
+tj_codex "$K7" 30 0 "$sub" "cycle one" "$K8"
+tj_codex "$K8" 31 0 "$sub" "cycle two" "$K7"
+tj_codex "$K9" 70 0 exec "pinned and run by exec" "" 1
+tj_codex "$K10" 8 0 vscode "transcript gone" "" 0 nofile
+head -c 1500000 /dev/zero >>"$TJ/codex/sessions/rollout-$K1.jsonl"
+set_mtime "$(tj_age 6)" "$TJ/codex/sessions/rollout-$K1.jsonl"
+env "${TJENV[@]}" "$LETHE" delete -y "$J5" >/dev/null 2>&1
+# tj_same NAME ARGS... — `lethe ARGS` prints the same with jq and with bash.
+tj_same() {
+    local name=$1 a b
+    shift
+    a=$(env "${TJENV[@]}" "$@" 2>&1) || true
+    b=$(env "${TJENV[@]}" LETHE_ROWS_IN_BASH=1 "$@" 2>&1) || true
+    if [[ -n $a && $a == "$b" ]]; then ok "rows in one jq: $name"; else ko "rows in one jq: $name" "$(diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | head -20)"; fi
+}
+# tj_rows AGENT STATUS SORT FILTER SUBAGENTS [ENV...] — a picker reload: its rows, label and sizes.
+tj_rows() {
+    printf '%s\n' "$1" >"$TJ/st/agent"; printf '%s\n' "$2" >"$TJ/st/status"; printf '%s\n' "$3" >"$TJ/st/sort"
+    printf '%s\n' "$4" >"$TJ/st/filter"; printf '%s\n' "$5" >"$TJ/st/subagents"; : >"$TJ/st/grep"; : >"$TJ/st/dir"
+    shift 5
+    env "${TJENV[@]}" LETHE_STATE="$TJ/st" "$@" "$LETHE" __rows
+    cat "$TJ/st/label" "$TJ/st/sizes"
+}
+tj_same "list" "$LETHE" list
+tj_same "list --subagents" "$LETHE" list --subagents
+tj_same "list --archived --subagents (a context row)" "$LETHE" list --archived --subagents
+tj_same "list --sort size --subagents" "$LETHE" list --sort size --subagents
+tj_same "list --sort oldest" "$LETHE" list --sort oldest
+tj_same "the deletion plan" COLUMNS=150 "$LETHE" delete -n --all
+tj_same "the archive plan, narrow" COLUMNS=70 "$LETHE" archive -n --all
+for view in "all all recent all hidden" "all all size all shown" "all all oldest all shown" \
+    "codex archived recent all hidden" "all all recent trash hidden"; do
+    # shellcheck disable=SC2086 # the five words of the view
+    a=$(tj_rows $view NO_COLOR= FZF_COLUMNS=200 LETHE_COLUMNS=1) b=$(tj_rows $view NO_COLOR= FZF_COLUMNS=200 LETHE_COLUMNS=1 LETHE_ROWS_IN_BASH=1)
+    check "rows in one jq: picker, $view" '[[ $(wc -l <<<"$a") -ge 3 && $a == "$b" ]]' "$(diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | head -20)"
+done
+# shellcheck disable=SC2086
+a=$(tj_rows all all recent all shown NO_COLOR= FZF_COLUMNS=50) b=$(tj_rows all all recent all shown NO_COLOR= FZF_COLUMNS=50 LETHE_ROWS_IN_BASH=1)
+check "rows in one jq: picker at 50 columns" '[[ $a == "$b" ]]' "$(diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | head -20)"
+if command -v python3 >/dev/null 2>&1; then
+    # On a terminal: colors, and the widths of the id and title columns.
+    tj_tty() { # tj_tty COLUMNS ENV...
+        local cols=$1
+        shift
+        env "${TJENV[@]}" NO_COLOR= "$@" python3 - "$cols" "$LETHE" list --subagents <<'TTY'
+import fcntl, os, pty, struct, sys, termios
+pid, fd = pty.fork()
+if pid == 0:
+    fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 40, int(sys.argv[1]), 0, 0))
+    os.dup2(os.open(os.devnull, os.O_WRONLY), 2)
+    os.execv(sys.argv[2], sys.argv[2:])
+out = b""
+while True:
+    try:
+        data = os.read(fd, 65536)
+    except OSError:
+        break
+    if not data:
+        break
+    out += data
+os.waitpid(pid, 0)
+sys.stdout.buffer.write(out)
+TTY
+    }
+    for cols in 70 130; do
+        a=$(tj_tty "$cols") b=$(tj_tty "$cols" LETHE_ROWS_IN_BASH=1)
+        check "rows in one jq: list on a terminal of $cols columns" '[[ $a == *$'"'"'\e['"'"'* && $a == "$b" ]]' \
+            "$(diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | head -20)"
+    done
+fi
+# The cause: no bash function runs per row any more (format_row, fit, tree_emit...).
+tj_trace() { # tj_trace ENV... — lines bash runs in the per-row functions, for list and a reload
+    printf 'all\n' >"$TJ/st/agent"; printf 'all\n' >"$TJ/st/status"; printf 'recent\n' >"$TJ/st/sort"
+    printf 'all\n' >"$TJ/st/filter"; printf 'shown\n' >"$TJ/st/subagents"
+    {
+        env "${TJENV[@]}" "$@" PS4='+${FUNCNAME[0]:-} ' bash -x "$LETHE" list --subagents 2>&1 >/dev/null
+        env "${TJENV[@]}" "$@" LETHE_STATE="$TJ/st" PS4='+${FUNCNAME[0]:-} ' bash -x "$LETHE" __rows 2>&1 >/dev/null
+    } | grep -cE '^\++(format_row|fit|fit_tail|char_width|human_age|tree_emit|tree_hide|tree_measure) ' || true
+}
+n_jq=$(tj_trace) n_bash=$(tj_trace LETHE_ROWS_IN_BASH=1)
+check "rows in one jq: no bash function runs per row" '((n_jq == 0 && n_bash > 100))' "jq: $n_jq, bash: $n_bash"
+
 echo
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))
