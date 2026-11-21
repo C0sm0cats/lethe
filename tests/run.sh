@@ -896,6 +896,10 @@ mkdir -p "$WORK/export" && printf 'active\n' >"$WORK/export/branches"
 (cd "$WORK/export" && for v in "$V1" "$V2"; do LETHE_STATE=$WORK/export "$LETHE" __export "$v" </dev/null >/dev/null 2>&1; done)
 out=$(cd "$WORK/export" && ls lethe-*.md | tr '\n' ' ')
 check "Ctrl-E exports sessions whose ids share 8 characters" '[[ $out == "lethe-01a02791-0000.md lethe-01a02791-1111.md " ]]' "$out"
+printf 'my notes\n' >"$WORK/export/lethe-01a02791-0000.md"
+out=$(cd "$WORK/export" && LETHE_STATE=$WORK/export "$LETHE" __export "$V1" </dev/null 2>&1)
+check "Ctrl-E never overwrites an existing export" \
+    '[[ $(<"$WORK/export/lethe-01a02791-0000.md") == "my notes" && $out == *"already exists; nothing written."* ]]' "$out"
 out=$(LETHE_STATE=$WORK/export "$LETHE" __preview "$V2" | sed -n 4p)
 check "... and the preview shows an id that can be used" '[[ $out == *"· 01a02791-1111" ]]' "$out"
 
@@ -1124,6 +1128,10 @@ out=$(LETHE_STATE=$WORK/st "$LETHE" __preview "sub:$S/../../etc" 2>&1)
 check "picker: a malformed subagent id reads nothing" '[[ -z $out ]]' "$out"
 (cd "$WORK" && LETHE_STATE=$WORK/st "$LETHE" __export "sub:$S/aaa" </dev/null >/dev/null 2>&1)
 check "picker: Ctrl-E on a subagent exports it alone" 'grep -q zanzibar "$WORK"/lethe-88888888-aaa.md && ! grep -q "Keys are fine" "$WORK"/lethe-88888888-aaa.md'
+printf 'my notes\n' >"$WORK/lethe-88888888-aaa.md"
+out=$(cd "$WORK" && LETHE_STATE=$WORK/st "$LETHE" __export "sub:$S/aaa" </dev/null 2>&1)
+check "picker: Ctrl-E never overwrites a subagent's export" \
+    '[[ $(<"$WORK/lethe-88888888-aaa.md") == "my notes" && $out == *"already exists; nothing written."* ]]' "$out"
 out=$(LETHE_STATE=$WORK/st "$LETHE" __action delete "sub:$S/aaa" </dev/null 2>&1)
 check "picker: Ctrl-D on a subagent explains and changes nothing" '[[ $out == *"lives inside its session"* && -f $CPROJ/$S.jsonl ]]' "$out"
 out=$(LETHE_STATE=$WORK/st "$LETHE" __resume "sub:$S/aaa" </dev/null 2>&1)
