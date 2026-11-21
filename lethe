@@ -3047,6 +3047,10 @@ cmd_trash() {
                 return
             fi
             (($# == 0)) || usage_error "trash list takes no arguments"
+            # Titles are cut to the panel (Ctrl-B) or the terminal, like the list, so
+            # they do not wrap under the next row; piped output keeps them whole.
+            local width=${FZF_PREVIEW_COLUMNS:-${COLUMNS:-0}}
+            if ((width == 0)) && [[ -t 1 ]]; then width=$(tput cols 2>/dev/null || echo 0); fi
             trash_load 1
             for i in "${!T_ENTRY[@]}"; do
                 trash_fields "$i"
@@ -3056,8 +3060,14 @@ cmd_trash() {
                 clean cwd
                 short_path cwd "$cwd"
                 fit_tail cwd "${cwd:--}" 28
+                title=${title:-(empty)}
+                # 53 columns before the title; the last one is left free.
+                if ((width > 64)); then
+                    fit title "$title" $((width - 54))
+                    title=${title%"${title##*[! ]}"}
+                fi
                 printf '%s%-4s%s %6s  %s%-8s%s  %s%s%s  %s\n' "$C_CYAN" "$age" "$C_RESET" "$hsize" \
-                    "$C_MAGENTA" "${id:0:8}" "$C_RESET" "$C_BLUE" "$cwd" "$C_RESET" "${title:-(empty)}"
+                    "$C_MAGENTA" "${id:0:8}" "$C_RESET" "$C_BLUE" "$cwd" "$C_RESET" "$title"
                 count=$((count + 1))
                 total=$((total + size))
             done

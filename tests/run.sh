@@ -1573,6 +1573,15 @@ claude_chat "$K2c" 3 "$WORK/other" 'user:another place' 'assistant:ok'
 "$LETHE" delete -y "$G" "$K2c" >/dev/null 2>&1
 out=$("$LETHE" trash | grep -v "in the trash" | perl -CSD -ne 'print index($_, /Design/ ? "Design" : "another"), "\n"' | sort -u | wc -l)
 check "the trash list is aligned" '[[ ${out//[[:space:]]/} == 1 ]]' "$("$LETHE" trash)"
+K2d=a2d00000-0000-4000-8000-00000000000d
+claude_chat "$K2d" 3 "$PROJ" 'user:Write integration tests for the orders service and its retries' 'assistant:ok'
+"$LETHE" delete -y "$K2d" >/dev/null 2>&1
+out=$(COLUMNS=80 "$LETHE" trash)
+long=$(perl -CSD -ne 'print if length > 80 && !/in the trash/' <<<"$out")
+check "at 80 columns long trash titles are cut, not wrapped" \
+    '[[ $out == *"Write integration tests f"*"…"* && -z $long ]]' "$out"
+out=$("$LETHE" trash)
+check "... and piped they stay whole" '[[ $out == *"Write integration tests for the orders service and its retries"* ]]' "$out"
 
 echo "audit: previews of huge transcripts"
 reset_fixture
