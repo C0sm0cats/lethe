@@ -349,6 +349,17 @@ check "an open Codex session and its subagents are protected" 'codex_exists "$A"
 exec 9<&-
 
 reset_fixture
+exec 9<"$CPROJ/$G.jsonl" # a process holds the Claude transcript open
+out=$("$LETHE" delete -y "$G" 2>&1) || true
+exec 9<&-
+check "a Claude session whose transcript a process holds open is protected" '[[ $out == *"open in a running agent"* && -f $CPROJ/$G.jsonl ]]' "$out"
+reset_fixture
+exec 9<"$CPROJ/$G/subagents/agent-x.jsonl" # ... or only one of its subagents
+out=$("$LETHE" delete -y "$G" 2>&1) || true
+exec 9<&-
+check "... and so is one whose subagent transcript is held open" '[[ $out == *"open in a running agent"* && -f $CPROJ/$G.jsonl ]]' "$out"
+
+reset_fixture
 set_mtime "$(date +%s)" "$(codex_file "$C" 0)" # C just finished: recent, so protected
 out=$("$LETHE" delete -y "$A" 2>&1) || true
 check "a session whose subagent is protected is left alone" \
